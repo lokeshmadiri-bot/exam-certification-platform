@@ -1,0 +1,142 @@
+import axios from 'axios';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+
+const api = axios.create({
+  baseURL: API_URL,
+});
+
+// Request interceptor to attach JWT token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor to handle token expiry / unauthenticated requests
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Clear token and redirect to login
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+export const authService = {
+  login: async (username, password) => {
+    const response = await api.post('/auth/login', { username, password });
+    if (response.data.success && response.data.data.token) {
+      localStorage.setItem('token', response.data.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.data));
+    }
+    return response.data;
+  },
+  logout: () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  },
+  getCurrentUser: () => {
+    const userStr = localStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : null;
+  }
+};
+
+export const examService = {
+  getAllExams: async () => {
+    const response = await api.get('/exams');
+    return response.data;
+  },
+  getExamById: async (id) => {
+    const response = await api.get(`/exams/${id}`);
+    return response.data;
+  },
+  getQuestions: async (examId) => {
+    const response = await api.get(`/exams/${examId}/questions`);
+    return response.data;
+  },
+  createExam: async (exam) => {
+    const response = await api.post('/exams', exam);
+    return response.data;
+  },
+  addQuestion: async (examId, question) => {
+    const response = await api.post(`/exams/${examId}/questions`, question);
+    return response.data;
+  },
+  updateStatus: async (examId, status) => {
+    const response = await api.put(`/exams/${examId}/status?status=${status}`);
+    return response.data;
+  }
+};
+
+export const attemptService = {
+  getAllAttempts: async () => {
+    const response = await api.get('/attempts');
+    return response.data;
+  },
+  getAttemptDetail: async (id) => {
+    const response = await api.get(`/attempts/${id}`);
+    return response.data;
+  },
+  getMyAttempts: async () => {
+    const response = await api.get('/attempts/my-attempts');
+    return response.data;
+  },
+  startAttempt: async (examId) => {
+    const response = await api.post(`/attempts/start?examId=${examId}`);
+    return response.data;
+  },
+  recordTabSwitch: async (attemptId, offset) => {
+    const response = await api.post(`/attempts/${attemptId}/tab-switch?offset=${offset}`);
+    return response.data;
+  },
+  recordViolation: async (attemptId, code, meta, offset, imageFile) => {
+    const formData = new FormData();
+    formData.append('code', code);
+    formData.append('meta', meta);
+    formData.append('offset', offset);
+    if (imageFile) {
+      formData.append('image', imageFile);
+    }
+    const response = await api.post(`/attempts/${attemptId}/violation`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  },
+  submitAttempt: async (attemptId, submissions) => {
+    const response = await api.post(`/attempts/${attemptId}/submit`, submissions);
+    return response.data;
+  }
+};
+
+export const adminService = {
+  getCandidates: async () => {
+    const response = await api.get('/admin/candidates');
+    return response.data;
+  },
+  approveOverride: async (candidateId) => {
+    const response = await api.post(`/admin/candidates/${candidateId}/override`);
+    return response.data;
+  },
+  getAuditLogs: async () => {
+    const response = await api.get('/admin/logs');
+    return response.data;
+  }
+};
+
+export default api;

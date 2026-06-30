@@ -1,18 +1,18 @@
 # Node / Frontend
-frontend/node_modules/
-frontend/dist/
-frontend/dist-ssr/
-frontend/*.local
-frontend/.env
+exam-engine-frontend/node_modules/
+exam-engine-frontend/dist/
+exam-engine-frontend/dist-ssr/
+exam-engine-frontend/*.local
+exam-engine-frontend/.env
 
 # Maven / Java / Backend
-backend/target/
-backend/*.class
-backend/*.log
-backend/*.jar
-backend/*.war
-backend/*.ear
-backend/.env
+exam-engine-backend/target/
+exam-engine-backend/*.class
+exam-engine-backend/*.log
+exam-engine-backend/*.jar
+exam-engine-backend/*.war
+exam-engine-backend/*.ear
+exam-engine-backend/.env
 
 # OS Files
 .DS_Store
@@ -29,5 +29,5 @@ desktop.ini
 *.sw?
 
 # Uploads snapshot directory
-backend/uploads/
+exam-engine-backend/uploads/
 uploads/

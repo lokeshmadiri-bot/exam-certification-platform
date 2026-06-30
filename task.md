@@ -1,0 +1,24 @@
+# Tasks
+
+- [x] Scaffold Project Structure
+  - [x] Create `frontend/` React app with Vite, Tailwind CSS, Axios, and React Router DOM
+  - [x] Create `backend/` Spring Boot structure with Maven pom.xml
+- [x] Database Schema & Configuration
+  - [x] Write PostgreSQL SQL schema script
+  - [x] Set up Spring Boot `application.yml` and dependencies
+- [x] Backend Implementation (Spring Boot)
+  - [x] Build models/entities (`User`, `Exam`, `CompetencyBand`, `Question`, `ExamAttempt`, `IntegrityViolation`, `AccessAuditLog`)
+  - [x] Build Spring Data JPA repositories
+  - [x] Build services (Storage Service with switchable Local/S3 implementation, Authentication, Exams, Attempts)
+  - [x] Build REST Controllers with JWT validation and security configuration
+  - [x] Build Global Exception Handling
+- [x] Frontend Implementation (React & Tailwind)
+  - [x] Migrate CSS and setup custom Tailwind theme matching prototype variables
+  - [x] Build common/layout components (`Sidebar`, `Topbar`, `Toast`, `Modal`)
+  - [x] Build Candidate pages (`Dashboard`, `Catalog`, `Results`, `Help`, `SystemCheck`)
+  - [x] Build Administrator pages (`Dashboard`, `Attempts`, `Review`, `Candidates`, `Exams`, `Authoring`, `Settings`)
+  - [x] Build `ExamRunner` overlay with webcam view, tab/resize triggers, and bilingual warnings
+  - [x] Integrate Axios API services
+- [x] Verification & Polish
+  - [x] Validate and run backend tests
+  - [x] Build and launch frontend/backend locally to test end-to-end proctoring flow
