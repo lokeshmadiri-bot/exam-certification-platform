@@ -1,42 +1,39 @@
-# OryFolks Certify — Backend API Service
+# OryFolks Certify — React Client Portal
 
-Production-ready Spring Boot backend application managing certifications, scoring criteria, and remote proctoring security.
+Production-ready React application managing candidate examination flows, proctoring controls, and administrator oversight reports.
 
 ## Technology Stack
 
-* Java 17
-* Spring Boot 3.2.5
-* Spring Security (JWT authentication)
-* Spring Data JPA
-* PostgreSQL
-* AWS SDK v2 (S3 integration)
-* Maven
+- React JS (Vite)
+- Tailwind CSS
+- Axios
+- React Router DOM
+- Lucide React
 
 ## Configuration
 
-Settings are configured via `src/main/resources/application.yml` using standard environment variables:
+Create a `.env` file with:
 
-| Variable | Description | Default |
-| --- | --- | --- |
-| `PORT` | Web service server port | `8080` |
-| `DB_HOST` | Database host URL | `localhost` |
-| `DB_PORT` | PostgreSQL port | `5432` |
-| `DB_NAME` | Database schema name | `certify` |
-| `DB_USERNAME` | DB Username | `postgres` |
-| `DB_PASSWORD` | DB Password | `postgres` |
-| `JWT_SECRET` | Secret key for JWT hashing | (Auto-assigned) |
-| `STORAGE_PROVIDER` | Toggle storage: `local` or `s3` | `local` |
+```env
+VITE_API_URL=http://localhost:8080/api
+```
 
 ## Getting Started
 
-1. Set up a PostgreSQL instance named `certify`.
-2. Clean and package the application:
-   ```bash
-   mvn clean package
-   ```
-3. Run the Spring Boot application:
-   ```bash
-   mvn spring-boot:run
-   ```
+### Install dependencies
 
-*Note: Default testing credentials (`aarav` / `password123` for Candidate, `ravi` / `password123` for Admin) are seeded automatically on database initialization.*
+```bash
+npm install
+```
+
+### Start the development server
+
+```bash
+npm run dev
+```
+
+### Build for production
+
+```bash
+npm run build
+```
