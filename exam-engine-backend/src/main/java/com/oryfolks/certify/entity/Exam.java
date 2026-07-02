@@ -1,6 +1,11 @@
 package com.oryfolks.certify.entity;
 
+import com.oryfolks.certify.enums.ExamStatus;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -12,7 +17,8 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "exams")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -21,38 +27,53 @@ public class Exam {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @Column(nullable = false, length = 100)
+    @NotBlank(message = "Exam title is required.")
+    @Column(name = "title", nullable = false, length = 100)
     private String title;
 
-    @Column(nullable = false, length = 50)
+    @NotBlank(message = "Technology stack is required.")
+    @Column(name = "stack", nullable = false, length = 50)
     private String stack;
 
+    @NotNull(message = "Duration is required.")
+    @Min(value = 1, message = "Duration must be greater than 0.")
     @Column(name = "duration_minutes", nullable = false)
     private Integer durationMinutes;
 
+    @NotNull(message = "Question pool size is required.")
+    @Min(value = 1, message = "Question pool must be greater than 0.")
     @Column(name = "question_pool", nullable = false)
     private Integer questionPool;
 
+    @NotNull(message = "Maximum attempts are required.")
+    @Min(value = 1, message = "Attempts must be at least 1.")
     @Column(name = "per_attempt", nullable = false)
     private Integer perAttempt;
 
+    @NotNull(message = "Pass mark is required.")
+    @Min(value = 0, message = "Pass mark cannot be negative.")
+    @Max(value = 100, message = "Pass mark cannot exceed 100.")
     @Column(name = "pass_mark", nullable = false)
     private Integer passMark;
 
-    @Column(nullable = false, length = 10)
+    @NotBlank(message = "Version is required.")
+    @Column(name = "version", nullable = false, length = 10)
     private String version;
 
-    @Column(nullable = false, length = 20)
-    private String status; // ACTIVE, DRAFT
+    @NotNull(message = "Exam status is required.")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private ExamStatus status;
 
-    @OneToMany(mappedBy = "exam", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "exam", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<CompetencyBand> competencyBands = new ArrayList<>();
 
     @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
