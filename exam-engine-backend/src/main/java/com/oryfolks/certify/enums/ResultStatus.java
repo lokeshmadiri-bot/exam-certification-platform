@@ -5,8 +5,12 @@ package com.oryfolks.certify.enums;
  */
 public enum ResultStatus {
 
-    PASS,
+    PASSED,
 
-    FAIL
+    FAILED,
+
+    IN_PROGRESS,
+
+    TERMINATED
 
 }

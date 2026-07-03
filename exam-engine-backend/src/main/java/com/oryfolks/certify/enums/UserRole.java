@@ -5,8 +5,8 @@ package com.oryfolks.certify.enums;
  */
 public enum UserRole {
 
-    ADMIN,
+    ROLE_ADMIN,
 
-    CANDIDATE
+    ROLE_CANDIDATE
 
 }
