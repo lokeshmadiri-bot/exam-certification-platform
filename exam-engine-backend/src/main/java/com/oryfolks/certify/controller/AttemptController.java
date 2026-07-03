@@ -3,6 +3,9 @@ package com.oryfolks.certify.controller;
 import com.oryfolks.certify.dto.ApiResponse;
 import com.oryfolks.certify.dto.AnswerSubmission;
 import com.oryfolks.certify.entity.*;
+import com.oryfolks.certify.enums.UserRole;
+import com.oryfolks.certify.enums.ResultStatus;
+import com.oryfolks.certify.enums.CompetencyLevel;
 import com.oryfolks.certify.repository.*;
 import com.oryfolks.certify.service.StorageService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,13 +51,14 @@ public class AttemptController {
 
     // Get detail of single attempt
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getAttemptDetail(@PathVariable UUID id, Principal principal) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAttemptDetail(@PathVariable UUID id,
+            Principal principal) {
         ExamAttempt attempt = examAttemptRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Attempt not found: " + id));
 
         // Audit log access if administrator views this
         User user = userRepository.findByUsername(principal.getName()).orElse(null);
-        if (user != null && user.getRole() == Role.ROLE_ADMIN) {
+        if (user != null && user.getRole() == UserRole.ROLE_ADMIN) {
             auditLogRepository.save(AccessAuditLog.builder()
                     .user(user)
                     .action("Viewed recording / details for Attempt #" + attempt.getId())
@@ -81,7 +85,8 @@ public class AttemptController {
 
     // Start a new exam attempt
     @PostMapping("/start")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> startAttempt(@RequestParam UUID examId, Principal principal) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> startAttempt(@RequestParam UUID examId,
+            Principal principal) {
         User user = userRepository.findByUsername(principal.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -89,16 +94,19 @@ public class AttemptController {
                 .orElseThrow(() -> new RuntimeException("Exam not found"));
 
         // Check if there is an active lock (already completed in last 30 days)
-        Optional<ExamAttempt> lastAttempt = examAttemptRepository.findFirstByCandidateIdAndExamIdOrderByCreatedAtDesc(user.getId(), exam.getId());
+        Optional<ExamAttempt> lastAttempt = examAttemptRepository
+                .findFirstByCandidateIdAndExamIdOrderByCreatedAtDesc(user.getId(), exam.getId());
         if (lastAttempt.isPresent() && lastAttempt.get().getCreatedAt().isAfter(LocalDateTime.now().minusDays(30))) {
-            // Check if there has been an override (we will represent override via simulated availability configuration)
-            // For now, let's allow starting anyway but log it, or enforce it. Let's enforce it unless user role allows starting.
+            // Check if there has been an override (we will represent override via simulated
+            // availability configuration)
+            // For now, let's allow starting anyway but log it, or enforce it. Let's enforce
+            // it unless user role allows starting.
         }
 
         ExamAttempt attempt = ExamAttempt.builder()
                 .candidate(user)
                 .exam(exam)
-                .resultStatus("IN_PROGRESS")
+                .resultStatus(ResultStatus.IN_PROGRESS)
                 .startTime(LocalDateTime.now())
                 .tabSwitchCount(0)
                 .build();
@@ -140,11 +148,12 @@ public class AttemptController {
 
     // Record a tab-switch event
     @PostMapping("/{id}/tab-switch")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> recordTabSwitch(@PathVariable UUID id, @RequestParam String offset) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> recordTabSwitch(@PathVariable UUID id,
+            @RequestParam String offset) {
         ExamAttempt attempt = examAttemptRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Attempt not found"));
 
-        if (!"IN_PROGRESS".equals(attempt.getResultStatus())) {
+        if (attempt.getResultStatus() != ResultStatus.IN_PROGRESS) {
             return ResponseEntity.badRequest().body(ApiResponse.error("Exam is not in progress"));
         }
 
@@ -160,11 +169,11 @@ public class AttemptController {
                 .build());
 
         if (strikes >= 3) {
-            attempt.setResultStatus("TERMINATED");
+            attempt.setResultStatus(ResultStatus.TERMINATED);
             attempt.setEndTime(LocalDateTime.now());
             // Grade partial score
             attempt.setScore(0);
-            attempt.setAssignedLevel("L5"); // Default lowest due to termination
+            attempt.setAssignedLevel(CompetencyLevel.L5); // Default lowest due to termination
             examAttemptRepository.save(attempt);
             Map<String, Object> res = new HashMap<>();
             res.put("terminated", true);
@@ -217,7 +226,7 @@ public class AttemptController {
         ExamAttempt attempt = examAttemptRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Attempt not found"));
 
-        if (!"IN_PROGRESS".equals(attempt.getResultStatus())) {
+        if (attempt.getResultStatus() != ResultStatus.IN_PROGRESS) {
             return ResponseEntity.badRequest().body(ApiResponse.error("Exam is already submitted or terminated"));
         }
 
@@ -249,7 +258,7 @@ public class AttemptController {
         attempt.setEndTime(LocalDateTime.now());
 
         // Map score to competency bands
-        String level = "L5";
+        CompetencyLevel level = CompetencyLevel.L5;
         List<CompetencyBand> bands = exam.getCompetencyBands();
         for (CompetencyBand band : bands) {
             if (finalScore >= band.getMinScore() && finalScore <= band.getMaxScore()) {
@@ -261,9 +270,9 @@ public class AttemptController {
 
         // Determine if Passed
         if (finalScore >= exam.getPassMark()) {
-            attempt.setResultStatus("PASSED");
+            attempt.setResultStatus(ResultStatus.PASSED);
         } else {
-            attempt.setResultStatus("NOT_PASSED");
+            attempt.setResultStatus(ResultStatus.FAILED);
         }
 
         ExamAttempt savedAttempt = examAttemptRepository.save(attempt);

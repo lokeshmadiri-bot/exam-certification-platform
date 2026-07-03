@@ -3,6 +3,7 @@ package com.oryfolks.certify.controller;
 import com.oryfolks.certify.dto.ApiResponse;
 import com.oryfolks.certify.entity.CompetencyBand;
 import com.oryfolks.certify.entity.Exam;
+import com.oryfolks.certify.enums.ExamStatus;
 import com.oryfolks.certify.entity.Question;
 import com.oryfolks.certify.repository.CompetencyBandRepository;
 import com.oryfolks.certify.repository.ExamRepository;
@@ -48,7 +49,7 @@ public class ExamController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Exam>> createExam(@RequestBody Exam exam) {
         // Link competency bands to the exam
         if (exam.getCompetencyBands() != null) {
@@ -61,7 +62,7 @@ public class ExamController {
     }
 
     @PostMapping("/{id}/questions")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Question>> addQuestion(@PathVariable UUID id, @RequestBody Question question) {
         Exam exam = examRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Exam not found: " + id));
@@ -71,11 +72,11 @@ public class ExamController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Exam>> updateExamStatus(@PathVariable UUID id, @RequestParam String status) {
         Exam exam = examRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Exam not found: " + id));
-        exam.setStatus(status.toUpperCase());
+        exam.setStatus(ExamStatus.valueOf(status.toUpperCase()));
         Exam saved = examRepository.save(exam);
         return ResponseEntity.ok(ApiResponse.success("Exam status updated", saved));
     }
