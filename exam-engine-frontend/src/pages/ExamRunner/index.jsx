@@ -1,0 +1,209 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Loader, Check } from 'lucide-react';
+
+import { ExamProvider, useExam } from '../../context/ExamContext';
+import Header from '../../components/exam/Header';
+import Question from '../../components/exam/Question';
+import Sidebar from '../../components/exam/Sidebar';
+import Footer from '../../components/exam/Footer';
+import WarningModal from '../../components/exam/WarningModal';
+import RaiseHand from '../../components/exam/RaiseHand';
+import Reconnect from '../../components/exam/Reconnect';
+import SubmitConfirmation from '../../components/exam/SubmitConfirmation';
+import SectionStepper from '../../components/exam/SectionStepper';
+
+import { useRecording } from '../../hooks/useRecording';
+import { useFullscreen } from '../../hooks/useFullscreen';
+import { useVisibility } from '../../hooks/useVisibility';
+
+import { examService } from '../../services/examService';
+import { proctorService } from '../../services/proctorService';
+import { useExamTimer } from '../../hooks/useExamTimer';
+
+function ExamRunnerContent() {
+  const { attemptId } = useParams();
+  const navigate = useNavigate();
+
+  const {
+    loading,
+    setLoading,
+    setQuestions,
+    selectedAnswers,
+    timeRemaining,
+    strikes,
+    setStrikes,
+    setWarningToast,
+    showTimeUp,
+    showThanks,
+    setShowThanks,
+    runnerRef,
+    streamRef
+  } = useExam();
+
+  const [examTitle, setExamTitle] = useState('Certification Exam');
+  const [examDuration, setExamDuration] = useState(45 * 60);
+
+  // Initialize and load attempt data
+  useEffect(() => {
+    async function loadAttempt() {
+      try {
+        const res = await examService.getAttemptDetail(attemptId);
+        const attemptObj = res.data.attempt;
+        const examObj = attemptObj.exam;
+        setExamTitle(examObj.title || 'Certification Exam');
+        setExamDuration((examObj.duration || 45) * 60);
+        
+        const questionsRes = await examService.startAttempt(examObj.id);
+        const rawQuestions = questionsRes.data.questions || [];
+        
+        // Sort questions contiguously by section order: EASY -> MEDIUM -> HARD
+        const sectionOrder = { 'EASY': 1, 'MEDIUM': 2, 'HARD': 3 };
+        const sortedQuestions = [...rawQuestions].sort((a, b) => {
+          const valA = sectionOrder[a.difficulty?.toUpperCase()] || 99;
+          const valB = sectionOrder[b.difficulty?.toUpperCase()] || 99;
+          return valA - valB;
+        });
+        setQuestions(sortedQuestions);
+      } catch (err) {
+        console.error('Failed to load attempt details:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadAttempt();
+  }, [attemptId, setQuestions, setLoading]);
+
+  const { captureSnapshot } = useRecording();
+
+  const handleStrikeTrigger = async (code, meta) => {
+    const formatTime = (secs) => {
+      const m = String(Math.floor(secs / 60)).padStart(2, '0');
+      const s = String(secs % 60).padStart(2, '0');
+      return `${m}:${s}`;
+    };
+    const offset = formatTime(timeRemaining);
+    const blob = await captureSnapshot();
+    const imageFile = blob ? new File([blob], 'snapshot.jpg', { type: 'image/jpeg' }) : null;
+
+    try {
+      const res = await proctorService.recordTabSwitch(attemptId, offset);
+      await proctorService.recordViolation(attemptId, code, meta, offset, imageFile);
+
+      if (res.data.terminated) {
+        if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+        try { if (document.exitFullscreen) document.exitFullscreen(); } catch (_) {}
+        navigate('/candidate/terminated');
+      } else {
+        setStrikes(res.data.strikes);
+        setWarningToast(`Warning ${res.data.strikes} of 3 — stay on the exam tab`);
+        setTimeout(() => setWarningToast(''), 4200);
+      }
+    } catch (err) {
+      console.error('Strike report failed:', err);
+    }
+  };
+
+  const handleGradingSubmit = async () => {
+    setShowThanks(true);
+    const submissions = Object.keys(selectedAnswers).map(qId => ({
+      questionId: qId,
+      selectedOption: selectedAnswers[qId]
+    }));
+
+    try {
+      const res = await examService.submitAttempt(attemptId, submissions);
+      if (res.success) {
+        if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+        try { if (document.exitFullscreen) document.exitFullscreen(); } catch (_) {}
+        setTimeout(() => {
+          navigate(`/candidate/result-view/${attemptId}`);
+        }, 1700);
+      }
+    } catch (err) {
+      console.error('Failed to submit attempt:', err);
+    }
+  };
+
+  useExamTimer(handleGradingSubmit);
+  useVisibility(handleStrikeTrigger);
+  const { enterFullscreenMode } = useFullscreen(handleStrikeTrigger);
+
+  // Request Fullscreen on launch
+  useEffect(() => {
+    if (!loading) {
+      enterFullscreenMode();
+    }
+  }, [loading]);
+
+  if (loading) {
+    return (
+      <div className="text-center py-20 font-mono text-sm text-white bg-[#081627] min-h-screen flex items-center justify-center gap-2">
+        <Loader className="w-5 h-5 animate-spin" />
+        <span>Loading proctored exam runner...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={runnerRef} className="runner fixed inset-0 z-50 bg-gradient-to-br from-[#081627] to-[#102a4d] text-[#e8eefb] flex flex-col overflow-hidden select-none">
+      {/* Watermark overlay */}
+      <div className="wm-text absolute inset-0 pointer-events-none text-white/5 font-mono text-xs select-none rotate-[-20deg] scale-[1.4] origin-center leading-[120px] whitespace-nowrap overflow-hidden">
+        {Array(60).fill("PROCTORED SESSION · ORYFOLKS CERTIFY ").join("")}
+      </div>
+
+      {/* Warnings & Modals */}
+      <WarningModal />
+      <Reconnect />
+      <RaiseHand />
+      <SubmitConfirmation onConfirm={handleGradingSubmit} />
+
+      {/* Time's Up Blockout */}
+      {showTimeUp && (
+        <div className="run-overlay fixed inset-0 z-50 bg-[#061222]/90 backdrop-blur-md flex items-center justify-center">
+          <div className="ov-card bg-[#0e2745] border border-white/10 rounded-2xl p-[34px_38px] text-center max-w-[430px] shadow-2xl">
+            <h3 className="font-display text-white text-[21px] font-semibold mb-2">Time's up</h3>
+            <p className="text-[#b9c9e2] text-[13.5px]">Submitting the answers you've completed. Please wait…</p>
+          </div>
+        </div>
+      )}
+
+      {/* Thanks Submission Blockout */}
+      {showThanks && (
+        <div className="run-overlay fixed inset-0 z-50 bg-[#061222]/90 backdrop-blur-md flex items-center justify-center">
+          <div className="ov-card bg-[#0e2745] border border-white/10 rounded-2xl p-[34px_38px] text-center max-w-[430px] shadow-2xl">
+            <div className="ov-ic w-14 h-14 rounded-2xl bg-[#0e9f6e]/20 text-[#34d27b] flex items-center justify-center mx-auto mb-4">
+              <Check className="w-7 h-7" />
+            </div>
+            <h3 className="font-display text-white text-[21px] font-semibold mb-2">Submission received</h3>
+            <p className="text-[#b9c9e2] text-[13.5px]">
+              Thank you. Your answers have been recorded and are being scored. Your result will appear in a moment…
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Top Header */}
+      <Header examTitle={examTitle} attemptId={attemptId} />
+
+      {/* Main Runner Screen Layout */}
+      <div className="run-body flex-1 grid grid-cols-1 lg:grid-cols-[1fr_330px] overflow-hidden">
+        <div className="run-main p-[30px_38px] overflow-y-auto">
+          <SectionStepper />
+          <Question />
+          <Footer />
+        </div>
+
+        <Sidebar durationSeconds={examDuration} />
+      </div>
+    </div>
+  );
+}
+
+export default function ExamRunner() {
+  return (
+    <ExamProvider>
+      <ExamRunnerContent />
+    </ExamProvider>
+  );
+}

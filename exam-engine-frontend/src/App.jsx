@@ -12,7 +12,7 @@ import CandidateResults from './pages/candidate/Results';
 import CandidateHelp from './pages/candidate/Help';
 import CandidateInstructions from './pages/candidate/Instructions';
 import CandidateSystemCheck from './pages/candidate/SystemCheck';
-import ExamRunner from './pages/candidate/ExamRunner';
+import ExamRunner from './pages/ExamRunner';
 import CandidateResultView from './pages/candidate/ResultView';
 import CandidateTerminatedView from './pages/candidate/TerminatedView';
 
