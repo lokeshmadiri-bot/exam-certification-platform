@@ -1,9 +1,9 @@
 package com.oryfolks.certify.controller;
 
-import com.oryfolks.certify.dto.ApiResponse;
+import com.oryfolks.certify.response.ApiResponse;
 import com.oryfolks.certify.entity.AccessAuditLog;
-import com.oryfolks.certify.entity.Role;
 import com.oryfolks.certify.entity.User;
+import com.oryfolks.certify.enums.UserRole;
 import com.oryfolks.certify.repository.AccessAuditLogRepository;
 import com.oryfolks.certify.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +17,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/admin")
-@PreAuthorize("hasRole('ROLE_ADMIN')")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
     @Autowired
@@ -28,7 +28,7 @@ public class AdminController {
 
     @GetMapping("/candidates")
     public ResponseEntity<ApiResponse<List<User>>> getCandidates() {
-        List<User> candidates = userRepository.findByRole(Role.ROLE_CANDIDATE);
+        List<User> candidates = userRepository.findByRole(UserRole.ROLE_CANDIDATE);
         return ResponseEntity.ok(ApiResponse.success("Candidates retrieved successfully", candidates));
     }
 
