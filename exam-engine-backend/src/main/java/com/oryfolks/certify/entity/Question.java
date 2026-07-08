@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
-
+import com.oryfolks.certify.entity.AttemptAnswer;
 import java.util.UUID;
 
 @Entity
@@ -15,7 +15,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = "exam")
+@ToString(exclude = ("exam"))
 public class Question {
 
     @Id

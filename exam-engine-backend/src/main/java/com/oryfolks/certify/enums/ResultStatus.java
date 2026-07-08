@@ -7,6 +7,8 @@ public enum ResultStatus {
 
     PASSED,
 
+    SUBMITTED,
+
     FAILED,
 
     IN_PROGRESS,

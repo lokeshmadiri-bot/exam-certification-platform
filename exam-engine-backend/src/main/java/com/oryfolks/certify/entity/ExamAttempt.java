@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import com.oryfolks.certify.entity.AttemptAnswer;
 
 /**
  * Represents a candidate's attempt for an exam.
@@ -33,7 +34,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = { "candidate", "exam", "violations" })
+@ToString(exclude = { "candidate", "exam", "violations", "answers" })
 public class ExamAttempt {
 
     @Id
@@ -80,6 +81,10 @@ public class ExamAttempt {
     @Builder.Default
     @OneToMany(mappedBy = "attempt", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<IntegrityViolation> violations = new ArrayList<>();
+
+    @OneToMany(mappedBy = "attempt", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<AttemptAnswer> answers = new ArrayList<>();
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
