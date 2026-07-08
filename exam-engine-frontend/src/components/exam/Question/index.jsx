@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { useExam } from '../../../context/ExamContext';
 import { useAutoSave } from '../../../hooks/useAutoSave';
 
 export default function Question() {
-  const { questions, currentIdx } = useExam();
-  const { selectedAnswers, saveAnswer } = useAutoSave();
+  const { questions, currentIdx, setVisitedQuestions, markedQuestions, setMarkedQuestions } = useExam();
+  const { answers, saveAnswer } = useAutoSave();
 
   if (questions.length === 0) {
     return <div className="text-center py-12 text-[#8A99AE]">No questions found for this exam.</div>;
@@ -13,20 +14,60 @@ export default function Question() {
   const currentQuestion = questions[currentIdx];
   const progressPercent = ((currentIdx + 1) / questions.length) * 100;
 
+  // Track visited questions
+  useEffect(() => {
+    if (currentQuestion) {
+      setVisitedQuestions((prev) => {
+        const updated = new Set(prev);
+        updated.add(currentQuestion.id);
+        return updated;
+      });
+    }
+  }, [currentIdx, currentQuestion, setVisitedQuestions]);
+
+  const isMarked = markedQuestions.has(currentQuestion?.id);
+
+  const toggleMarkForReview = () => {
+    setMarkedQuestions((prev) => {
+      const updated = new Set(prev);
+      if (updated.has(currentQuestion.id)) {
+        updated.delete(currentQuestion.id);
+      } else {
+        updated.add(currentQuestion.id);
+      }
+      return updated;
+    });
+  };
+
   return (
     <div className="run-q max-w-[760px] mx-auto">
       {/* Progress stepper */}
-      <div className="qmeta flex items-center gap-3 text-[#8fa9d0] text-[12.5px] font-mono mb-4">
-        <span>Q {String(currentIdx + 1).padStart(2, '0')} / {questions.length}</span>
-        <div className="bar flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
-          <i 
-            className="block h-full bg-gradient-to-r from-[#2F6BFF] to-[#6e9bff] transition-all" 
-            style={{ width: `${progressPercent}%` }} 
-          />
+      <div className="qmeta flex items-center justify-between text-[#8fa9d0] text-[12.5px] font-mono mb-4">
+        <div className="flex items-center gap-3 flex-1">
+          <span>Q {String(currentIdx + 1).padStart(2, '0')} / {questions.length}</span>
+          <div className="bar flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <i 
+              className="block h-full bg-gradient-to-r from-[#2F6BFF] to-[#6e9bff] transition-all" 
+              style={{ width: `${progressPercent}%` }} 
+            />
+          </div>
         </div>
-        <span className="savechip flex items-center gap-1.5 text-[#86e0b4]">
-          <i className="w-1.5 h-1.5 rounded-full bg-[#34d27b] animate-pulse" /> Saved
-        </span>
+        <div className="flex items-center gap-4 ml-4">
+          <button
+            onClick={toggleMarkForReview}
+            className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all ${
+              isMarked 
+                ? 'bg-[#854d0e] text-[#fef08a] border-[#ca8a04]' 
+                : 'bg-white/5 text-[#9fb6d6] border-white/10 hover:bg-white/10'
+            }`}
+          >
+            {isMarked ? <BookmarkCheck className="w-3.5 h-3.5 text-[#fef08a]" /> : <Bookmark className="w-3.5 h-3.5" />}
+            <span>{isMarked ? 'Marked' : 'Mark for Review'}</span>
+          </button>
+          <span className="savechip flex items-center gap-1.5 text-[#86e0b4]">
+            <i className="w-1.5 h-1.5 rounded-full bg-[#34d27b] animate-pulse" /> Saved
+          </span>
+        </div>
       </div>
 
       {/* Question Details */}
@@ -48,7 +89,7 @@ export default function Question() {
           { key: 'C', text: currentQuestion.optionC },
           { key: 'D', text: currentQuestion.optionD }
         ].map((opt) => {
-          const isSelected = selectedAnswers[currentQuestion.id] === opt.key;
+          const isSelected = answers[currentQuestion.id] === opt.key;
           return (
             <div
               key={opt.key}

@@ -28,6 +28,11 @@ public class Question {
     @JsonIgnore
     private Exam exam;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "section_id")
+    @JsonIgnore
+    private Section section;
+
     @NotBlank(message = "Question text is required.")
     @Column(name = "question_text", nullable = false, columnDefinition = "TEXT")
     private String questionText;

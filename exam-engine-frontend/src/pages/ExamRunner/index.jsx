@@ -38,7 +38,10 @@ function ExamRunnerContent() {
     showThanks,
     setShowThanks,
     runnerRef,
-    streamRef
+    streamRef,
+    setAttemptId,
+    setSections,
+    setAnswers
   } = useExam();
 
   const [examTitle, setExamTitle] = useState('Certification Exam');
@@ -48,31 +51,37 @@ function ExamRunnerContent() {
   useEffect(() => {
     async function loadAttempt() {
       try {
-        const res = await examService.getAttemptDetail(attemptId);
-        const attemptObj = res.data.attempt;
-        const examObj = attemptObj.exam;
-        setExamTitle(examObj.title || 'Certification Exam');
-        setExamDuration((examObj.duration || 45) * 60);
+        setAttemptId(attemptId);
         
-        const questionsRes = await examService.startAttempt(examObj.id);
-        const rawQuestions = questionsRes.data.questions || [];
+        // Fetch detailed runner data (sections, questions, previously saved answers)
+        const runnerRes = await examService.getRunnerData(attemptId);
+        const data = runnerRes.data;
         
-        // Sort questions contiguously by section order: EASY -> MEDIUM -> HARD
-        const sectionOrder = { 'EASY': 1, 'MEDIUM': 2, 'HARD': 3 };
-        const sortedQuestions = [...rawQuestions].sort((a, b) => {
-          const valA = sectionOrder[a.difficulty?.toUpperCase()] || 99;
-          const valB = sectionOrder[b.difficulty?.toUpperCase()] || 99;
-          return valA - valB;
+        setExamTitle(data.examTitle || 'Certification Exam');
+        
+        // Assemble flat questions list from sections
+        const allQuestions = [];
+        const loadedSections = data.sections || [];
+        loadedSections.forEach((sec) => {
+          if (sec.questions) {
+            sec.questions.forEach((q) => {
+              q.sectionName = sec.name;
+              allQuestions.push(q);
+            });
+          }
         });
-        setQuestions(sortedQuestions);
+        
+        setSections(loadedSections);
+        setQuestions(allQuestions);
+        setAnswers(data.answers || {});
       } catch (err) {
-        console.error('Failed to load attempt details:', err);
+        console.error('Failed to load runner data:', err);
       } finally {
         setLoading(false);
       }
     }
     loadAttempt();
-  }, [attemptId, setQuestions, setLoading]);
+  }, [attemptId, setQuestions, setLoading, setAttemptId, setSections, setAnswers]);
 
   const { captureSnapshot } = useRecording();
 
@@ -106,13 +115,9 @@ function ExamRunnerContent() {
 
   const handleGradingSubmit = async () => {
     setShowThanks(true);
-    const submissions = Object.keys(selectedAnswers).map(qId => ({
-      questionId: qId,
-      selectedOption: selectedAnswers[qId]
-    }));
 
     try {
-      const res = await examService.submitAttempt(attemptId, submissions);
+      const res = await examService.submitAttemptNew(attemptId);
       if (res.success) {
         if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
         try { if (document.exitFullscreen) document.exitFullscreen(); } catch (_) {}
