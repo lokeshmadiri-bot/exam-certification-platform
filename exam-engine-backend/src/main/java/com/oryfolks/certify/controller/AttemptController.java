@@ -42,6 +42,12 @@ public class AttemptController {
     @Autowired
     private AccessAuditLogRepository auditLogRepository;
 
+    @Autowired
+    private SectionRepository sectionRepository;
+
+    @Autowired
+    private AnswerRepository answerRepository;
+
     // Retrieve all attempts (for administrator oversight)
     @GetMapping
     public ResponseEntity<ApiResponse<List<ExamAttempt>>> getAllAttempts() {

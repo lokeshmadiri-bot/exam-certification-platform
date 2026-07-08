@@ -58,7 +58,7 @@ export default function CandidateSystemCheck() {
   const handleStartExam = async () => {
     try {
       // Create exam attempt record on the backend
-      const res = await attemptService.startAttempt(examId);
+      const res = await examService.startExamAttempt(examId);
       if (res.success) {
         // Clean stream tracks so that the runner can re-capture or preserve it
         if (streamRef.current) {

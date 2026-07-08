@@ -29,7 +29,15 @@ CREATE TABLE IF NOT EXISTS exams (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Competency Bands Table
+-- 3. Sections Table
+CREATE TABLE IF NOT EXISTS sections (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    exam_id UUID REFERENCES exams(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. Competency Bands Table
 CREATE TABLE IF NOT EXISTS competency_bands (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     exam_id UUID REFERENCES exams(id) ON DELETE CASCADE,
@@ -39,10 +47,11 @@ CREATE TABLE IF NOT EXISTS competency_bands (
     max_score INT NOT NULL
 );
 
--- 4. Questions Table
+-- 5. Questions Table
 CREATE TABLE IF NOT EXISTS questions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     exam_id UUID REFERENCES exams(id) ON DELETE CASCADE,
+    section_id UUID REFERENCES sections(id) ON DELETE SET NULL,
     question_text TEXT NOT NULL,
     code_snippet TEXT,
     difficulty VARCHAR(20) NOT NULL, -- EASY, MEDIUM, HARD
@@ -55,7 +64,7 @@ CREATE TABLE IF NOT EXISTS questions (
     is_active BOOLEAN DEFAULT TRUE
 );
 
--- 5. Exam Attempts Table
+-- 6. Exam Attempts Table
 CREATE TABLE IF NOT EXISTS exam_attempts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     candidate_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -69,7 +78,16 @@ CREATE TABLE IF NOT EXISTS exam_attempts (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 6. Integrity Violations Table
+-- 7. Answers Table
+CREATE TABLE IF NOT EXISTS answers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    attempt_id UUID REFERENCES exam_attempts(id) ON DELETE CASCADE,
+    question_id UUID REFERENCES questions(id) ON DELETE CASCADE,
+    selected_option VARCHAR(10),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 8. Integrity Violations Table
 CREATE TABLE IF NOT EXISTS integrity_violations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     attempt_id UUID REFERENCES exam_attempts(id) ON DELETE CASCADE,
