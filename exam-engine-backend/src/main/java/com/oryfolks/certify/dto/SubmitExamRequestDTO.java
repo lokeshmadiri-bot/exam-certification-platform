@@ -26,4 +26,7 @@ public class SubmitExamRequestDTO {
     @NotEmpty(message = "Answers cannot be empty.")
     private List<AnswerSubmission> answers;
 
+    @Builder.Default
+    private Boolean forceSubmit = false;
+
 }
