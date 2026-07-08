@@ -1,20 +1,18 @@
 package com.oryfolks.certify.controller;
 
 import com.oryfolks.certify.dto.ApiResponse;
-import com.oryfolks.certify.entity.CompetencyBand;
-import com.oryfolks.certify.entity.Exam;
-import com.oryfolks.certify.enums.ExamStatus;
-import com.oryfolks.certify.entity.Question;
-import com.oryfolks.certify.repository.CompetencyBandRepository;
-import com.oryfolks.certify.repository.ExamRepository;
-import com.oryfolks.certify.repository.QuestionRepository;
+import com.oryfolks.certify.dto.AnswerSubmission;
+import com.oryfolks.certify.entity.*;
+import com.oryfolks.certify.enums.*;
+import com.oryfolks.certify.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.UUID;
+import java.security.Principal;
+import java.time.LocalDateTime;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/exams")
@@ -28,6 +26,18 @@ public class ExamController {
 
     @Autowired
     private QuestionRepository questionRepository;
+
+    @Autowired
+    private ExamAttemptRepository examAttemptRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private SectionRepository sectionRepository;
+
+    @Autowired
+    private AnswerRepository answerRepository;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<Exam>>> getAllExams() {
@@ -79,5 +89,202 @@ public class ExamController {
         exam.setStatus(ExamStatus.valueOf(status.toUpperCase()));
         Exam saved = examRepository.save(exam);
         return ResponseEntity.ok(ApiResponse.success("Exam status updated", saved));
+    }
+
+    @PostMapping("/{examId}/start")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> startExamAttempt(
+            @PathVariable UUID examId,
+            Principal principal) {
+        User user = userRepository.findByUsername(principal.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new RuntimeException("Exam not found"));
+
+        ExamAttempt attempt = ExamAttempt.builder()
+                .candidate(user)
+                .exam(exam)
+                .resultStatus(ResultStatus.IN_PROGRESS)
+                .startTime(LocalDateTime.now())
+                .tabSwitchCount(0)
+                .build();
+
+        ExamAttempt savedAttempt = examAttemptRepository.save(attempt);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("attemptId", savedAttempt.getId());
+        response.put("examId", exam.getId());
+        response.put("status", "IN_PROGRESS");
+
+        return ResponseEntity.ok(ApiResponse.success("Exam attempt started", response));
+    }
+
+    @GetMapping("/attempts/{attemptId}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getRunnerData(@PathVariable UUID attemptId) {
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        Exam exam = attempt.getExam();
+        List<Section> sections = sectionRepository.findByExamId(exam.getId());
+        List<Question> questions = questionRepository.findByExamIdAndIsActiveTrue(exam.getId());
+        List<Answer> savedAnswers = answerRepository.findByAttemptId(attemptId);
+
+        Map<String, String> answersMap = new HashMap<>();
+        for (Answer ans : savedAnswers) {
+            answersMap.put(ans.getQuestion().getId().toString(), ans.getSelectedOption());
+        }
+
+        List<Map<String, Object>> sectionsData = new ArrayList<>();
+
+        if (sections.isEmpty()) {
+            Map<String, List<Map<String, Object>>> groupedQuestions = new LinkedHashMap<>();
+            groupedQuestions.put("EASY", new ArrayList<>());
+            groupedQuestions.put("MEDIUM", new ArrayList<>());
+            groupedQuestions.put("HARD", new ArrayList<>());
+
+            for (Question q : questions) {
+                String diff = q.getDifficulty() != null ? q.getDifficulty().toUpperCase() : "EASY";
+                List<Map<String, Object>> list = groupedQuestions.get(diff);
+                if (list == null) {
+                    list = new ArrayList<>();
+                    groupedQuestions.put(diff, list);
+                }
+                
+                Map<String, Object> qMap = new HashMap<>();
+                qMap.put("id", q.getId());
+                qMap.put("questionText", q.getQuestionText());
+                qMap.put("codeSnippet", q.getCodeSnippet());
+                qMap.put("difficulty", q.getDifficulty());
+                qMap.put("marks", q.getMarks());
+                qMap.put("optionA", q.getOptionA());
+                qMap.put("optionB", q.getOptionB());
+                qMap.put("optionC", q.getOptionC());
+                qMap.put("optionD", q.getOptionD());
+                list.add(qMap);
+            }
+
+            int sectionIdCounter = 1;
+            for (Map.Entry<String, List<Map<String, Object>>> entry : groupedQuestions.entrySet()) {
+                if (!entry.getValue().isEmpty()) {
+                    Map<String, Object> sectionMap = new HashMap<>();
+                    sectionMap.put("id", String.valueOf(sectionIdCounter++));
+                    sectionMap.put("name", entry.getKey() + " Section");
+                    sectionMap.put("questions", entry.getValue());
+                    sectionsData.add(sectionMap);
+                }
+            }
+        } else {
+            for (Section sec : sections) {
+                Map<String, Object> sectionMap = new HashMap<>();
+                sectionMap.put("id", sec.getId());
+                sectionMap.put("name", sec.getName());
+
+                List<Map<String, Object>> qList = new ArrayList<>();
+                for (Question q : questions) {
+                    if (q.getSection() != null && q.getSection().getId().equals(sec.getId())) {
+                        Map<String, Object> qMap = new HashMap<>();
+                        qMap.put("id", q.getId());
+                        qMap.put("questionText", q.getQuestionText());
+                        qMap.put("codeSnippet", q.getCodeSnippet());
+                        qMap.put("difficulty", q.getDifficulty());
+                        qMap.put("marks", q.getMarks());
+                        qMap.put("optionA", q.getOptionA());
+                        qMap.put("optionB", q.getOptionB());
+                        qMap.put("optionC", q.getOptionC());
+                        qMap.put("optionD", q.getOptionD());
+                        qList.add(qMap);
+                    }
+                }
+                sectionMap.put("questions", qList);
+                sectionsData.add(sectionMap);
+            }
+        }
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("attemptId", attempt.getId());
+        data.put("examTitle", exam.getTitle());
+        data.put("sections", sectionsData);
+        data.put("answers", answersMap);
+
+        return ResponseEntity.ok(ApiResponse.success("Runner details retrieved", data));
+    }
+
+    @PostMapping("/attempts/{attemptId}/answers")
+    public ResponseEntity<ApiResponse<Answer>> saveAnswer(
+            @PathVariable UUID attemptId,
+            @RequestBody AnswerSubmission submission) {
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found"));
+
+        Question question = questionRepository.findById(submission.getQuestionId())
+                .orElseThrow(() -> new RuntimeException("Question not found"));
+
+        Optional<Answer> existing = answerRepository.findByAttemptIdAndQuestionId(attemptId, submission.getQuestionId());
+        
+        Answer answer;
+        if (existing.isPresent()) {
+            answer = existing.get();
+            answer.setSelectedOption(submission.getSelectedOption());
+        } else {
+            answer = Answer.builder()
+                    .attempt(attempt)
+                    .question(question)
+                    .selectedOption(submission.getSelectedOption())
+                    .build();
+        }
+
+        Answer saved = answerRepository.save(answer);
+        return ResponseEntity.ok(ApiResponse.success("Answer saved successfully", saved));
+    }
+
+    @PostMapping("/attempts/{attemptId}/submit")
+    public ResponseEntity<ApiResponse<ExamAttempt>> submitRunnerAttempt(@PathVariable UUID attemptId) {
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found"));
+
+        if (attempt.getResultStatus() != ResultStatus.IN_PROGRESS) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Exam is already submitted or terminated"));
+        }
+
+        Exam exam = attempt.getExam();
+        List<Question> questions = questionRepository.findByExamId(exam.getId());
+        List<Answer> savedAnswers = answerRepository.findByAttemptId(attemptId);
+
+        int totalMarks = 0;
+        int earnedMarks = 0;
+
+        for (Question q : questions) {
+            totalMarks += q.getMarks();
+            Optional<Answer> ansOpt = savedAnswers.stream()
+                    .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
+                    .findFirst();
+
+            if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
+                earnedMarks += q.getMarks();
+            }
+        }
+
+        int finalScore = totalMarks > 0 ? (int) Math.round(((double) earnedMarks / totalMarks) * 100) : 0;
+        attempt.setScore(finalScore);
+        attempt.setEndTime(LocalDateTime.now());
+
+        CompetencyLevel level = CompetencyLevel.L5;
+        List<CompetencyBand> bands = exam.getCompetencyBands();
+        for (CompetencyBand band : bands) {
+            if (finalScore >= band.getMinScore() && finalScore <= band.getMaxScore()) {
+                level = band.getLevelName();
+                break;
+            }
+        }
+        attempt.setAssignedLevel(level);
+
+        if (finalScore >= exam.getPassMark()) {
+            attempt.setResultStatus(ResultStatus.PASSED);
+        } else {
+            attempt.setResultStatus(ResultStatus.FAILED);
+        }
+
+        ExamAttempt savedAttempt = examAttemptRepository.save(attempt);
+        return ResponseEntity.ok(ApiResponse.success("Exam submitted successfully", savedAttempt));
     }
 }

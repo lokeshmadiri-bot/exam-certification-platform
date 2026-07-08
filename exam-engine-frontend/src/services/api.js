@@ -79,6 +79,22 @@ export const examService = {
   updateStatus: async (examId, status) => {
     const response = await api.put(`/exams/${examId}/status?status=${status}`);
     return response.data;
+  },
+  startExamAttempt: async (examId) => {
+    const response = await api.post(`/exams/${examId}/start`);
+    return response.data;
+  },
+  getRunnerData: async (attemptId) => {
+    const response = await api.get(`/exams/attempts/${attemptId}`);
+    return response.data;
+  },
+  saveAnswer: async (attemptId, questionId, selectedOption) => {
+    const response = await api.post(`/exams/attempts/${attemptId}/answers`, { questionId, selectedOption });
+    return response.data;
+  },
+  submitAttemptNew: async (attemptId) => {
+    const response = await api.post(`/exams/attempts/${attemptId}/submit`);
+    return response.data;
   }
 };
 
