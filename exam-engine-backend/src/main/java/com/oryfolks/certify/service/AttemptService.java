@@ -32,6 +32,17 @@ import com.oryfolks.certify.entity.Question;
 
 import org.springframework.transaction.annotation.Transactional;
 
+
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.UUID;
+
+import com.oryfolks.certify.entity.ExamAttempt;
+import com.oryfolks.certify.entity.IntegrityViolation;
+
+import com.oryfolks.certify.repository.IntegrityViolationRepository;
+import com.oryfolks.certify.service.StorageService;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -49,7 +60,12 @@ public class AttemptService {
     private final ExamRepository examRepository;
 
     private final QuestionRepository questionRepository;
+
     private final AttemptAnswerRepository attemptAnswerRepository;
+
+    private final IntegrityViolationRepository integrityViolationRepository;
+
+private final StorageService storageService;
 
     public StartExamResponseDTO startExam(
             StartExamRequestDTO request,
@@ -103,6 +119,52 @@ public class AttemptService {
                 .startTime(attempt.getStartTime())
                 .build();
     }
+
+    @Transactional
+public void recordTabSwitch(UUID attemptId) {
+
+    ExamAttempt attempt = attemptRepository.findById(attemptId)
+            .orElseThrow(() ->
+                    new ResourceNotFoundException("Exam attempt not found."));
+
+    attempt.setTabSwitchCount(attempt.getTabSwitchCount() + 1);
+
+    attemptRepository.save(attempt);
+}
+
+    @Transactional
+public void recordViolation(
+        UUID attemptId,
+        String violationCode,
+        String metaDescription,
+        String timestampOffset,
+        MultipartFile snapshot) {
+
+    // Find exam attempt
+    ExamAttempt attempt = attemptRepository.findById(attemptId)
+            .orElseThrow(() ->
+                    new ResourceNotFoundException("Exam attempt not found."));
+
+    String snapshotUrl = null;
+
+if (snapshot != null && !snapshot.isEmpty()) {
+    snapshotUrl = storageService.uploadFile(snapshot, "integrity-violations");
+}
+
+    // Create integrity violation
+    IntegrityViolation violation = IntegrityViolation.builder()
+            .attempt(attempt)
+            .violationCode(violationCode)
+            .metaDescription(metaDescription)
+            .timestampOffset(timestampOffset)
+            .snapshotUrl(snapshotUrl)
+            .build();
+
+    integrityViolationRepository.save(violation);
+
+    
+}
+
 
     @Transactional
     public SubmitExamResponseDTO submitExam(
