@@ -2,6 +2,7 @@ package com.oryfolks.certify.entity;
 
 import com.oryfolks.certify.enums.CompetencyLevel;
 import com.oryfolks.certify.enums.ResultStatus;
+import com.oryfolks.certify.enums.ResultPublishStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -61,6 +62,10 @@ public class ExamAttempt {
     @Column(name = "assigned_level", length = 10)
     private CompetencyLevel assignedLevel;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "competency_level", length = 10)
+    private CompetencyLevel competencyLevel;
+
     @NotNull(message = "Result status is required.")
     @Enumerated(EnumType.STRING)
     @Column(name = "result_status", nullable = false, length = 30)
@@ -89,5 +94,14 @@ public class ExamAttempt {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "published_at")
+private LocalDateTime publishedAt;
+
+    @NotNull(message = "Result publish status is required.")
+@Enumerated(EnumType.STRING)
+@Column(name = "result_publish_status", nullable = false, length = 20)
+@Builder.Default
+private ResultPublishStatus resultPublishStatus = ResultPublishStatus.PENDING;
 
 }
