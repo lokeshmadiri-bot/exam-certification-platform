@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.*;
 
 @RestController
@@ -101,11 +102,15 @@ public class ExamController {
         Exam exam = examRepository.findById(examId)
                 .orElseThrow(() -> new RuntimeException("Exam not found"));
 
+        LocalDateTime startTime = LocalDateTime.now();
+        LocalDateTime endTime = startTime.plusMinutes(exam.getDurationMinutes());
+
         ExamAttempt attempt = ExamAttempt.builder()
                 .candidate(user)
                 .exam(exam)
                 .resultStatus(ResultStatus.IN_PROGRESS)
-                .startTime(LocalDateTime.now())
+                .startTime(startTime)
+                .endTime(endTime)
                 .tabSwitchCount(0)
                 .build();
 
@@ -113,8 +118,9 @@ public class ExamController {
 
         Map<String, Object> response = new HashMap<>();
         response.put("attemptId", savedAttempt.getId());
-        response.put("examId", exam.getId());
-        response.put("status", "IN_PROGRESS");
+        response.put("startTime", startTime.toString());
+        response.put("endTime", endTime.toString());
+        response.put("remainingSeconds", Duration.between(LocalDateTime.now(), endTime).getSeconds());
 
         return ResponseEntity.ok(ApiResponse.success("Exam attempt started", response));
     }
@@ -209,8 +215,25 @@ public class ExamController {
         return ResponseEntity.ok(ApiResponse.success("Runner details retrieved", data));
     }
 
+    @GetMapping("/attempts/{attemptId}/timer")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getRemainingTime(@PathVariable UUID attemptId) {
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        long remaining = 0;
+        if (attempt.getEndTime() != null) {
+            remaining = Duration.between(LocalDateTime.now(), attempt.getEndTime()).getSeconds();
+            if (remaining < 0) remaining = 0;
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("remainingSeconds", remaining);
+
+        return ResponseEntity.ok(ApiResponse.success("Remaining time retrieved", response));
+    }
+
     @PostMapping("/attempts/{attemptId}/answers")
-    public ResponseEntity<ApiResponse<Answer>> saveAnswer(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> saveAnswer(
             @PathVariable UUID attemptId,
             @RequestBody AnswerSubmission submission) {
         ExamAttempt attempt = examAttemptRepository.findById(attemptId)
@@ -219,22 +242,35 @@ public class ExamController {
         Question question = questionRepository.findById(submission.getQuestionId())
                 .orElseThrow(() -> new RuntimeException("Question not found"));
 
+        String optionText = submission.getSelectedOption();
+        if ((optionText == null || optionText.trim().isEmpty()) && submission.getOptionId() != null) {
+            int opId = submission.getOptionId();
+            if (opId == 1) optionText = "A";
+            else if (opId == 2) optionText = "B";
+            else if (opId == 3) optionText = "C";
+            else if (opId == 4) optionText = "D";
+        }
+
         Optional<Answer> existing = answerRepository.findByAttemptIdAndQuestionId(attemptId, submission.getQuestionId());
         
         Answer answer;
         if (existing.isPresent()) {
             answer = existing.get();
-            answer.setSelectedOption(submission.getSelectedOption());
+            answer.setSelectedOption(optionText);
         } else {
             answer = Answer.builder()
                     .attempt(attempt)
                     .question(question)
-                    .selectedOption(submission.getSelectedOption())
+                    .selectedOption(optionText)
                     .build();
         }
 
-        Answer saved = answerRepository.save(answer);
-        return ResponseEntity.ok(ApiResponse.success("Answer saved successfully", saved));
+        answerRepository.save(answer);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Answer Saved");
+
+        return ResponseEntity.ok(ApiResponse.success("Answer saved successfully", response));
     }
 
     @PostMapping("/attempts/{attemptId}/submit")
@@ -286,5 +322,20 @@ public class ExamController {
 
         ExamAttempt savedAttempt = examAttemptRepository.save(attempt);
         return ResponseEntity.ok(ApiResponse.success("Exam submitted successfully", savedAttempt));
+    }
+
+    @GetMapping("/attempts/{attemptId}/integrity")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getIntegritySettings(@PathVariable UUID attemptId) {
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("candidateName", attempt.getCandidate().getFullName());
+        response.put("candidateId", attempt.getCandidate().getId().toString());
+        response.put("examName", attempt.getExam().getTitle());
+        response.put("watermarkEnabled", true);
+        response.put("fullscreenRequired", true);
+
+        return ResponseEntity.ok(ApiResponse.success("Integrity settings retrieved", response));
     }
 }

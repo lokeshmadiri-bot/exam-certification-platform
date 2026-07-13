@@ -3,6 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Loader, Check } from 'lucide-react';
 
 import { ExamProvider, useExam } from '../../context/ExamContext';
+import { IntegrityProvider, useIntegrity } from '../../context/IntegrityContext';
+import { useKeyboardBlock } from '../../hooks/useKeyboardBlock';
+import { useRightClick } from '../../hooks/useRightClick';
+import WatermarkOverlay from '../../components/exam/WatermarkOverlay';
+import FullscreenDialog from '../../components/exam/FullscreenDialog';
 import Header from '../../components/exam/Header';
 import Question from '../../components/exam/Question';
 import Sidebar from '../../components/exam/Sidebar';
@@ -22,6 +27,18 @@ import { proctorService } from '../../services/proctorService';
 import { useExamTimer } from '../../hooks/useExamTimer';
 
 function ExamRunnerContent() {
+  useKeyboardBlock();
+  useRightClick();
+
+  useEffect(() => {
+    const handleDragStart = (e) => {
+      e.preventDefault();
+    };
+    window.addEventListener('dragstart', handleDragStart, true);
+    return () => {
+      window.removeEventListener('dragstart', handleDragStart, true);
+    };
+  }, []);
   const { attemptId } = useParams();
   const navigate = useNavigate();
 
@@ -152,10 +169,9 @@ function ExamRunnerContent() {
 
   return (
     <div ref={runnerRef} className="runner fixed inset-0 z-50 bg-gradient-to-br from-[#081627] to-[#102a4d] text-[#e8eefb] flex flex-col overflow-hidden select-none">
-      {/* Watermark overlay */}
-      <div className="wm-text absolute inset-0 pointer-events-none text-white/5 font-mono text-xs select-none rotate-[-20deg] scale-[1.4] origin-center leading-[120px] whitespace-nowrap overflow-hidden">
-        {Array(60).fill("PROCTORED SESSION · ORYFOLKS CERTIFY ").join("")}
-      </div>
+      {/* Integrity Dialog and Watermark Overlay */}
+      <FullscreenDialog />
+      <WatermarkOverlay />
 
       {/* Warnings & Modals */}
       <WarningModal />
@@ -208,7 +224,9 @@ function ExamRunnerContent() {
 export default function ExamRunner() {
   return (
     <ExamProvider>
-      <ExamRunnerContent />
+      <IntegrityProvider>
+        <ExamRunnerContent />
+      </IntegrityProvider>
     </ExamProvider>
   );
 }
