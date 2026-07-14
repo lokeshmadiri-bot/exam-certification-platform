@@ -13,12 +13,13 @@ export function ExamProvider({ children }) {
   const [handRaised, setHandRaised] = useState(false);
   const [raiseCount, setRaiseCount] = useState(0);
   
-  // Section and Question status states
   const [sections, setSections] = useState([]);
   const [answers, setAnswers] = useState({});
   const [visitedQuestions, setVisitedQuestions] = useState(new Set());
   const [markedQuestions, setMarkedQuestions] = useState(new Set());
   const [attemptId, setAttemptId] = useState(null);
+  const [saving, setSaving] = useState('Saved');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Modals & Warnings
   const [warningToast, setWarningToast] = useState('');
@@ -48,6 +49,8 @@ export function ExamProvider({ children }) {
     visitedQuestions, setVisitedQuestions,
     markedQuestions, setMarkedQuestions,
     attemptId, setAttemptId,
+    saving, setSaving,
+    isSubmitting, setIsSubmitting,
     warningToast, setWarningToast,
     toastMsg, setToastMsg,
     toastShow, setToastShow,

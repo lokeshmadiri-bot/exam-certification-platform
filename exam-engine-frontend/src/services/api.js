@@ -88,12 +88,20 @@ export const examService = {
     const response = await api.get(`/exams/attempts/${attemptId}`);
     return response.data;
   },
-  saveAnswer: async (attemptId, questionId, selectedOption) => {
-    const response = await api.post(`/exams/attempts/${attemptId}/answers`, { questionId, selectedOption });
+  saveAnswer: async (attemptId, questionId, selectedOption, optionId) => {
+    const response = await api.post(`/exams/attempts/${attemptId}/answers`, { questionId, selectedOption, optionId });
     return response.data;
   },
   submitAttemptNew: async (attemptId) => {
     const response = await api.post(`/exams/attempts/${attemptId}/submit`);
+    return response.data;
+  },
+  getRemainingTime: async (attemptId) => {
+    const response = await api.get(`/exams/attempts/${attemptId}/timer`);
+    return response.data;
+  },
+  getIntegritySettings: async (attemptId) => {
+    const response = await api.get(`/exams/attempts/${attemptId}/integrity`);
     return response.data;
   }
 };
