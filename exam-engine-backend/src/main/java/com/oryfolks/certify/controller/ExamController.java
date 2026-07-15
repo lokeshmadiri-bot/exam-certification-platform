@@ -2,6 +2,8 @@ package com.oryfolks.certify.controller;
 
 import com.oryfolks.certify.dto.ApiResponse;
 import com.oryfolks.certify.dto.AnswerSubmission;
+import com.oryfolks.certify.dto.ViolationRequestDTO;
+import com.oryfolks.certify.dto.ViolationResponseDTO;
 import com.oryfolks.certify.entity.*;
 import com.oryfolks.certify.enums.*;
 import com.oryfolks.certify.repository.*;
@@ -39,6 +41,9 @@ public class ExamController {
 
     @Autowired
     private AnswerRepository answerRepository;
+
+    @Autowired
+    private ExamViolationRepository examViolationRepository;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<Exam>>> getAllExams() {
@@ -211,6 +216,9 @@ public class ExamController {
         data.put("examTitle", exam.getTitle());
         data.put("sections", sectionsData);
         data.put("answers", answersMap);
+        data.put("resultStatus", attempt.getResultStatus().toString());
+        long strikeCount = examViolationRepository.countByAttemptId(attemptId);
+        data.put("strikeCount", (int) strikeCount);
 
         return ResponseEntity.ok(ApiResponse.success("Runner details retrieved", data));
     }
@@ -337,5 +345,97 @@ public class ExamController {
         response.put("fullscreenRequired", true);
 
         return ResponseEntity.ok(ApiResponse.success("Integrity settings retrieved", response));
+    }
+
+    @PostMapping("/attempts/{attemptId}/violations")
+    public ResponseEntity<ApiResponse<ViolationResponseDTO>> recordViolation(
+            @PathVariable UUID attemptId,
+            @RequestBody ViolationRequestDTO request) {
+        
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        if (attempt.getResultStatus() != ResultStatus.IN_PROGRESS) {
+            long count = examViolationRepository.countByAttemptId(attemptId);
+            return ResponseEntity.ok(ApiResponse.success("Attempt is already completed or terminated",
+                    new ViolationResponseDTO((int) count, true)));
+        }
+
+        long currentCount = examViolationRepository.countByAttemptId(attemptId);
+        int strikeNumber = (int) currentCount + 1;
+
+        LocalDateTime violationTime;
+        try {
+            violationTime = LocalDateTime.parse(request.getTimestamp());
+        } catch (Exception e) {
+            violationTime = LocalDateTime.now();
+        }
+
+        ExamViolation violation = ExamViolation.builder()
+                .attempt(attempt)
+                .type(request.getType())
+                .strikeNumber(strikeNumber)
+                .description("Violation of type " + request.getType() + " detected.")
+                .createdAt(violationTime)
+                .build();
+
+        examViolationRepository.save(violation);
+
+        boolean terminate = strikeNumber >= 3;
+        if (terminate) {
+            terminateAttemptInternal(attempt);
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("Violation recorded",
+                new ViolationResponseDTO(strikeNumber, terminate)));
+    }
+
+    @PostMapping("/attempts/{attemptId}/terminate")
+    public ResponseEntity<ApiResponse<String>> terminateAttempt(@PathVariable UUID attemptId) {
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        if (attempt.getResultStatus() == ResultStatus.IN_PROGRESS) {
+            terminateAttemptInternal(attempt);
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("Exam attempt terminated successfully", null));
+    }
+
+    private void terminateAttemptInternal(ExamAttempt attempt) {
+        Exam exam = attempt.getExam();
+        List<Question> questions = questionRepository.findByExamId(exam.getId());
+        List<Answer> savedAnswers = answerRepository.findByAttemptId(attempt.getId());
+
+        int totalMarks = 0;
+        int earnedMarks = 0;
+
+        for (Question q : questions) {
+            totalMarks += q.getMarks();
+            Optional<Answer> ansOpt = savedAnswers.stream()
+                    .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
+                    .findFirst();
+
+            if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
+                earnedMarks += q.getMarks();
+            }
+        }
+
+        int finalScore = totalMarks > 0 ? (int) Math.round(((double) earnedMarks / totalMarks) * 100) : 0;
+        attempt.setScore(finalScore);
+        attempt.setEndTime(LocalDateTime.now());
+
+        CompetencyLevel level = CompetencyLevel.L5;
+        List<CompetencyBand> bands = exam.getCompetencyBands();
+        for (CompetencyBand band : bands) {
+            if (finalScore >= band.getMinScore() && finalScore <= band.getMaxScore()) {
+                level = band.getLevelName();
+                break;
+            }
+        }
+        attempt.setAssignedLevel(level);
+        attempt.setResultStatus(ResultStatus.TERMINATED);
+
+        examAttemptRepository.save(attempt);
     }
 }

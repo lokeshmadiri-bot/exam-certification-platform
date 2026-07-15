@@ -12,7 +12,8 @@ import Header from '../../components/exam/Header';
 import Question from '../../components/exam/Question';
 import Sidebar from '../../components/exam/Sidebar';
 import Footer from '../../components/exam/Footer';
-import WarningModal from '../../components/exam/WarningModal';
+import WarningModal from '../../exam/components/WarningModal';
+import TerminateModal from '../../exam/components/TerminateModal';
 import RaiseHand from '../../components/exam/RaiseHand';
 import Reconnect from '../../components/exam/Reconnect';
 import SubmitConfirmation from '../../components/exam/SubmitConfirmation';
@@ -20,10 +21,9 @@ import SectionStepper from '../../components/exam/SectionStepper';
 
 import { useRecording } from '../../hooks/useRecording';
 import { useFullscreen } from '../../hooks/useFullscreen';
-import { useVisibility } from '../../hooks/useVisibility';
+import { useStrikeEngine } from '../../exam/hooks/useStrikeEngine';
 
 import { examService } from '../../services/examService';
-import { proctorService } from '../../services/proctorService';
 import { useExamTimer } from '../../hooks/useExamTimer';
 
 function ExamRunnerContent() {
@@ -63,6 +63,7 @@ function ExamRunnerContent() {
 
   const [examTitle, setExamTitle] = useState('Certification Exam');
   const [examDuration, setExamDuration] = useState(45 * 60);
+  const [initialStrikeCount, setInitialStrikeCount] = useState(0);
 
   // Initialize and load attempt data
   useEffect(() => {
@@ -73,8 +74,15 @@ function ExamRunnerContent() {
         // Fetch detailed runner data (sections, questions, previously saved answers)
         const runnerRes = await examService.getRunnerData(attemptId);
         const data = runnerRes.data;
+
+        if (data.resultStatus === 'TERMINATED') {
+          navigate('/candidate/terminated');
+          return;
+        }
         
         setExamTitle(data.examTitle || 'Certification Exam');
+        setInitialStrikeCount(data.strikeCount || 0);
+        setStrikes(data.strikeCount || 0);
         
         // Assemble flat questions list from sections
         const allQuestions = [];
@@ -98,37 +106,7 @@ function ExamRunnerContent() {
       }
     }
     loadAttempt();
-  }, [attemptId, setQuestions, setLoading, setAttemptId, setSections, setAnswers]);
-
-  const { captureSnapshot } = useRecording();
-
-  const handleStrikeTrigger = async (code, meta) => {
-    const formatTime = (secs) => {
-      const m = String(Math.floor(secs / 60)).padStart(2, '0');
-      const s = String(secs % 60).padStart(2, '0');
-      return `${m}:${s}`;
-    };
-    const offset = formatTime(timeRemaining);
-    const blob = await captureSnapshot();
-    const imageFile = blob ? new File([blob], 'snapshot.jpg', { type: 'image/jpeg' }) : null;
-
-    try {
-      const res = await proctorService.recordTabSwitch(attemptId, offset);
-      await proctorService.recordViolation(attemptId, code, meta, offset, imageFile);
-
-      if (res.data.terminated) {
-        if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-        try { if (document.exitFullscreen) document.exitFullscreen(); } catch (_) {}
-        navigate('/candidate/terminated');
-      } else {
-        setStrikes(res.data.strikes);
-        setWarningToast(`Warning ${res.data.strikes} of 3 — stay on the exam tab`);
-        setTimeout(() => setWarningToast(''), 4200);
-      }
-    } catch (err) {
-      console.error('Strike report failed:', err);
-    }
-  };
+  }, [attemptId, setQuestions, setLoading, setAttemptId, setSections, setAnswers, navigate, setStrikes]);
 
   const handleGradingSubmit = async () => {
     setShowThanks(true);
@@ -148,8 +126,33 @@ function ExamRunnerContent() {
   };
 
   useExamTimer(handleGradingSubmit);
-  useVisibility(handleStrikeTrigger);
-  const { enterFullscreenMode } = useFullscreen(handleStrikeTrigger);
+
+  const isProctoringActive = !loading && !handRaised && !offline;
+
+  const handleFrontendTerminate = () => {
+    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+    try { if (document.exitFullscreen) document.exitFullscreen(); } catch (_) {}
+    navigate('/candidate/terminated');
+  };
+
+  const {
+    strikeCount,
+    warningVisible,
+    terminated,
+    dismissWarning
+  } = useStrikeEngine({
+    attemptId,
+    initialStrikeCount,
+    active: isProctoringActive,
+    onTerminate: handleFrontendTerminate
+  });
+
+  // Sync strike count back to global ExamContext so headers/indicators render it correctly
+  useEffect(() => {
+    setStrikes(strikeCount);
+  }, [strikeCount, setStrikes]);
+
+  const { enterFullscreenMode } = useFullscreen();
 
   // Request Fullscreen on launch
   useEffect(() => {
@@ -174,7 +177,8 @@ function ExamRunnerContent() {
       <WatermarkOverlay />
 
       {/* Warnings & Modals */}
-      <WarningModal />
+      <WarningModal isOpen={warningVisible} strikeCount={strikeCount} onClose={dismissWarning} />
+      <TerminateModal isOpen={terminated} />
       <Reconnect />
       <RaiseHand />
       <SubmitConfirmation onConfirm={handleGradingSubmit} />

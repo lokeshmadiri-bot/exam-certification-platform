@@ -98,7 +98,17 @@ CREATE TABLE IF NOT EXISTS integrity_violations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 7. Access Audit Logs Table
+-- 9. Exam Violations Table
+CREATE TABLE IF NOT EXISTS exam_violation (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    attempt_id UUID REFERENCES exam_attempts(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    strike_number INT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 10. Access Audit Logs Table
 CREATE TABLE IF NOT EXISTS access_audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
