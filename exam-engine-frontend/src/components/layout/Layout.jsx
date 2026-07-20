@@ -3,6 +3,7 @@ import { useNavigate, Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import CmdPalette from '../common/CmdPalette';
+import CommandPalette from '../../admin/a2/CommandPalette';
 import { authService } from '../../services/api';
 
 export default function Layout({ title }) {
@@ -21,6 +22,7 @@ export default function Layout({ title }) {
   }, [navigate]);
 
   useEffect(() => {
+    if (user?.role === 'ROLE_ADMIN') return;
     const handleGlobalKeys = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
@@ -29,7 +31,7 @@ export default function Layout({ title }) {
     };
     window.addEventListener('keydown', handleGlobalKeys);
     return () => window.removeEventListener('keydown', handleGlobalKeys);
-  }, []);
+  }, [user]);
 
   if (!user) return null;
 
@@ -66,11 +68,15 @@ export default function Layout({ title }) {
       </div>
 
       {/* Command Palette */}
-      <CmdPalette
-        show={cmdPaletteOpen}
-        onClose={() => setCmdPaletteOpen(false)}
-        role={user?.role}
-      />
+      {user?.role === 'ROLE_ADMIN' ? (
+        <CommandPalette />
+      ) : (
+        <CmdPalette
+          show={cmdPaletteOpen}
+          onClose={() => setCmdPaletteOpen(false)}
+          role={user?.role}
+        />
+      )}
     </div>
   );
 }
