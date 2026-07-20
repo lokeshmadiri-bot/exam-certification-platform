@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Bell, Menu, Command, Award, ShieldCheck } from 'lucide-react';
+import NotificationsPanel from '../../admin/a2/NotificationsPanel';
 
 export default function Topbar({ user, title, onMenuToggle, onOpenCmdPalette }) {
   const navigate = useNavigate();
@@ -70,39 +71,43 @@ export default function Topbar({ user, title, onMenuToggle, onOpenCmdPalette }) 
       </button>
 
       {/* Notification Icon */}
-      <div className="relative">
-        <button
-          onClick={() => setShowNotifications(!showNotifications)}
-          className="icon-btn w-[38px] h-[38px] rounded-xl flex items-center justify-center text-[#5C6B82] hover:bg-[#F4F7FC] hover:text-[#0E1B2E] relative"
-        >
-          <Bell className="w-[18px] h-[18px]" />
-          <span className="dot absolute top-2 right-2.5 w-1.5 h-1.5 bg-[#F2A93B] rounded-full border border-white"></span>
-        </button>
+      {user?.role === 'ROLE_ADMIN' ? (
+        <NotificationsPanel />
+      ) : (
+        <div className="relative">
+          <button
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="icon-btn w-[38px] h-[38px] rounded-xl flex items-center justify-center text-[#5C6B82] hover:bg-[#F4F7FC] hover:text-[#0E1B2E] relative"
+          >
+            <Bell className="w-[18px] h-[18px]" />
+            <span className="dot absolute top-2 right-2.5 w-1.5 h-1.5 bg-[#F2A93B] rounded-full border border-white"></span>
+          </button>
 
-        {/* Notifications Panel */}
-        {showNotifications && (
-          <div className="notif absolute right-0 top-[52px] w-[330px] bg-white border border-[#E4EAF2] rounded-xl shadow-2xl z-50 overflow-hidden animate-[fade_0.2s_ease]">
-            <div className="nh flex items-center justify-between px-4 py-3 border-b border-[#EEF2F8]">
-              <b className="font-display text-[14px] text-[#0E1B2E]">Notifications</b>
-              <button onClick={() => setShowNotifications(false)} className="text-[12px] text-[#2F6BFF] font-semibold hover:underline">
-                Close
-              </button>
-            </div>
-            <div className="max-h-[300px] overflow-y-auto">
-              {notifications.map((notif) => (
-                <div key={notif.id} className="ni flex gap-3 px-4 py-3 border-b border-[#EEF2F8] hover:bg-[#F4F7FC]">
-                  {notif.unread && <span className="d w-2 h-2 rounded-full bg-[#2F6BFF] mt-1.5 shrink-0" />}
-                  <div>
-                    <b className="text-[13px] font-semibold text-[#0E1B2E]">{notif.title}</b>
-                    <span className="text-[12px] text-[#5C6B82] block leading-tight mt-0.5">{notif.desc}</span>
+          {/* Notifications Panel */}
+          {showNotifications && (
+            <div className="notif absolute right-0 top-[52px] w-[330px] bg-white border border-[#E4EAF2] rounded-xl shadow-2xl z-50 overflow-hidden animate-[fade_0.2s_ease]">
+              <div className="nh flex items-center justify-between px-4 py-3 border-b border-[#EEF2F8]">
+                <b className="font-display text-[14px] text-[#0E1B2E]">Notifications</b>
+                <button onClick={() => setShowNotifications(false)} className="text-[12px] text-[#2F6BFF] font-semibold hover:underline">
+                  Close
+                </button>
+              </div>
+              <div className="max-h-[300px] overflow-y-auto">
+                {notifications.map((notif) => (
+                  <div key={notif.id} className="ni flex gap-3 px-4 py-3 border-b border-[#EEF2F8] hover:bg-[#F4F7FC]">
+                    {notif.unread && <span className="d w-2 h-2 rounded-full bg-[#2F6BFF] mt-1.5 shrink-0" />}
+                    <div>
+                      <b className="text-[13px] font-semibold text-[#0E1B2E]">{notif.title}</b>
+                      <span className="text-[12px] text-[#5C6B82] block leading-tight mt-0.5">{notif.desc}</span>
+                    </div>
+                    <span className="text-[11px] text-[#8A99AE] font-mono ml-auto">{notif.time}</span>
                   </div>
-                  <span className="text-[11px] text-[#8A99AE] font-mono ml-auto">{notif.time}</span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </header>
   );
 }

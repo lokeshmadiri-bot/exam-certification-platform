@@ -85,23 +85,23 @@ export default function Sidebar({ user, onNavClose }) {
           <nav className="space-y-1">
             <div className="sb-section text-[#62789b] text-[10.5px] tracking-[1.4px] uppercase font-mono font-semibold mx-2.5 mb-2">Oversight</div>
             <button
-              onClick={() => handleNav('/admin')}
-              className={`nav-item ${isActive('/admin') ? 'active' : ''}`}
+              onClick={() => handleNav('/admin/dashboard')}
+              className={`nav-item ${isActive('/admin/dashboard') || isActive('/admin') ? 'active' : ''}`}
             >
               <LayoutDashboard />
               <span>Dashboard</span>
             </button>
             <button
               onClick={() => handleNav('/admin/attempts')}
-              className={`nav-item ${isActive('/admin/attempts') ? 'active' : ''}`}
+              className={`nav-item ${isActive('/admin/attempts') && !location.search.includes('result=NEEDS_REVIEW') ? 'active' : ''}`}
             >
               <ClipboardList />
               <span>Attempts</span>
               <span className="tag">1,248</span>
             </button>
             <button
-              onClick={() => handleNav('/admin/review')}
-              className={`nav-item ${isActive('/admin/review') ? 'active' : ''}`}
+              onClick={() => handleNav('/admin/attempts?result=NEEDS_REVIEW')}
+              className={`nav-item ${location.pathname === '/admin/attempts' && location.search.includes('result=NEEDS_REVIEW') ? 'active' : ''}`}
             >
               <AlertTriangle />
               <span>Review &amp; flags</span>

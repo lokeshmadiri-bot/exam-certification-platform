@@ -17,9 +17,9 @@ import CandidateResultView from './pages/candidate/ResultView';
 import CandidateTerminatedView from './pages/candidate/TerminatedView';
 
 // Admin Pages
-import AdminDashboard from './pages/admin/Dashboard';
-import AdminAttempts from './pages/admin/Attempts';
-import AdminReview from './pages/admin/Review';
+import AdminDashboard from './admin/a2/AdminDashboard';
+import AdminAttempts from './admin/a2/AttemptsPage';
+import AdminReview from './admin/a2/AttemptReviewPage';
 import AdminCandidates from './pages/admin/Candidates';
 import AdminExams from './pages/admin/Exams';
 import AdminAuthoring from './pages/admin/Authoring';
@@ -49,9 +49,11 @@ export default function App() {
 
         {/* Admin Routes */}
         <Route path="/admin" element={<Layout title="Admin Panel" />}>
-          <Route index element={<AdminDashboard />} />
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="attempts" element={<AdminAttempts />} />
-          <Route path="review" element={<AdminReview />} />
+          <Route path="attempts/:attemptId/review" element={<AdminReview />} />
+          <Route path="review" element={<Navigate to="/admin/attempts?result=NEEDS_REVIEW" replace />} />
           <Route path="candidates" element={<AdminCandidates />} />
           <Route path="exams" element={<AdminExams />} />
           <Route path="authoring" element={<AdminAuthoring />} />
