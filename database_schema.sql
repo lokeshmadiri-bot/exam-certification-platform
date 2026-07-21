@@ -75,6 +75,9 @@ CREATE TABLE IF NOT EXISTS exam_attempts (
     start_time TIMESTAMP NOT NULL,
     end_time TIMESTAMP,
     tab_switch_count INT DEFAULT 0,
+    last_seen TIMESTAMP,
+    remaining_seconds BIGINT,
+    submitted_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -113,5 +116,26 @@ CREATE TABLE IF NOT EXISTS access_audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     action VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ip_address VARCHAR(50),
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 11. Recording Sessions Table
+CREATE TABLE IF NOT EXISTS recording_session (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    attempt_id UUID REFERENCES exam_attempts(id) ON DELETE CASCADE,
+    video_url VARCHAR(500),
+    status VARCHAR(30),
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP
+);
+
+-- 12. AI Flags Table
+CREATE TABLE IF NOT EXISTS ai_flag (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    attempt_id UUID REFERENCES exam_attempts(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    confidence DOUBLE PRECISION,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    snapshot_url VARCHAR(500)
 );
