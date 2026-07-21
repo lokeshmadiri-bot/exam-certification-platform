@@ -107,6 +107,7 @@ export default function Sidebar({ user, onNavClose }) {
               <span>Review &amp; flags</span>
               <span className="tag">14</span>
             </button>
+            <div className="sb-section text-[#62789b] text-[10.5px] tracking-[1.4px] uppercase font-mono font-semibold mx-2.5 mt-5 mb-2">Configure</div>
             <button
               onClick={() => handleNav('/admin/candidates')}
               className={`nav-item ${isActive('/admin/candidates') ? 'active' : ''}`}
@@ -114,8 +115,6 @@ export default function Sidebar({ user, onNavClose }) {
               <Users />
               <span>Candidates</span>
             </button>
-            
-            <div className="sb-section text-[#62789b] text-[10.5px] tracking-[1.4px] uppercase font-mono font-semibold mx-2.5 mt-5 mb-2">Configure</div>
             <button
               onClick={() => handleNav('/admin/exams')}
               className={`nav-item ${isActive('/admin/exams') ? 'active' : ''}`}
@@ -131,11 +130,18 @@ export default function Sidebar({ user, onNavClose }) {
               <span>Exam authoring</span>
             </button>
             <button
-              onClick={() => handleNav('/admin/settings')}
-              className={`nav-item ${isActive('/admin/settings') ? 'active' : ''}`}
+              onClick={() => handleNav('/admin/questions')}
+              className={`nav-item ${isActive('/admin/questions') ? 'active' : ''}`}
+            >
+              <BookOpen />
+              <span>Question Bank</span>
+            </button>
+            <button
+              onClick={() => handleNav('/admin/governance')}
+              className={`nav-item ${isActive('/admin/governance') || isActive('/admin/settings') ? 'active' : ''}`}
             >
               <Settings />
-              <span>Governance</span>
+              <span>Governance &amp; Settings</span>
             </button>
           </nav>
         )}

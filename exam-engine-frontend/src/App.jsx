@@ -20,10 +20,11 @@ import CandidateTerminatedView from './pages/candidate/TerminatedView';
 import AdminDashboard from './admin/a2/AdminDashboard';
 import AdminAttempts from './admin/a2/AttemptsPage';
 import AdminReview from './admin/a2/AttemptReviewPage';
-import AdminCandidates from './pages/admin/Candidates';
-import AdminExams from './pages/admin/Exams';
-import AdminAuthoring from './pages/admin/Authoring';
-import AdminSettings from './pages/admin/Settings';
+import CandidatesPage from './admin/a2/a1/CandidatesPage';
+import ExamsLibraryPage from './admin/a2/a1/ExamsLibraryPage';
+import AuthoringPage from './admin/a2/a1/Authoringpage';
+import QuestionBankPage from './admin/a2/a1/QuestionBankPage';
+import GovernanceSettingsPage from './admin/a2/a1/Goveranancesettingspage';
 
 export default function App() {
   return (
@@ -54,10 +55,12 @@ export default function App() {
           <Route path="attempts" element={<AdminAttempts />} />
           <Route path="attempts/:attemptId/review" element={<AdminReview />} />
           <Route path="review" element={<Navigate to="/admin/attempts?result=NEEDS_REVIEW" replace />} />
-          <Route path="candidates" element={<AdminCandidates />} />
-          <Route path="exams" element={<AdminExams />} />
-          <Route path="authoring" element={<AdminAuthoring />} />
-          <Route path="settings" element={<AdminSettings />} />
+          <Route path="candidates" element={<CandidatesPage />} />
+          <Route path="exams" element={<ExamsLibraryPage />} />
+          <Route path="authoring" element={<AuthoringPage />} />
+          <Route path="questions" element={<QuestionBankPage />} />
+          <Route path="governance" element={<GovernanceSettingsPage />} />
+          <Route path="settings" element={<GovernanceSettingsPage />} />
         </Route>
 
         {/* Redirects */}
