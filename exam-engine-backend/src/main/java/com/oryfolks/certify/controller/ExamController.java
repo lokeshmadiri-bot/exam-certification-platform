@@ -4,6 +4,10 @@ import com.oryfolks.certify.dto.ApiResponse;
 import com.oryfolks.certify.dto.AnswerSubmission;
 import com.oryfolks.certify.dto.ViolationRequestDTO;
 import com.oryfolks.certify.dto.ViolationResponseDTO;
+import com.oryfolks.certify.dto.AnswerSyncDTO;
+import com.oryfolks.certify.dto.SyncRequestDTO;
+import com.oryfolks.certify.dto.AttemptStatusDTO;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oryfolks.certify.entity.*;
 import com.oryfolks.certify.enums.*;
 import com.oryfolks.certify.repository.*;
@@ -437,5 +441,138 @@ public class ExamController {
         attempt.setResultStatus(ResultStatus.TERMINATED);
 
         examAttemptRepository.save(attempt);
+    }
+
+    @GetMapping("/attempts/{attemptId}/status")
+    public ResponseEntity<ApiResponse<AttemptStatusDTO>> getAttemptStatus(@PathVariable UUID attemptId) {
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        long remaining = 0;
+        if (attempt.getEndTime() != null) {
+            remaining = Duration.between(LocalDateTime.now(), attempt.getEndTime()).getSeconds();
+            if (remaining < 0) remaining = 0;
+        }
+
+        attempt.setLastSeen(LocalDateTime.now());
+        attempt.setRemainingSeconds(remaining);
+        examAttemptRepository.save(attempt);
+
+        AttemptStatusDTO statusDTO = AttemptStatusDTO.builder()
+                .status(attempt.getResultStatus().toString())
+                .remainingSeconds(remaining)
+                .lastSeen(attempt.getLastSeen())
+                .build();
+
+        return ResponseEntity.ok(ApiResponse.success("Attempt status retrieved", statusDTO));
+    }
+
+    @PostMapping("/attempts/{attemptId}/sync")
+    public ResponseEntity<ApiResponse<AttemptStatusDTO>> syncAttemptAnswers(
+            @PathVariable UUID attemptId,
+            @RequestBody SyncRequestDTO request) {
+
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        int syncedCount = 0;
+        if (attempt.getResultStatus() == ResultStatus.IN_PROGRESS && request != null && request.getAnswers() != null) {
+            for (AnswerSyncDTO dto : request.getAnswers()) {
+                if (dto.getQuestionId() == null) continue;
+                Question question = questionRepository.findById(dto.getQuestionId()).orElse(null);
+                if (question == null) continue;
+
+                String optionText = dto.getSelectedOption();
+                if ((optionText == null || optionText.trim().isEmpty()) && dto.getOptionId() != null) {
+                    int opId = dto.getOptionId();
+                    if (opId == 1) optionText = "A";
+                    else if (opId == 2) optionText = "B";
+                    else if (opId == 3) optionText = "C";
+                    else if (opId == 4) optionText = "D";
+                }
+
+                Optional<Answer> existing = answerRepository.findByAttemptIdAndQuestionId(attemptId, dto.getQuestionId());
+                Answer answer;
+                if (existing.isPresent()) {
+                    answer = existing.get();
+                    answer.setSelectedOption(optionText);
+                } else {
+                    answer = Answer.builder()
+                            .attempt(attempt)
+                            .question(question)
+                            .selectedOption(optionText)
+                            .build();
+                }
+                answerRepository.save(answer);
+                syncedCount++;
+            }
+        }
+
+        long remaining = 0;
+        if (attempt.getEndTime() != null) {
+            remaining = Duration.between(LocalDateTime.now(), attempt.getEndTime()).getSeconds();
+            if (remaining < 0) remaining = 0;
+        }
+
+        attempt.setLastSeen(LocalDateTime.now());
+        if (request != null && request.getRemainingSeconds() != null) {
+            attempt.setRemainingSeconds(request.getRemainingSeconds());
+        } else {
+            attempt.setRemainingSeconds(remaining);
+        }
+        examAttemptRepository.save(attempt);
+
+        AttemptStatusDTO statusDTO = AttemptStatusDTO.builder()
+                .status(attempt.getResultStatus().toString())
+                .remainingSeconds(remaining)
+                .lastSeen(attempt.getLastSeen())
+                .syncedCount(syncedCount)
+                .build();
+
+        return ResponseEntity.ok(ApiResponse.success("Answers synchronized successfully", statusDTO));
+    }
+
+    @PostMapping("/attempts/{attemptId}/beacon")
+    public ResponseEntity<ApiResponse<String>> handleBeacon(
+            @PathVariable UUID attemptId,
+            @RequestBody(required = false) String rawBody) {
+
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        if (attempt.getResultStatus() == ResultStatus.IN_PROGRESS && rawBody != null && !rawBody.trim().isEmpty()) {
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                SyncRequestDTO request = mapper.readValue(rawBody, SyncRequestDTO.class);
+                if (request != null && request.getAnswers() != null) {
+                    for (AnswerSyncDTO dto : request.getAnswers()) {
+                        if (dto.getQuestionId() == null) continue;
+                        Question question = questionRepository.findById(dto.getQuestionId()).orElse(null);
+                        if (question == null) continue;
+
+                        Optional<Answer> existing = answerRepository.findByAttemptIdAndQuestionId(attemptId, dto.getQuestionId());
+                        Answer answer;
+                        if (existing.isPresent()) {
+                            answer = existing.get();
+                            answer.setSelectedOption(dto.getSelectedOption());
+                        } else {
+                            answer = Answer.builder()
+                                    .attempt(attempt)
+                                    .question(question)
+                                    .selectedOption(dto.getSelectedOption())
+                                    .build();
+                        }
+                        answerRepository.save(answer);
+                    }
+                }
+            } catch (Exception e) {
+                // Log and continue gracefully for beacon transmissions
+            }
+        }
+
+        attempt.setLastSeen(LocalDateTime.now());
+        examAttemptRepository.save(attempt);
+
+        return ResponseEntity.ok(ApiResponse.success("Beacon recorded", "OK"));
     }
 }

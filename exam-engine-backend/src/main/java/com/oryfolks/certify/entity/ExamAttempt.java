@@ -99,9 +99,18 @@ public class ExamAttempt {
 private LocalDateTime publishedAt;
 
     @NotNull(message = "Result publish status is required.")
-@Enumerated(EnumType.STRING)
-@Column(name = "result_publish_status", nullable = false, length = 20)
-@Builder.Default
-private ResultPublishStatus resultPublishStatus = ResultPublishStatus.PENDING;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "result_publish_status", nullable = false, length = 20)
+    @Builder.Default
+    private ResultPublishStatus resultPublishStatus = ResultPublishStatus.PENDING;
+
+    @Column(name = "last_seen")
+    private LocalDateTime lastSeen;
+
+    @Column(name = "remaining_seconds")
+    private Long remainingSeconds;
+
+    @Column(name = "submitted_at")
+    private LocalDateTime submittedAt;
 
 }

@@ -14,6 +14,13 @@ import Sidebar from '../../components/exam/Sidebar';
 import Footer from '../../components/exam/Footer';
 import WarningModal from '../../exam/components/WarningModal';
 import TerminateModal from '../../exam/components/TerminateModal';
+import OfflineOverlay from '../../exam/components/OfflineOverlay';
+import ReconnectLoader from '../../exam/components/ReconnectLoader';
+import TimeUpModal from '../../exam/components/TimeUpModal';
+import RecordingIndicator from '../../exam/components/RecordingIndicator';
+import ViolationSummaryModal from '../../exam/components/ViolationSummaryModal';
+import ThankYouPage from '../../exam/components/ThankYouPage';
+
 import RaiseHand from '../../components/exam/RaiseHand';
 import Reconnect from '../../components/exam/Reconnect';
 import SubmitConfirmation from '../../components/exam/SubmitConfirmation';
@@ -22,6 +29,11 @@ import SectionStepper from '../../components/exam/SectionStepper';
 import { useRecording } from '../../hooks/useRecording';
 import { useFullscreen } from '../../hooks/useFullscreen';
 import { useStrikeEngine } from '../../exam/hooks/useStrikeEngine';
+import { useReconnect } from '../../exam/hooks/useReconnect';
+import { useTimeUp } from '../../exam/hooks/useTimeUp';
+import { useUnload } from '../../exam/hooks/useUnload';
+import { useRecording as useModularRecording } from '../../exam/hooks/useRecording';
+import { useAIFlags } from '../../exam/hooks/useAIFlags';
 
 import { examService } from '../../services/examService';
 import { useExamTimer } from '../../hooks/useExamTimer';
@@ -58,12 +70,19 @@ function ExamRunnerContent() {
     streamRef,
     setAttemptId,
     setSections,
-    setAnswers
+    setAnswers,
+    answers,
+    handRaised,
+    offline,
+    setOffline
   } = useExam();
 
   const [examTitle, setExamTitle] = useState('Certification Exam');
   const [examDuration, setExamDuration] = useState(45 * 60);
   const [initialStrikeCount, setInitialStrikeCount] = useState(0);
+  const [showViolationSummary, setShowViolationSummary] = useState(false);
+  const [summaryData, setSummaryData] = useState(null);
+  const [showThankYouPage, setShowThankYouPage] = useState(false);
 
   // Initialize and load attempt data
   useEffect(() => {
@@ -116,9 +135,8 @@ function ExamRunnerContent() {
       if (res.success) {
         if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
         try { if (document.exitFullscreen) document.exitFullscreen(); } catch (_) {}
-        setTimeout(() => {
-          navigate(`/candidate/result-view/${attemptId}`);
-        }, 1700);
+        setShowThanks(false);
+        setShowThankYouPage(true);
       }
     } catch (err) {
       console.error('Failed to submit attempt:', err);
@@ -127,7 +145,71 @@ function ExamRunnerContent() {
 
   useExamTimer(handleGradingSubmit);
 
-  const isProctoringActive = !loading && !handRaised && !offline;
+  // Maintain refs for unload/sendBeacon handlers to access latest values
+  const answersRef = React.useRef(answers);
+  const timeRemainingRef = React.useRef(timeRemaining);
+  useEffect(() => {
+    answersRef.current = answers;
+    timeRemainingRef.current = timeRemaining;
+  }, [answers, timeRemaining]);
+
+  // Reconnect hook
+  const { online, syncing, reconnecting } = useReconnect({
+    attemptId,
+    answers,
+    timeRemaining,
+    setTimeRemaining,
+    onResumed: () => setOffline(false)
+  });
+
+  // Time-up hook
+  const { submitting, isTimeUp } = useTimeUp({
+    attemptId,
+    initialSeconds: timeRemaining,
+    answers,
+    active: !loading && !handRaised && online && !offline,
+    onAutoSubmit: handleGradingSubmit
+  });
+
+  // Unload / sendBeacon hook
+  useUnload({
+    attemptId,
+    answersRef,
+    timeRemainingRef,
+    active: !loading
+  });
+
+  // Modular recording & AI flags hooks
+  const { recording, stopAndUploadRecording } = useModularRecording({
+    attemptId,
+    active: !loading,
+    streamRef,
+    videoRef: null
+  });
+
+  const { fetchSummary } = useAIFlags({
+    attemptId,
+    active: !loading
+  });
+
+  const handleInitialSubmitTrigger = async () => {
+    try {
+      const summary = await fetchSummary(attemptId);
+      setSummaryData(summary || { warnings: strikes, aiFlags: [] });
+      setShowViolationSummary(true);
+    } catch (e) {
+      setSummaryData({ warnings: strikes, aiFlags: [] });
+      setShowViolationSummary(true);
+    }
+  };
+
+  const handleFinalSubmitAnyway = async () => {
+    setShowViolationSummary(false);
+    stopAndUploadRecording(attemptId).catch(() => {});
+    await handleGradingSubmit();
+  };
+
+  const isProctoringActive = !loading && !handRaised && online && !offline;
 
   const handleFrontendTerminate = () => {
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
@@ -179,9 +261,19 @@ function ExamRunnerContent() {
       {/* Warnings & Modals */}
       <WarningModal isOpen={warningVisible} strikeCount={strikeCount} onClose={dismissWarning} />
       <TerminateModal isOpen={terminated} />
+      <OfflineOverlay isOpen={!online || offline} />
+      <ReconnectLoader isOpen={syncing || reconnecting} />
+      <TimeUpModal isOpen={isTimeUp} />
+      <ViolationSummaryModal
+        isOpen={showViolationSummary}
+        summary={summaryData}
+        onConfirmSubmit={handleFinalSubmitAnyway}
+        onClose={() => setShowViolationSummary(false)}
+      />
+      <ThankYouPage isOpen={showThankYouPage} attemptId={attemptId} />
       <Reconnect />
       <RaiseHand />
-      <SubmitConfirmation onConfirm={handleGradingSubmit} />
+      <SubmitConfirmation onConfirm={handleInitialSubmitTrigger} />
 
       {/* Time's Up Blockout */}
       {showTimeUp && (
