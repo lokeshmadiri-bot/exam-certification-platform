@@ -1,12 +1,60 @@
+import { useEffect, useRef } from 'react';
 import { useExam } from '../context/ExamContext';
 import { storage } from '../utils/storage';
 import { examService } from '../services/examService';
 
 export function useAutoSave() {
-  const { answers, setAnswers, attemptId } = useExam();
+  const { answers, setAnswers, attemptId, saving, setSaving } = useExam();
+  const retryTimeoutRef = useRef(null);
+
+  const getOptionId = (option) => {
+    const map = { 'A': 1, 'B': 2, 'C': 3, 'D': 4 };
+    return map[option] || null;
+  };
+
+  // Sync any pending items in the queue
+  const processQueue = async () => {
+    if (!attemptId) return;
+
+    const queue = storage.get(`queue_${attemptId}`, {});
+    const pendingQuestions = Object.keys(queue);
+    
+    if (pendingQuestions.length === 0) {
+      setSaving('Saved');
+      return;
+    }
+
+    setSaving('Saving...');
+    let allSucceeded = true;
+
+    for (const qId of pendingQuestions) {
+      const option = queue[qId];
+      const optId = getOptionId(option);
+
+      try {
+        await examService.saveAnswer(attemptId, qId, option, optId);
+        
+        // Remove from queue on success
+        const currentQueue = storage.get(`queue_${attemptId}`, {});
+        delete currentQueue[qId];
+        storage.set(`queue_${attemptId}`, currentQueue);
+      } catch (err) {
+        console.error(`Retry auto-save failed for question ${qId}:`, err);
+        allSucceeded = false;
+      }
+    }
+
+    if (allSucceeded) {
+      setSaving('Saved');
+    } else {
+      setSaving('Retrying...');
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = setTimeout(processQueue, 5000);
+    }
+  };
 
   const saveAnswer = async (questionId, option) => {
-    // Update local state
+    // 1. Update local state
     setAnswers((prev) => {
       const updated = { ...prev, [questionId]: option };
       if (attemptId) {
@@ -15,18 +63,37 @@ export function useAutoSave() {
       return updated;
     });
 
-    // Sync to database
+    // 2. Add to localStorage retry queue
     if (attemptId) {
-      try {
-        await examService.saveAnswer(attemptId, questionId, option);
-      } catch (err) {
-        console.error('Failed to sync answer to database:', err);
-      }
+      const queue = storage.get(`queue_${attemptId}`, {});
+      queue[questionId] = option;
+      storage.set(`queue_${attemptId}`, queue);
     }
+
+    // 3. Trigger processing
+    await processQueue();
   };
+
+  // On mount and network reconnect, try processing the queue
+  useEffect(() => {
+    if (attemptId) {
+      processQueue();
+
+      const handleOnline = () => {
+        processQueue();
+      };
+
+      window.addEventListener('online', handleOnline);
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+      };
+    }
+  }, [attemptId]);
 
   return {
     answers,
+    saving,
     saveAnswer
   };
 }

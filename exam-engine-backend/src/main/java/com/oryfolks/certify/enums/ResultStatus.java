@@ -13,6 +13,8 @@ public enum ResultStatus {
 
     IN_PROGRESS,
 
-    TERMINATED
+    TERMINATED,
+
+    NOT_PASSED
 
 }

@@ -64,9 +64,19 @@ export default function Question() {
             {isMarked ? <BookmarkCheck className="w-3.5 h-3.5 text-[#fef08a]" /> : <Bookmark className="w-3.5 h-3.5" />}
             <span>{isMarked ? 'Marked' : 'Mark for Review'}</span>
           </button>
-          <span className="savechip flex items-center gap-1.5 text-[#86e0b4]">
-            <i className="w-1.5 h-1.5 rounded-full bg-[#34d27b] animate-pulse" /> Saved
-          </span>
+          {saving === 'Saving...' ? (
+            <span className="savechip flex items-center gap-1.5 text-[#ffc58a]">
+              <i className="w-1.5 h-1.5 rounded-full bg-[#F2A93B] animate-pulse" /> Saving...
+            </span>
+          ) : saving === 'Retrying...' ? (
+            <span className="savechip flex items-center gap-1.5 text-[#ff9e9e]">
+              <i className="w-1.5 h-1.5 rounded-full bg-[#ea3a3a] animate-pulse" /> Retrying...
+            </span>
+          ) : (
+            <span className="savechip flex items-center gap-1.5 text-[#86e0b4]">
+              <i className="w-1.5 h-1.5 rounded-full bg-[#34d27b] animate-pulse" /> Saved
+            </span>
+          )}
         </div>
       </div>
 

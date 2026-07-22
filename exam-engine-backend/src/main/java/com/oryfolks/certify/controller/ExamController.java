@@ -1,7 +1,13 @@
 package com.oryfolks.certify.controller;
 
 import com.oryfolks.certify.dto.ApiResponse;
-
+import com.oryfolks.certify.dto.AnswerSubmission;
+import com.oryfolks.certify.dto.ViolationRequestDTO;
+import com.oryfolks.certify.dto.ViolationResponseDTO;
+import com.oryfolks.certify.dto.AnswerSyncDTO;
+import com.oryfolks.certify.dto.SyncRequestDTO;
+import com.oryfolks.certify.dto.AttemptStatusDTO;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oryfolks.certify.entity.*;
 import com.oryfolks.certify.enums.*;
 import com.oryfolks.certify.repository.*;
@@ -16,6 +22,7 @@ import com.oryfolks.certify.dto.QuestionResponseDTO;
 import com.oryfolks.certify.dto.AnswerSubmission;
 import java.security.Principal;
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.*;
 
 @RestController
@@ -47,9 +54,10 @@ public class ExamController {
     private AnswerRepository answerRepository;
 
 
+    @Autowired
+    private ExamViolationRepository examViolationRepository;
     @GetMapping
     public ResponseEntity<ApiResponse<List<ExamCardResponseDTO>>> getAllExams() {
-
         return ResponseEntity.ok(
                 ApiResponse.success(
                         "Exams fetched successfully.",
@@ -130,7 +138,7 @@ public class ExamController {
                         exam));
     }
 
-    
+
 
     @GetMapping("/attempts/{attemptId}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getRunnerData(@PathVariable UUID attemptId) {
@@ -218,8 +226,359 @@ public class ExamController {
         data.put("examTitle", exam.getTitle());
         data.put("sections", sectionsData);
         data.put("answers", answersMap);
+        data.put("resultStatus", attempt.getResultStatus().toString());
+        long strikeCount = examViolationRepository.countByAttemptId(attemptId);
+        data.put("strikeCount", (int) strikeCount);
 
         return ResponseEntity.ok(ApiResponse.success("Runner details retrieved", data));
     }
-   
+
+    @GetMapping("/attempts/{attemptId}/timer")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getRemainingTime(@PathVariable UUID attemptId) {
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        long remaining = 0;
+        if (attempt.getEndTime() != null) {
+            remaining = Duration.between(LocalDateTime.now(), attempt.getEndTime()).getSeconds();
+            if (remaining < 0) remaining = 0;
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("remainingSeconds", remaining);
+
+        return ResponseEntity.ok(ApiResponse.success("Remaining time retrieved", response));
+    }
+
+    @PostMapping("/attempts/{attemptId}/answers")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> saveAnswer(
+            @PathVariable UUID attemptId,
+            @RequestBody AnswerSubmission submission) {
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found"));
+
+        Question question = questionRepository.findById(submission.getQuestionId())
+                .orElseThrow(() -> new RuntimeException("Question not found"));
+
+        String optionText = submission.getSelectedOption();
+        if ((optionText == null || optionText.trim().isEmpty()) && submission.getOptionId() != null) {
+            int opId = submission.getOptionId();
+            if (opId == 1) optionText = "A";
+            else if (opId == 2) optionText = "B";
+            else if (opId == 3) optionText = "C";
+            else if (opId == 4) optionText = "D";
+        }
+
+        Optional<Answer> existing = answerRepository.findByAttemptIdAndQuestionId(attemptId, submission.getQuestionId());
+        
+        Answer answer;
+        if (existing.isPresent()) {
+            answer = existing.get();
+            answer.setSelectedOption(optionText);
+        } else {
+            answer = Answer.builder()
+                    .attempt(attempt)
+                    .question(question)
+                    .selectedOption(optionText)
+                    .build();
+        }
+
+        answerRepository.save(answer);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Answer Saved");
+
+        return ResponseEntity.ok(ApiResponse.success("Answer saved successfully", response));
+    }
+
+    @PostMapping("/attempts/{attemptId}/submit")
+    public ResponseEntity<ApiResponse<ExamAttempt>> submitRunnerAttempt(@PathVariable UUID attemptId) {
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found"));
+
+        if (attempt.getResultStatus() != ResultStatus.IN_PROGRESS) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Exam is already submitted or terminated"));
+        }
+
+        Exam exam = attempt.getExam();
+        List<Question> questions = questionRepository.findByExamId(exam.getId());
+        List<Answer> savedAnswers = answerRepository.findByAttemptId(attemptId);
+
+        int totalMarks = 0;
+        int earnedMarks = 0;
+
+        for (Question q : questions) {
+            totalMarks += q.getMarks();
+            Optional<Answer> ansOpt = savedAnswers.stream()
+                    .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
+                    .findFirst();
+
+            if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
+                earnedMarks += q.getMarks();
+            }
+        }
+
+        int finalScore = totalMarks > 0 ? (int) Math.round(((double) earnedMarks / totalMarks) * 100) : 0;
+        attempt.setScore(finalScore);
+        attempt.setEndTime(LocalDateTime.now());
+
+        CompetencyLevel level = CompetencyLevel.L5;
+        List<CompetencyBand> bands = exam.getCompetencyBands();
+        for (CompetencyBand band : bands) {
+            if (finalScore >= band.getMinScore() && finalScore <= band.getMaxScore()) {
+                level = band.getLevelName();
+                break;
+            }
+        }
+        attempt.setAssignedLevel(level);
+
+        if (finalScore >= exam.getPassMark()) {
+            attempt.setResultStatus(ResultStatus.PASSED);
+        } else {
+            attempt.setResultStatus(ResultStatus.FAILED);
+        }
+
+        ExamAttempt savedAttempt = examAttemptRepository.save(attempt);
+        return ResponseEntity.ok(ApiResponse.success("Exam submitted successfully", savedAttempt));
+    }
+
+    @GetMapping("/attempts/{attemptId}/integrity")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getIntegritySettings(@PathVariable UUID attemptId) {
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("candidateName", attempt.getCandidate().getFullName());
+        response.put("candidateId", attempt.getCandidate().getId().toString());
+        response.put("examName", attempt.getExam().getTitle());
+        response.put("watermarkEnabled", true);
+        response.put("fullscreenRequired", true);
+
+        return ResponseEntity.ok(ApiResponse.success("Integrity settings retrieved", response));
+    }
+
+    @PostMapping("/attempts/{attemptId}/violations")
+    public ResponseEntity<ApiResponse<ViolationResponseDTO>> recordViolation(
+            @PathVariable UUID attemptId,
+            @RequestBody ViolationRequestDTO request) {
+        
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        if (attempt.getResultStatus() != ResultStatus.IN_PROGRESS) {
+            long count = examViolationRepository.countByAttemptId(attemptId);
+            return ResponseEntity.ok(ApiResponse.success("Attempt is already completed or terminated",
+                    new ViolationResponseDTO((int) count, true)));
+        }
+
+        long currentCount = examViolationRepository.countByAttemptId(attemptId);
+        int strikeNumber = (int) currentCount + 1;
+
+        LocalDateTime violationTime;
+        try {
+            violationTime = LocalDateTime.parse(request.getTimestamp());
+        } catch (Exception e) {
+            violationTime = LocalDateTime.now();
+        }
+
+        ExamViolation violation = ExamViolation.builder()
+                .attempt(attempt)
+                .type(request.getType())
+                .strikeNumber(strikeNumber)
+                .description("Violation of type " + request.getType() + " detected.")
+                .createdAt(violationTime)
+                .build();
+
+        examViolationRepository.save(violation);
+
+        boolean terminate = strikeNumber >= 3;
+        if (terminate) {
+            terminateAttemptInternal(attempt);
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("Violation recorded",
+                new ViolationResponseDTO(strikeNumber, terminate)));
+    }
+
+    @PostMapping("/attempts/{attemptId}/terminate")
+    public ResponseEntity<ApiResponse<String>> terminateAttempt(@PathVariable UUID attemptId) {
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        if (attempt.getResultStatus() == ResultStatus.IN_PROGRESS) {
+            terminateAttemptInternal(attempt);
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("Exam attempt terminated successfully", null));
+    }
+
+    private void terminateAttemptInternal(ExamAttempt attempt) {
+        Exam exam = attempt.getExam();
+        List<Question> questions = questionRepository.findByExamId(exam.getId());
+        List<Answer> savedAnswers = answerRepository.findByAttemptId(attempt.getId());
+
+        int totalMarks = 0;
+        int earnedMarks = 0;
+
+        for (Question q : questions) {
+            totalMarks += q.getMarks();
+            Optional<Answer> ansOpt = savedAnswers.stream()
+                    .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
+                    .findFirst();
+
+            if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
+                earnedMarks += q.getMarks();
+            }
+        }
+
+        int finalScore = totalMarks > 0 ? (int) Math.round(((double) earnedMarks / totalMarks) * 100) : 0;
+        attempt.setScore(finalScore);
+        attempt.setEndTime(LocalDateTime.now());
+
+        CompetencyLevel level = CompetencyLevel.L5;
+        List<CompetencyBand> bands = exam.getCompetencyBands();
+        for (CompetencyBand band : bands) {
+            if (finalScore >= band.getMinScore() && finalScore <= band.getMaxScore()) {
+                level = band.getLevelName();
+                break;
+            }
+        }
+        attempt.setAssignedLevel(level);
+        attempt.setResultStatus(ResultStatus.TERMINATED);
+
+        examAttemptRepository.save(attempt);
+    }
+
+    @GetMapping("/attempts/{attemptId}/status")
+    public ResponseEntity<ApiResponse<AttemptStatusDTO>> getAttemptStatus(@PathVariable UUID attemptId) {
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        long remaining = 0;
+        if (attempt.getEndTime() != null) {
+            remaining = Duration.between(LocalDateTime.now(), attempt.getEndTime()).getSeconds();
+            if (remaining < 0) remaining = 0;
+        }
+
+        attempt.setLastSeen(LocalDateTime.now());
+        attempt.setRemainingSeconds(remaining);
+        examAttemptRepository.save(attempt);
+
+        AttemptStatusDTO statusDTO = AttemptStatusDTO.builder()
+                .status(attempt.getResultStatus().toString())
+                .remainingSeconds(remaining)
+                .lastSeen(attempt.getLastSeen())
+                .build();
+
+        return ResponseEntity.ok(ApiResponse.success("Attempt status retrieved", statusDTO));
+    }
+
+    @PostMapping("/attempts/{attemptId}/sync")
+    public ResponseEntity<ApiResponse<AttemptStatusDTO>> syncAttemptAnswers(
+            @PathVariable UUID attemptId,
+            @RequestBody SyncRequestDTO request) {
+
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        int syncedCount = 0;
+        if (attempt.getResultStatus() == ResultStatus.IN_PROGRESS && request != null && request.getAnswers() != null) {
+            for (AnswerSyncDTO dto : request.getAnswers()) {
+                if (dto.getQuestionId() == null) continue;
+                Question question = questionRepository.findById(dto.getQuestionId()).orElse(null);
+                if (question == null) continue;
+
+                String optionText = dto.getSelectedOption();
+                if ((optionText == null || optionText.trim().isEmpty()) && dto.getOptionId() != null) {
+                    int opId = dto.getOptionId();
+                    if (opId == 1) optionText = "A";
+                    else if (opId == 2) optionText = "B";
+                    else if (opId == 3) optionText = "C";
+                    else if (opId == 4) optionText = "D";
+                }
+
+                Optional<Answer> existing = answerRepository.findByAttemptIdAndQuestionId(attemptId, dto.getQuestionId());
+                Answer answer;
+                if (existing.isPresent()) {
+                    answer = existing.get();
+                    answer.setSelectedOption(optionText);
+                } else {
+                    answer = Answer.builder()
+                            .attempt(attempt)
+                            .question(question)
+                            .selectedOption(optionText)
+                            .build();
+                }
+                answerRepository.save(answer);
+                syncedCount++;
+            }
+        }
+
+        long remaining = 0;
+        if (attempt.getEndTime() != null) {
+            remaining = Duration.between(LocalDateTime.now(), attempt.getEndTime()).getSeconds();
+            if (remaining < 0) remaining = 0;
+        }
+
+        attempt.setLastSeen(LocalDateTime.now());
+        if (request != null && request.getRemainingSeconds() != null) {
+            attempt.setRemainingSeconds(request.getRemainingSeconds());
+        } else {
+            attempt.setRemainingSeconds(remaining);
+        }
+        examAttemptRepository.save(attempt);
+
+        AttemptStatusDTO statusDTO = AttemptStatusDTO.builder()
+                .status(attempt.getResultStatus().toString())
+                .remainingSeconds(remaining)
+                .lastSeen(attempt.getLastSeen())
+                .syncedCount(syncedCount)
+                .build();
+
+        return ResponseEntity.ok(ApiResponse.success("Answers synchronized successfully", statusDTO));
+    }
+
+    @PostMapping("/attempts/{attemptId}/beacon")
+    public ResponseEntity<ApiResponse<String>> handleBeacon(
+            @PathVariable UUID attemptId,
+            @RequestBody(required = false) String rawBody) {
+
+        ExamAttempt attempt = examAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
+
+        if (attempt.getResultStatus() == ResultStatus.IN_PROGRESS && rawBody != null && !rawBody.trim().isEmpty()) {
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                SyncRequestDTO request = mapper.readValue(rawBody, SyncRequestDTO.class);
+                if (request != null && request.getAnswers() != null) {
+                    for (AnswerSyncDTO dto : request.getAnswers()) {
+                        if (dto.getQuestionId() == null) continue;
+                        Question question = questionRepository.findById(dto.getQuestionId()).orElse(null);
+                        if (question == null) continue;
+
+                        Optional<Answer> existing = answerRepository.findByAttemptIdAndQuestionId(attemptId, dto.getQuestionId());
+                        Answer answer;
+                        if (existing.isPresent()) {
+                            answer = existing.get();
+                            answer.setSelectedOption(dto.getSelectedOption());
+                        } else {
+                            answer = Answer.builder()
+                                    .attempt(attempt)
+                                    .question(question)
+                                    .selectedOption(dto.getSelectedOption())
+                                    .build();
+                        }
+                        answerRepository.save(answer);
+                    }
+                }
+            } catch (Exception e) {
+                // Log and continue gracefully for beacon transmissions
+            }
+        }
+
+        attempt.setLastSeen(LocalDateTime.now());
+        examAttemptRepository.save(attempt);
+
+        return ResponseEntity.ok(ApiResponse.success("Beacon recorded", "OK"));
+    }
 }
