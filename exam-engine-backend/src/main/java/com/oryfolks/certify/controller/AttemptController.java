@@ -1,5 +1,7 @@
 package com.oryfolks.certify.controller;
 
+import com.oryfolks.certify.dto.AttemptHistoryResponseDTO;
+import com.oryfolks.certify.dto.AttemptDetailsResponseDTO;
 import com.oryfolks.certify.dto.ApiResponse;
 import com.oryfolks.certify.dto.AnswerSubmission;
 import com.oryfolks.certify.entity.*;
@@ -24,152 +26,110 @@ import com.oryfolks.certify.dto.SubmitExamResponseDTO;
 
 import com.oryfolks.certify.service.AttemptService;
 
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+
 import org.springframework.security.access.prepost.PreAuthorize;
 import java.security.Principal;
-import java.time.LocalDateTime;
-import java.util.*;
 
+import java.util.UUID;
 @RestController
-@RequestMapping("/api/attempts")
+@RequestMapping("/api/candidate/attempts")
 public class AttemptController {
 
-    @Autowired
+@Autowired
 private AttemptService attemptService;
-
-@Autowired
-private UserRepository userRepository;
-
-@Autowired
-private QuestionRepository questionRepository;
-
-@Autowired
-private AttemptAnswerRepository attemptAnswerRepository;
-
-
-@Autowired
-private ExamAttemptRepository examAttemptRepository;
-
-    @Autowired
-    private IntegrityViolationRepository integrityViolationRepository;
 
     @Autowired
     private StorageService storageService;
 
-    @Autowired
-    private AccessAuditLogRepository auditLogRepository;
-
-    @Autowired
-    private SectionRepository sectionRepository;
-
-    @Autowired
-    private AnswerRepository answerRepository;
-
-    // Retrieve all attempts (for administrator oversight)
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<ExamAttempt>>> getAllAttempts() {
-        List<ExamAttempt> attempts = examAttemptRepository.findAllByOrderByCreatedAtDesc();
-        return ResponseEntity.ok(ApiResponse.success("Attempts fetched successfully", attempts));
-    }
-
-    // Get detail of single attempt
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getAttemptDetail(@PathVariable UUID id,
-            Principal principal) {
-        ExamAttempt attempt = examAttemptRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Attempt not found: " + id));
-
-        // Audit log access if administrator views this
-        User user = userRepository.findByUsername(principal.getName()).orElse(null);
-        if (user != null && user.getRole() == UserRole.ROLE_ADMIN) {
-            auditLogRepository.save(AccessAuditLog.builder()
-                    .user(user)
-                    .action("Viewed recording / details for Attempt #" + attempt.getId())
-                    .build());
-        }
-
-        List<IntegrityViolation> violations = integrityViolationRepository.findByAttemptIdOrderByCreatedAtAsc(id);
-
-        Map<String, Object> data = new HashMap<>();
-        data.put("attempt", attempt);
-        data.put("violations", violations);
-
-        return ResponseEntity.ok(ApiResponse.success("Attempt details retrieved", data));
-    }
-
-    // Fetch attempt history of the logged-in candidate
-    @GetMapping("/my-attempts")
-    public ResponseEntity<ApiResponse<List<ExamAttempt>>> getMyAttempts(Principal principal) {
-        User user = userRepository.findByUsername(principal.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        List<ExamAttempt> attempts = examAttemptRepository.findByCandidateIdOrderByCreatedAtDesc(user.getId());
-        return ResponseEntity.ok(ApiResponse.success("Candidate attempts fetched", attempts));
-    }
-
     @PostMapping("/start")
-public ResponseEntity<ApiResponse<StartExamResponseDTO>> startAttempt(
-        @Valid @RequestBody StartExamRequestDTO request,
-        Principal principal) {
+    public ResponseEntity<ApiResponse<StartExamResponseDTO>> startAttempt(
+            @Valid @RequestBody StartExamRequestDTO request,
+            Principal principal) {
 
-    StartExamResponseDTO response =
-            attemptService.startExam(request, principal.getName());
+        StartExamResponseDTO response =
+                attemptService.startExam(request, principal.getName());
 
-    return ResponseEntity.ok(
-            ApiResponse.success("Exam started successfully.", response));
-}
+        return ResponseEntity.ok(
+                ApiResponse.success("Exam started successfully.", response));
+    }
 
-   @PostMapping("/{id}/tab-switch")
-@PreAuthorize("hasRole('CANDIDATE')")
-public ResponseEntity<ApiResponse<String>> recordTabSwitch(
-        @PathVariable UUID id) {
 
-    attemptService.recordTabSwitch(id);
+    @PostMapping("/{attemptId}/tab-switch")
+    @PreAuthorize("hasRole('CANDIDATE')")
+    public ResponseEntity<ApiResponse<String>> recordTabSwitch(
+            @PathVariable UUID attemptId) {
 
-    return ResponseEntity.ok(
-            ApiResponse.success(
-                    "Tab switch recorded successfully.",
-                    null
-            )
-    );
-}
-    @PostMapping("/{id}/violation")
-@PreAuthorize("hasRole('CANDIDATE')")
-public ResponseEntity<ApiResponse<String>> recordViolation(
-        @PathVariable UUID id,
-        @RequestParam String violationCode,
-        @RequestParam(required = false) String metaDescription,
-        @RequestParam String timestampOffset,
-        @RequestParam(required = false) MultipartFile snapshot) {
+        attemptService.recordTabSwitch(attemptId);
 
-    attemptService.recordViolation(
-            id,
-            violationCode,
-            metaDescription,
-            timestampOffset,
-            snapshot
-    );
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "Tab switch recorded successfully.",
+                        null
+                )
+        );
+    }
 
-    return ResponseEntity.ok(
-            ApiResponse.success(
-                    "Integrity violation recorded successfully.",
-                    null
-            )
-    );
-}
+
+    @PostMapping("/{attemptId}/violation")
+    @PreAuthorize("hasRole('CANDIDATE')")
+    public ResponseEntity<ApiResponse<String>> recordViolation(
+            @PathVariable UUID attemptId,
+            @RequestParam String violationCode,
+            @RequestParam(required = false) String metaDescription,
+            @RequestParam String timestampOffset,
+            @RequestParam(required = false) MultipartFile snapshot) {
+
+        attemptService.recordViolation(
+                attemptId,
+                violationCode,
+                metaDescription,
+                timestampOffset,
+                snapshot
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "Integrity violation recorded successfully.",
+                        null
+                )
+        );
+    }
+
 
     @PostMapping("/submit")
-@PreAuthorize("hasRole('CANDIDATE')")
-public ResponseEntity<ApiResponse<SubmitExamResponseDTO>> submitAttempt(
-        @Valid @RequestBody SubmitExamRequestDTO request,
-        Principal principal) {
+    @PreAuthorize("hasRole('CANDIDATE')")
+    public ResponseEntity<ApiResponse<SubmitExamResponseDTO>> submitAttempt(
+            @Valid @RequestBody SubmitExamRequestDTO request,
+            Principal principal) {
 
-    SubmitExamResponseDTO response =
-            attemptService.submitExam(request, principal.getName());
+        SubmitExamResponseDTO response =
+                attemptService.submitExam(request, principal.getName());
 
-    return ResponseEntity.ok(
-            ApiResponse.success(
-                    "Exam submitted successfully.",
-                    response
-            )
-    );
-}
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "Exam submitted successfully.",
+                        response
+                )
+        );
+    }
+
+
+    @PostMapping("/{attemptId}/answers")
+    public ResponseEntity<ApiResponse<Answer>> saveAnswer(
+            @PathVariable UUID attemptId,
+            @RequestBody AnswerSubmission submission) {
+
+        Answer answer =
+                attemptService.saveAnswer(
+                        attemptId,
+                        submission);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "Answer saved successfully.",
+                        answer));
+    }
+
 }

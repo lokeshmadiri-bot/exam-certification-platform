@@ -29,4 +29,5 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> 
             ResultPublishStatus resultPublishStatus);
 
     List<ExamAttempt> findByCandidateIdOrderByEndTimeDesc(UUID candidateId);
+
 }

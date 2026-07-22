@@ -17,17 +17,19 @@ import com.oryfolks.certify.dto.AttemptDetailsResponseDTO;
 import com.oryfolks.certify.dto.AttemptAnswerResponseDTO;
 import com.oryfolks.certify.dto.IntegrityViolationResponseDTO;
 import com.oryfolks.certify.entity.ExamAttempt;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Service;
+
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 import java.util.UUID;
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class CandidateService {
 
     private final UserRepository userRepository;
@@ -38,7 +40,7 @@ public class CandidateService {
 
     private final IntegrityViolationRepository integrityViolationRepository;
 
-    @Transactional(readOnly = true)
+
     public CandidateDashboardResponseDTO getDashboard(String username) {
 
         // Find candidate
@@ -65,16 +67,7 @@ public class CandidateService {
                 .findByCandidateIdOrderByCreatedAtDesc(candidate.getId())
                 .stream()
                 .limit(5)
-                .map(attempt -> AttemptHistoryResponseDTO.builder()
-                        .attemptId(attempt.getId())
-                        .examId(attempt.getExam().getId())
-                        .examTitle(attempt.getExam().getTitle())
-                        .stack(attempt.getExam().getStack())
-                        .startedAt(attempt.getStartTime())
-                        .submittedAt(attempt.getEndTime())
-                        .resultStatus(attempt.getResultStatus())
-                        .resultPublishStatus(attempt.getResultPublishStatus())
-                        .build())
+                .map(this::mapAttemptHistory)
                 .toList();
 
         return CandidateDashboardResponseDTO.builder()
@@ -88,7 +81,7 @@ public class CandidateService {
                 .build();
     }
 
-    @Transactional(readOnly = true)
+
     public List<AttemptHistoryResponseDTO> getMyAttempts(String username) {
 
         User candidate = userRepository.findByUsername(username)
@@ -97,20 +90,11 @@ public class CandidateService {
         List<ExamAttempt> attempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(candidate.getId());
 
         return attempts.stream()
-                .map(attempt -> AttemptHistoryResponseDTO.builder()
-                        .attemptId(attempt.getId())
-                        .examId(attempt.getExam().getId())
-                        .examTitle(attempt.getExam().getTitle())
-                        .stack(attempt.getExam().getStack())
-                        .startedAt(attempt.getStartTime())
-                        .submittedAt(attempt.getEndTime())
-                        .resultStatus(attempt.getResultStatus())
-                        .resultPublishStatus(attempt.getResultPublishStatus())
-                        .build())
+                .map(this::mapAttemptHistory)
                 .toList();
     }
 
-    @Transactional(readOnly = true)
+ 
     public AttemptDetailsResponseDTO getAttemptDetails(
             UUID attemptId,
             String username) {
@@ -161,7 +145,7 @@ public class CandidateService {
                 .build();
     }
 
-    @Transactional(readOnly = true)
+    
     public List<ResultResponseDTO> getMyResults(String username) {
 
         // Find logged-in candidate
@@ -202,4 +186,18 @@ public class CandidateService {
                 .toList();
     }
 
+
+    private AttemptHistoryResponseDTO mapAttemptHistory(ExamAttempt attempt) {
+
+    return AttemptHistoryResponseDTO.builder()
+            .attemptId(attempt.getId())
+            .examId(attempt.getExam().getId())
+            .examTitle(attempt.getExam().getTitle())
+            .stack(attempt.getExam().getStack())
+            .startedAt(attempt.getStartTime())
+            .submittedAt(attempt.getEndTime())
+            .resultStatus(attempt.getResultStatus())
+            .resultPublishStatus(attempt.getResultPublishStatus())
+            .build();
+}
 }

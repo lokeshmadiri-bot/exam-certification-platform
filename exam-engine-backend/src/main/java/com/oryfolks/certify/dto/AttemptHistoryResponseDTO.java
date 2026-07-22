@@ -24,6 +24,8 @@ public class AttemptHistoryResponseDTO {
 
     private String stack;
 
+    private String candidateName;
+
     private LocalDateTime startedAt;
 
     private LocalDateTime submittedAt;
