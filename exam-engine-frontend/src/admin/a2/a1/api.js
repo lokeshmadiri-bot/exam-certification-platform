@@ -55,7 +55,7 @@ async function del(path) {
 }
 
 function authHeaders() {
-    const token = localStorage.getItem("admin_token");
+    const token = localStorage.getItem("admin_token") || localStorage.getItem("token");
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -161,6 +161,26 @@ export const bulkUpdateQuestions = (ids, patch) =>
         mockBulkUpdateQuestions(ids, patch)
     );
 
+// ---------------- AI Question Generation (Gemini) ----------------
+
+export const generateAIQuestions = (payload) =>
+    withFallback(
+        () => post("/questions/ai/generate", payload),
+        () => mockGenerateAIQuestions(payload)
+    );
+
+export const saveAIQuestions = (payload) =>
+    withFallback(
+        () => post("/questions/ai/save", payload),
+        () => mockSaveAIQuestions(payload)
+    );
+
+export const regenerateAIQuestion = (question) =>
+    withFallback(
+        () => post("/questions/ai/regenerate", question),
+        () => mockRegenerateAIQuestion(question)
+    );
+
 // ---------------- Candidates (Task 5) ----------------
 
 export const fetchCandidates = (filters = {}) =>
@@ -255,16 +275,35 @@ const MOCK = {
         "EXM-101": { L1: [0, 20], L2: [21, 40], L3: [41, 60], L4: [61, 80], L5: [81, 100] },
     },
 
-    questions: Array.from({ length: 42 }, (_, i) => {
+    questions: Array.from({ length: 24 }, (_, i) => {
         const level = LEVELS[i % LEVELS.length];
         const type = QUESTION_TYPES[i % QUESTION_TYPES.length];
+        const stack = STACKS[i % STACKS.length];
         return {
             id: `Q-${1000 + i}`,
-            title: `${STACKS[i % STACKS.length]} question #${i + 1}`,
-            stack: STACKS[i % STACKS.length],
+            title: `What is the primary function of ${stack} feature #${i + 1}?`,
+            questionText: `What is the primary function of ${stack} feature #${i + 1}? Explain its usage in enterprise applications.`,
+            stack,
             type,
             level,
+            difficulty: i % 3 === 0 ? "EASY" : i % 3 === 1 ? "MEDIUM" : "HARD",
+            topic: `${stack} Fundamentals`,
+            marks: (i % 3) + 1,
+            optionA: `Option A for ${stack} feature #${i + 1}`,
+            optionB: `Option B for ${stack} feature #${i + 1}`,
+            optionC: `Option C for ${stack} feature #${i + 1}`,
+            optionD: `Option D for ${stack} feature #${i + 1}`,
+            correctOption: ["A", "B", "C", "D"][i % 4],
+            codeSnippet: type === "CODING" ? `// Example ${stack} snippet\nfunction demo() {\n  return "Hello ${stack}";\n}` : "",
+            language: stack === "React" || stack === "Node" ? "JavaScript" : stack,
+            sampleInput: type === "CODING" ? "hello" : "",
+            sampleOutput: type === "CODING" ? "olleh" : "",
+            expectedOutput: type === "CODING" ? "olleh" : "",
+            modelAnswer: type === "DESCRIPTIVE" ? "Model answer detailing architectural principles." : "",
+            explanation: "Refer to official developer documentation.",
             status: i % 9 === 0 ? "INACTIVE" : "ACTIVE",
+            source: i % 2 === 0 ? "MANUAL" : "AI",
+            aiModel: i % 2 === 0 ? null : "Gemini-2.5-Flash",
             updatedAt: new Date(Date.now() - i * 6 * 3600 * 1000).toISOString(),
         };
     }),
@@ -404,7 +443,10 @@ function mockSaveBands(examId, bands) {
 
 function mockListQuestions(filters) {
     let rows = MOCK.questions;
-    if (filters.q) rows = rows.filter((q) => q.title.toLowerCase().includes(filters.q.toLowerCase()));
+    if (filters.q) {
+        const query = filters.q.toLowerCase();
+        rows = rows.filter((q) => (q.questionText || q.title || "").toLowerCase().includes(query) || (q.topic || "").toLowerCase().includes(query));
+    }
     if (filters.stack) rows = rows.filter((q) => q.stack === filters.stack);
     if (filters.type) rows = rows.filter((q) => q.type === filters.type);
     if (filters.level) rows = rows.filter((q) => q.level === filters.level);
@@ -413,7 +455,8 @@ function mockListQuestions(filters) {
 }
 
 function mockCreateQuestion(payload) {
-    const q = { id: uid("Q"), status: "ACTIVE", updatedAt: nowIso(), ...payload };
+    const title = payload.questionText ? payload.questionText.slice(0, 60) : (payload.title || "Untitled Question");
+    const q = { id: uid("Q"), title, status: "ACTIVE", source: "MANUAL", updatedAt: nowIso(), ...payload };
     MOCK.questions.unshift(q);
     pushAudit("CREATE_QUESTION", "Question Bank", "-", q.id);
     return q;
@@ -556,6 +599,101 @@ function mockAuditLog(filters) {
     if (filters.user) rows = rows.filter((r) => r.user === filters.user);
     return { rows, total: rows.length };
 }
+// ---------- AI Question Generation Mocks ----------
+
+const AI_MOCK_TEMPLATES = {
+    Java: [
+        { q: "What does the 'final' keyword mean when applied to a method in Java?", a: "The method cannot be overridden by subclasses", b: "The method runs only once", c: "The method is static", d: "The method is private", ans: "A" },
+        { q: "Which collection does NOT allow duplicate elements in Java?", a: "ArrayList", b: "LinkedList", c: "HashSet", d: "Vector", ans: "C" },
+        { q: "What is the default value of an int field in a Java class?", a: "null", b: "undefined", c: "0", d: "-1", ans: "C" },
+    ],
+    React: [
+        { q: "Which hook is used to run a side effect after render in React?", a: "useState", b: "useEffect", c: "useContext", d: "useRef", ans: "B" },
+        { q: "What does the key prop do in a React list rendering?", a: "Styles the element", b: "Helps React identify which items changed", c: "Prevents re-rendering", d: "Marks the element as required", ans: "B" },
+        { q: "Which method is used to update state in a React class component?", a: "this.updateState()", b: "this.changeState()", c: "this.setState()", d: "this.state = {}", ans: "C" },
+    ],
+    Python: [
+        { q: "Which keyword is used to define a generator function in Python?", a: "async", b: "lambda", c: "yield", d: "return", ans: "C" },
+        { q: "What data structure does a Python dict implement under the hood?", a: "Linked List", b: "Binary Tree", c: "Hash Table", d: "Stack", ans: "C" },
+        { q: "What is the output of bool([]) in Python?", a: "True", b: "False", c: "None", d: "Error", ans: "B" },
+    ],
+    Node: [
+        { q: "What is the event loop in Node.js responsible for?", a: "Compiling TypeScript", b: "Managing non-blocking I/O operations", c: "Garbage collection", d: "SSL termination", ans: "B" },
+        { q: "Which module in Node.js is used to create HTTP servers?", a: "fs", b: "path", c: "http", d: "stream", ans: "C" },
+        { q: "What does res.json() do in an Express handler?", a: "Reads JSON from the request", b: "Sends a JSON response", c: "Validates JSON", d: "Parses query params as JSON", ans: "B" },
+    ],
+    SQL: [
+        { q: "What does the HAVING clause do in SQL?", a: "Filters rows before grouping", b: "Filters groups after GROUP BY", c: "Joins two tables", d: "Orders the result set", ans: "B" },
+        { q: "Which join type returns all rows from both tables regardless of match?", a: "INNER JOIN", b: "LEFT JOIN", c: "FULL OUTER JOIN", d: "CROSS JOIN", ans: "C" },
+        { q: "What is the purpose of an index in a database?", a: "Enforces uniqueness", b: "Speeds up data retrieval", c: "Prevents NULL values", d: "Encrypts the column", ans: "B" },
+    ],
+};
+
+function mockGenerateAIQuestions(payload) {
+    const { stack = "Java", level = "L3", difficulty = "MEDIUM", type = "MCQ", count = 3 } = payload;
+    const templates = AI_MOCK_TEMPLATES[stack] || AI_MOCK_TEMPLATES.Java;
+    const marksMap = { EASY: 1, MEDIUM: 2, HARD: 3 };
+
+    return Array.from({ length: Math.min(count, 10) }, (_, i) => {
+        const t = templates[i % templates.length];
+        return {
+            tempId: `gen-${i}-${Date.now()}`,
+            questionText: t.q,
+            codeSnippet: type === "CODING" ? `// ${stack} example\nSystem.out.println("Q${i + 1}");` : "",
+            stack,
+            type,
+            level,
+            difficulty,
+            marks: marksMap[difficulty] || 2,
+            optionA: t.a,
+            optionB: t.b,
+            optionC: t.c,
+            optionD: t.d,
+            correctOption: t.ans,
+            source: "AI",
+            aiModel: "Gemini-2.5-Flash (mock)",
+            examId: payload.examId || null,
+        };
+    });
+}
+
+function mockSaveAIQuestions(payload) {
+    const { questions = [] } = payload;
+    questions.forEach((q) => {
+        const saved = {
+            id: uid("Q"),
+            title: q.questionText.slice(0, 60),
+            stack: q.stack,
+            type: q.type,
+            level: q.level,
+            status: "ACTIVE",
+            source: "AI",
+            aiModel: q.aiModel || "Gemini-2.5-Flash",
+            updatedAt: nowIso(),
+        };
+        MOCK.questions.unshift(saved);
+        pushAudit("AI_GENERATE_QUESTION", "Question Bank", "-", saved.id);
+    });
+    return { ok: true, saved: questions.length };
+}
+
+function mockRegenerateAIQuestion(original) {
+    const templates = AI_MOCK_TEMPLATES[original.stack] || AI_MOCK_TEMPLATES.Java;
+    const picked = templates[Math.floor(Math.random() * templates.length)];
+    return {
+        ...original,
+        tempId: `regen-${Date.now()}`,
+        questionText: picked.q,
+        optionA: picked.a,
+        optionB: picked.b,
+        optionC: picked.c,
+        optionD: picked.d,
+        correctOption: picked.ans,
+        aiModel: "Gemini-2.5-Flash (mock)",
+    };
+}
+
+// ---------- / AI Mock ----------
 
 function pushAudit(action, module, oldValue, newValue) {
     MOCK.auditLog.unshift({
