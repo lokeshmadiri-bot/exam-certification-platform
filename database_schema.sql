@@ -53,15 +53,26 @@ CREATE TABLE IF NOT EXISTS questions (
     exam_id UUID REFERENCES exams(id) ON DELETE CASCADE,
     section_id UUID REFERENCES sections(id) ON DELETE SET NULL,
     question_text TEXT NOT NULL,
-    code_snippet TEXT,
+    topic VARCHAR(100),
+    type VARCHAR(20) DEFAULT 'MCQ', -- MCQ, CODING, DESCRIPTIVE
+    level VARCHAR(10) DEFAULT 'L1', -- L1, L2, L3, L4, L5
     difficulty VARCHAR(20) NOT NULL, -- EASY, MEDIUM, HARD
-    marks INT NOT NULL,
-    correct_option VARCHAR(1) NOT NULL, -- A, B, C, D
-    option_a TEXT NOT NULL,
-    option_b TEXT NOT NULL,
-    option_c TEXT NOT NULL,
-    option_d TEXT NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE
+    marks INT NOT NULL DEFAULT 1,
+    correct_option VARCHAR(5), -- A, B, C, D
+    option_a TEXT,
+    option_b TEXT,
+    option_c TEXT,
+    option_d TEXT,
+    code_snippet TEXT,
+    language VARCHAR(30),
+    sample_input TEXT,
+    sample_output TEXT,
+    expected_output TEXT,
+    model_answer TEXT,
+    explanation TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    source VARCHAR(20) DEFAULT 'MANUAL',
+    ai_model VARCHAR(50)
 );
 
 -- 6. Exam Attempts Table
@@ -75,9 +86,6 @@ CREATE TABLE IF NOT EXISTS exam_attempts (
     start_time TIMESTAMP NOT NULL,
     end_time TIMESTAMP,
     tab_switch_count INT DEFAULT 0,
-    last_seen TIMESTAMP,
-    remaining_seconds BIGINT,
-    submitted_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
