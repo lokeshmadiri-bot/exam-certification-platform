@@ -194,3 +194,14 @@
 
 /* ---- Pagination ---- */
 .a1-pagination { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 16px; }
+
+/* ---- Banners ---- */
+.a1-banner { border-radius: 8px; padding: 12px 16px; font-size: 13.5px; margin-bottom: 16px; }
+.a1-banner-slim { margin-bottom: 12px; padding: 9px 14px; }
+.a1-banner-navy { background: var(--a1-navy-soft); color: var(--a1-navy); border: 1px solid #cddcf0; }
+.a1-banner-green { background: var(--a1-green-soft); color: var(--a1-green); border: 1px solid #bfe3cf; }
+.a1-banner-amber { background: var(--a1-amber-soft); color: #9a6210; border: 1px solid #f0d9a8; }
+
+/* ---- Extra pills ---- */
+.a1-pill-navy { background: var(--a1-navy); color: #fff; }
+
