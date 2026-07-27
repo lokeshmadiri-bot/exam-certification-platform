@@ -5,6 +5,7 @@ import com.oryfolks.certify.repository.ExamRepository;
 import com.oryfolks.certify.repository.UserRepository;
 import com.oryfolks.certify.repository.QuestionRepository;
 import com.oryfolks.certify.repository.AttemptAnswerRepository;
+import com.oryfolks.certify.repository.AnswerRepository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,13 +30,12 @@ import com.oryfolks.certify.dto.AnswerSubmission;
 
 import com.oryfolks.certify.entity.AttemptAnswer;
 import com.oryfolks.certify.entity.Question;
+import com.oryfolks.certify.entity.Answer;
 
 import org.springframework.transaction.annotation.Transactional;
 
 
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.UUID;
 
 import com.oryfolks.certify.entity.ExamAttempt;
 import com.oryfolks.certify.entity.IntegrityViolation;
@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
+
 
 @Service
 @RequiredArgsConstructor
@@ -65,7 +66,9 @@ public class AttemptService {
 
     private final IntegrityViolationRepository integrityViolationRepository;
 
-private final StorageService storageService;
+    private final AnswerRepository answerRepository;
+
+    private final StorageService storageService;
 
     public StartExamResponseDTO startExam(
             StartExamRequestDTO request,
@@ -91,82 +94,136 @@ private final StorageService storageService;
             ExamAttempt attempt = existingAttempt.get();
 
             return StartExamResponseDTO.builder()
-                    .attemptId(attempt.getId())
-                    .examId(exam.getId())
-                    .examTitle(exam.getTitle())
-                    .durationMinutes(exam.getDurationMinutes())
-                    .startTime(attempt.getStartTime())
-                    .build();
+                                        .attemptId(attempt.getId())
+                                        .examId(exam.getId())
+                                        .examTitle(exam.getTitle())
+                                        .durationMinutes(exam.getDurationMinutes())
+                                        .startTime(attempt.getStartTime())
+                                        .build();
+        }
+
+        if (existingAttempt.isPresent()) {
+
+            ExamAttempt lastAttempt = existingAttempt.get();
+
+            LocalDateTime referenceDate =
+                lastAttempt.getEndTime() != null
+                        ? lastAttempt.getEndTime()
+                        : lastAttempt.getCreatedAt();
+
+            LocalDateTime nextEligibleDate =
+                    referenceDate.plusDays(30);
+
+            System.out.println("==================================");
+System.out.println("Attempt ID      : " + lastAttempt.getId());
+            System.out.println("Created At      : " + lastAttempt.getCreatedAt());
+            System.out.println("End Time        : " + lastAttempt.getEndTime());
+            System.out.println("Reference Date  : " + referenceDate);
+            System.out.println("Next Eligible   : " + nextEligibleDate);
+            System.out.println("Current Time    : " + LocalDateTime.now());
+            System.out.println("==================================");
+
+            if (LocalDateTime.now().isBefore(nextEligibleDate)) {
+
+                long remainingDays =
+                        java.time.Duration
+                                .between(LocalDateTime.now(), nextEligibleDate)
+                                .toDays();
+
+                throw new BadRequestException(
+                        "You have already attempted this exam. "
+                        + "You can retake it after "
+                        + nextEligibleDate.toLocalDate()
+                        + " (" + remainingDays + " day(s) remaining).");
+            }
         }
 
         ExamAttempt attempt = ExamAttempt.builder()
-                .candidate(candidate)
-                .exam(exam)
-                .score(0)
-                .assignedLevel(null)
-                .resultStatus(ResultStatus.IN_PROGRESS)
-                .startTime(LocalDateTime.now())
-                .tabSwitchCount(0)
-                .build();
+                                            .candidate(candidate)
+                                            .exam(exam)
+                                            .score(0)
+                                            .resultStatus(ResultStatus.IN_PROGRESS)
+                                            .startTime(LocalDateTime.now())
+                                            .tabSwitchCount(0)
+                                            .build();
 
         attempt = attemptRepository.save(attempt);
 
         return StartExamResponseDTO.builder()
-                .attemptId(attempt.getId())
-                .examId(exam.getId())
-                .examTitle(exam.getTitle())
-                .durationMinutes(exam.getDurationMinutes())
-                .startTime(attempt.getStartTime())
-                .build();
+                                    .attemptId(attempt.getId())
+                                    .examId(exam.getId())
+                                    .examTitle(exam.getTitle())
+                                    .durationMinutes(exam.getDurationMinutes())
+                                    .startTime(attempt.getStartTime())
+                                    .build();
     }
 
-    @Transactional
-public void recordTabSwitch(UUID attemptId) {
+    
+    public void recordTabSwitch(UUID attemptId) {
 
-    ExamAttempt attempt = attemptRepository.findById(attemptId)
-            .orElseThrow(() ->
-                    new ResourceNotFoundException("Exam attempt not found."));
+        ExamAttempt attempt = attemptRepository.findById(attemptId)
+                                                .orElseThrow(() ->
+                                                        new ResourceNotFoundException("Exam attempt not found."));
 
-    attempt.setTabSwitchCount(attempt.getTabSwitchCount() + 1);
+        attempt.setTabSwitchCount(attempt.getTabSwitchCount() + 1);
 
-    attemptRepository.save(attempt);
-}
+        attemptRepository.save(attempt);
+    }
 
-    @Transactional
-public void recordViolation(
+    
+    public void recordViolation(
         UUID attemptId,
         String violationCode,
         String metaDescription,
         String timestampOffset,
         MultipartFile snapshot) {
 
-    // Find exam attempt
-    ExamAttempt attempt = attemptRepository.findById(attemptId)
-            .orElseThrow(() ->
-                    new ResourceNotFoundException("Exam attempt not found."));
+        // Find exam attempt
+        ExamAttempt attempt = attemptRepository.findById(attemptId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Exam attempt not found."));
 
-    String snapshotUrl = null;
+        String snapshotUrl = null;
 
-if (snapshot != null && !snapshot.isEmpty()) {
-    snapshotUrl = storageService.uploadFile(snapshot, "integrity-violations");
-}
+        if (snapshot != null && !snapshot.isEmpty()) {
+            snapshotUrl = storageService.uploadFile(snapshot, "integrity-violations");
+        }
 
-    // Create integrity violation
-    IntegrityViolation violation = IntegrityViolation.builder()
-            .attempt(attempt)
-            .violationCode(violationCode)
-            .metaDescription(metaDescription)
-            .timestampOffset(timestampOffset)
-            .snapshotUrl(snapshotUrl)
-            .build();
+        // Create integrity violation
+        IntegrityViolation violation = IntegrityViolation.builder()
+                .attempt(attempt)
+                .violationCode(violationCode)
+                .metaDescription(metaDescription)
+                .timestampOffset(timestampOffset)
+                .snapshotUrl(snapshotUrl)
+                .build();
 
-    integrityViolationRepository.save(violation);
+        integrityViolationRepository.save(violation);
 
     
-}
+    }
 
 
-    @Transactional
+    private void validateSelectedOption(String selectedOption) {
+
+        if (selectedOption == null) {
+            throw new BadRequestException("Selected option is required.");
+        }
+
+        switch (selectedOption.toUpperCase()) {
+            case "A":
+            case "B":
+            case "C":
+            case "D":
+                return;
+
+            default:
+                throw new BadRequestException(
+                        "Invalid selected option. Allowed values are A, B, C or D.");
+        }
+    }
+
+    
     public SubmitExamResponseDTO submitExam(
             SubmitExamRequestDTO request,
             String username) {
@@ -217,6 +274,8 @@ if (snapshot != null && !snapshot.isEmpty()) {
 
         for (AnswerSubmission answer : request.getAnswers()) {
 
+            validateSelectedOption(answer.getSelectedOption());
+
             if (!uniqueQuestionIds.add(answer.getQuestionId())) {
                 throw new BadRequestException(
                         "Duplicate answers detected for question: " + answer.getQuestionId());
@@ -225,6 +284,11 @@ if (snapshot != null && !snapshot.isEmpty()) {
             Question question = questionRepository.findById(answer.getQuestionId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Question not found: " + answer.getQuestionId()));
+
+            if (!question.getExam().getId().equals(attempt.getExam().getId())) {
+                throw new BadRequestException(
+                        "Question does not belong to this exam.");
+            }
 
             AttemptAnswer attemptAnswer = AttemptAnswer.builder()
                     .attempt(attempt)
@@ -235,7 +299,10 @@ if (snapshot != null && !snapshot.isEmpty()) {
             attemptAnswers.add(attemptAnswer);
         }
 
-        // Save all answers
+        // Remove previously stored answers for this attempt (if any)
+        attemptAnswerRepository.deleteByAttemptId(attempt.getId());
+
+        // Save latest submitted answers
         attemptAnswerRepository.saveAll(attemptAnswers);
 
         // Update exam attempt
@@ -251,6 +318,50 @@ if (snapshot != null && !snapshot.isEmpty()) {
                 .message("Exam submitted successfully. Your results will be published after admin review.")
                 .submittedAt(attempt.getEndTime())
                 .build();
+    }
+
+    
+    
+    public Answer saveAnswer(
+            UUID attemptId,
+            AnswerSubmission submission) {
+
+        ExamAttempt attempt = attemptRepository.findById(attemptId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Attempt not found."));
+
+        Question question = questionRepository.findById(submission.getQuestionId())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Question not found."));
+
+        if (!question.getExam().getId().equals(attempt.getExam().getId())) {
+            throw new BadRequestException(
+                    "Question does not belong to this exam.");
+        }
+
+        Optional<Answer> existing =
+                answerRepository.findByAttemptIdAndQuestionId(
+                        attemptId,
+                        submission.getQuestionId());
+
+        Answer answer;
+
+        if (existing.isPresent()) {
+
+            answer = existing.get();
+            answer.setSelectedOption(submission.getSelectedOption());
+
+        } else {
+
+            answer = Answer.builder()
+                    .attempt(attempt)
+                    .question(question)
+                    .selectedOption(submission.getSelectedOption())
+                    .build();
+
+        }
+
+        return answerRepository.save(answer);
     }
 
 }

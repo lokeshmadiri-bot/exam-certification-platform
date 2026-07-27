@@ -1,4 +1,4 @@
-package com.examportal.exam_engine_backend;
+package com.oryfolks.certify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oryfolks.certify.CertifyApplication;

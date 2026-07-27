@@ -12,4 +12,6 @@ public interface AttemptAnswerRepository extends JpaRepository<AttemptAnswer, UU
 
     List<AttemptAnswer> findByAttemptId(UUID attemptId);
 
+    void deleteByAttemptId(UUID attemptId);
+
 }

@@ -33,3 +33,10 @@ app:
       region: ${AWS_REGION:us-east-1}
       access-key: ${AWS_ACCESS_KEY_ID:}
       secret-key: ${AWS_SECRET_ACCESS_KEY:}
+
+# ---- Gemini AI ----
+gemini:
+  api:
+    key: ${GEMINI_API_KEY:}
+    url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent
+

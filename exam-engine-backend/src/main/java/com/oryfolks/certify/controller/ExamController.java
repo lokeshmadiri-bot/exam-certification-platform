@@ -15,7 +15,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
+import com.oryfolks.certify.service.ExamService;
+import com.oryfolks.certify.dto.ExamCardResponseDTO;
+import com.oryfolks.certify.dto.ExamDetailsResponseDTO;
+import com.oryfolks.certify.dto.QuestionResponseDTO;
+import com.oryfolks.certify.dto.AnswerSubmission;
 import java.security.Principal;
 import java.time.LocalDateTime;
 import java.time.Duration;
@@ -24,6 +28,9 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/exams")
 public class ExamController {
+
+    @Autowired
+    private ExamService examService;
 
     @Autowired
     private ExamRepository examRepository;
@@ -46,93 +53,92 @@ public class ExamController {
     @Autowired
     private AnswerRepository answerRepository;
 
+
     @Autowired
     private ExamViolationRepository examViolationRepository;
-
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Exam>>> getAllExams() {
-        List<Exam> exams = examRepository.findAll();
-        return ResponseEntity.ok(ApiResponse.success("Exams fetched successfully", exams));
+    public ResponseEntity<ApiResponse<List<ExamCardResponseDTO>>> getAllExams() {
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "Exams fetched successfully.",
+                        examService.getAvailableExams()
+            )
+        );
     }
+
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Exam>> getExamById(@PathVariable UUID id) {
-        Exam exam = examRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Exam not found: " + id));
-        return ResponseEntity.ok(ApiResponse.success("Exam details fetched successfully", exam));
+    public ResponseEntity<ApiResponse<ExamDetailsResponseDTO>> getExamById(
+        @PathVariable UUID id) {
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "Exam details fetched successfully.",
+                        examService.getExamDetails(id)
+                )
+        );
     }
 
+
     @GetMapping("/{id}/questions")
-    public ResponseEntity<ApiResponse<List<Question>>> getQuestionsForExam(@PathVariable UUID id) {
-        List<Question> questions = questionRepository.findByExamId(id);
-        return ResponseEntity.ok(ApiResponse.success("Questions fetched successfully", questions));
+    public ResponseEntity<ApiResponse<List<QuestionResponseDTO>>> getQuestionsForExam(
+        @PathVariable UUID id) {
+
+    return ResponseEntity.ok(
+            ApiResponse.success(
+                    "Questions fetched successfully.",
+                    examService.getQuestions(id)
+            )
+        );
     }
+
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Exam>> createExam(@RequestBody Exam exam) {
-        // Link competency bands to the exam
-        if (exam.getCompetencyBands() != null) {
-            for (CompetencyBand band : exam.getCompetencyBands()) {
-                band.setExam(exam);
-            }
-        }
-        Exam savedExam = examRepository.save(exam);
-        return ResponseEntity.ok(ApiResponse.success("Exam created successfully", savedExam));
+    public ResponseEntity<ApiResponse<Exam>> createExam(
+            @RequestBody Exam exam) {
+
+        Exam savedExam = examService.createExam(exam);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "Exam created successfully.",
+                        savedExam));
     }
+
 
     @PostMapping("/{id}/questions")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Question>> addQuestion(@PathVariable UUID id, @RequestBody Question question) {
-        Exam exam = examRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Exam not found: " + id));
-        question.setExam(exam);
-        Question savedQuestion = questionRepository.save(question);
-        return ResponseEntity.ok(ApiResponse.success("Question added successfully", savedQuestion));
+    public ResponseEntity<ApiResponse<Question>> addQuestion(
+            @PathVariable UUID id,
+            @RequestBody Question question) {
+
+        Question savedQuestion =
+                examService.addQuestion(id, question);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "Question added successfully.",
+                        savedQuestion));
     }
+
 
     @PutMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Exam>> updateExamStatus(@PathVariable UUID id, @RequestParam String status) {
-        Exam exam = examRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Exam not found: " + id));
-        exam.setStatus(ExamStatus.valueOf(status.toUpperCase()));
-        Exam saved = examRepository.save(exam);
-        return ResponseEntity.ok(ApiResponse.success("Exam status updated", saved));
+    public ResponseEntity<ApiResponse<Exam>> updateExamStatus(
+            @PathVariable UUID id,
+            @RequestParam String status) {
+
+        Exam exam =
+                examService.updateExamStatus(id, status);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "Exam status updated successfully.",
+                        exam));
     }
 
-    @PostMapping("/{examId}/start")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> startExamAttempt(
-            @PathVariable UUID examId,
-            Principal principal) {
-        User user = userRepository.findByUsername(principal.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        Exam exam = examRepository.findById(examId)
-                .orElseThrow(() -> new RuntimeException("Exam not found"));
-
-        LocalDateTime startTime = LocalDateTime.now();
-        LocalDateTime endTime = startTime.plusMinutes(exam.getDurationMinutes());
-
-        ExamAttempt attempt = ExamAttempt.builder()
-                .candidate(user)
-                .exam(exam)
-                .resultStatus(ResultStatus.IN_PROGRESS)
-                .startTime(startTime)
-                .endTime(endTime)
-                .tabSwitchCount(0)
-                .build();
-
-        ExamAttempt savedAttempt = examAttemptRepository.save(attempt);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("attemptId", savedAttempt.getId());
-        response.put("startTime", startTime.toString());
-        response.put("endTime", endTime.toString());
-        response.put("remainingSeconds", Duration.between(LocalDateTime.now(), endTime).getSeconds());
-
-        return ResponseEntity.ok(ApiResponse.success("Exam attempt started", response));
-    }
 
     @GetMapping("/attempts/{attemptId}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getRunnerData(@PathVariable UUID attemptId) {
