@@ -97,7 +97,6 @@ export default function Sidebar({ user, onNavClose }) {
             >
               <ClipboardList />
               <span>Attempts</span>
-              <span className="tag">1,248</span>
             </button>
             <button
               onClick={() => handleNav('/admin/attempts?result=NEEDS_REVIEW')}
@@ -105,7 +104,6 @@ export default function Sidebar({ user, onNavClose }) {
             >
               <AlertTriangle />
               <span>Review &amp; flags</span>
-              <span className="tag">14</span>
             </button>
             <div className="sb-section text-[#62789b] text-[10.5px] tracking-[1.4px] uppercase font-mono font-semibold mx-2.5 mt-5 mb-2">Configure</div>
             <button
@@ -155,7 +153,9 @@ export default function Sidebar({ user, onNavClose }) {
           </div>
           <div className="overflow-hidden">
             <b className="text-white text-[13px] font-semibold block truncate">{user?.fullName || 'User'}</b>
-            <span className="text-[#7e93b4] text-[11px] block truncate">{user?.title || 'Engineer'}</span>
+            <span className="text-[#7e93b4] text-[11px] block truncate">
+              {user?.title || (user?.role === 'ROLE_ADMIN' ? 'Administrator' : 'Candidate')}
+            </span>
           </div>
         </div>
         <button
