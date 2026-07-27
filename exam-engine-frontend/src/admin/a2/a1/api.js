@@ -252,70 +252,12 @@ const currentAdmin = () => {
 };
 
 const MOCK = {
-    users: [
-        { email: "priya.admin@company.com", password: "admin123", name: "Priya Nair", role: "ADMIN" },
-        { email: "arjun.admin@company.com", password: "admin123", name: "Arjun Verma", role: "ADMIN" },
-    ],
-
-    exams: [
-        { id: "EXM-101", title: "Java Backend Developer", stack: "Java", status: "ACTIVE", version: 3, questionPoolSize: 120, questionsPerAttempt: 30, durationMin: 60, passMark: 60, updatedAt: "2026-07-10T09:00:00Z", pendingApproval: null },
-        { id: "EXM-102", title: "React Frontend Engineer", stack: "React", status: "ACTIVE", version: 2, questionPoolSize: 90, questionsPerAttempt: 25, durationMin: 50, passMark: 60, updatedAt: "2026-07-08T11:20:00Z", pendingApproval: null },
-        { id: "EXM-103", title: "Python Data Engineer", stack: "Python", status: "DRAFT", version: 1, questionPoolSize: 60, questionsPerAttempt: 20, durationMin: 45, passMark: 55, updatedAt: "2026-07-14T15:40:00Z", pendingApproval: null },
-        { id: "EXM-104", title: "Node.js Services", stack: "Node", status: "INACTIVE", version: 4, questionPoolSize: 100, questionsPerAttempt: 25, durationMin: 55, passMark: 60, updatedAt: "2026-06-29T08:10:00Z", pendingApproval: null },
-        { id: "EXM-105", title: "SQL & Data Modelling", stack: "SQL", status: "ACTIVE", version: 1, questionPoolSize: 70, questionsPerAttempt: 20, durationMin: 40, passMark: 65, updatedAt: "2026-07-01T13:00:00Z", pendingApproval: null },
-    ],
-
-    examVersions: [
-        { id: "V-1", examId: "EXM-101", version: 1, publishedAt: "2026-05-01T09:00:00Z", publishedBy: "Priya Nair", notes: "Initial release" },
-        { id: "V-2", examId: "EXM-101", version: 2, publishedAt: "2026-06-10T09:00:00Z", publishedBy: "Arjun Verma", notes: "Added L4 coding set" },
-        { id: "V-3", examId: "EXM-101", version: 3, publishedAt: "2026-07-10T09:00:00Z", publishedBy: "Priya Nair", notes: "Refreshed MCQ pool" },
-    ],
-
-    bandsByExam: {
-        "EXM-101": { L1: [0, 20], L2: [21, 40], L3: [41, 60], L4: [61, 80], L5: [81, 100] },
-    },
-
-    questions: Array.from({ length: 24 }, (_, i) => {
-        const level = LEVELS[i % LEVELS.length];
-        const type = QUESTION_TYPES[i % QUESTION_TYPES.length];
-        const stack = STACKS[i % STACKS.length];
-        return {
-            id: `Q-${1000 + i}`,
-            title: `What is the primary function of ${stack} feature #${i + 1}?`,
-            questionText: `What is the primary function of ${stack} feature #${i + 1}? Explain its usage in enterprise applications.`,
-            stack,
-            type,
-            level,
-            difficulty: i % 3 === 0 ? "EASY" : i % 3 === 1 ? "MEDIUM" : "HARD",
-            topic: `${stack} Fundamentals`,
-            marks: (i % 3) + 1,
-            optionA: `Option A for ${stack} feature #${i + 1}`,
-            optionB: `Option B for ${stack} feature #${i + 1}`,
-            optionC: `Option C for ${stack} feature #${i + 1}`,
-            optionD: `Option D for ${stack} feature #${i + 1}`,
-            correctOption: ["A", "B", "C", "D"][i % 4],
-            codeSnippet: type === "CODING" ? `// Example ${stack} snippet\nfunction demo() {\n  return "Hello ${stack}";\n}` : "",
-            language: stack === "React" || stack === "Node" ? "JavaScript" : stack,
-            sampleInput: type === "CODING" ? "hello" : "",
-            sampleOutput: type === "CODING" ? "olleh" : "",
-            expectedOutput: type === "CODING" ? "olleh" : "",
-            modelAnswer: type === "DESCRIPTIVE" ? "Model answer detailing architectural principles." : "",
-            explanation: "Refer to official developer documentation.",
-            status: i % 9 === 0 ? "INACTIVE" : "ACTIVE",
-            source: i % 2 === 0 ? "MANUAL" : "AI",
-            aiModel: i % 2 === 0 ? null : "Gemini-2.5-Flash",
-            updatedAt: new Date(Date.now() - i * 6 * 3600 * 1000).toISOString(),
-        };
-    }),
-
-    candidates: [
-        { id: "CAN-01", name: "R. Sharma", email: "r.sharma@mail.com", exam: "Java Backend Developer", status: "COMPLETED", locked: true, lockedUntil: "2026-08-05T00:00:00Z", lastAttempt: "2026-07-06T10:00:00Z", pendingApproval: null },
-        { id: "CAN-02", name: "P. Reddy", email: "p.reddy@mail.com", exam: "React Frontend Engineer", status: "IN_PROGRESS", locked: false, lockedUntil: null, lastAttempt: "2026-07-15T12:00:00Z", pendingApproval: null },
-        { id: "CAN-03", name: "K. Iyer", email: "k.iyer@mail.com", exam: "Python Data Engineer", status: "COMPLETED", locked: true, lockedUntil: "2026-07-28T00:00:00Z", lastAttempt: "2026-06-28T09:30:00Z", pendingApproval: null },
-        { id: "CAN-04", name: "S. Das", email: "s.das@mail.com", exam: "SQL & Data Modelling", status: "NOT_STARTED", locked: false, lockedUntil: null, lastAttempt: null, pendingApproval: null },
-        { id: "CAN-05", name: "M. Khan", email: "m.khan@mail.com", exam: "Node.js Services", status: "COMPLETED", locked: true, lockedUntil: "2026-08-01T00:00:00Z", lastAttempt: "2026-07-02T14:15:00Z", pendingApproval: null },
-    ],
-
+    users: [],
+    exams: [],
+    examVersions: [],
+    bandsByExam: {},
+    questions: [],
+    candidates: [],
     governance: {
         retentionDays: 180,
         pendingRetentionChange: null,
@@ -330,12 +272,8 @@ const MOCK = {
             snapshotResolution: "160x120",
         },
     },
-
     approvals: [],
-    auditLog: [
-        { id: uid("AUD"), user: "Priya Nair", action: "PUBLISH_VERSION", module: "Authoring", date: "2026-07-10T09:00:00Z", oldValue: "v2", newValue: "v3" },
-        { id: uid("AUD"), user: "Arjun Verma", action: "CREATE_QUESTION", module: "Question Bank", date: "2026-07-09T16:20:00Z", oldValue: "-", newValue: "Q-1032" },
-    ],
+    auditLog: [],
 };
 
 function mockLogin(email, password) {
