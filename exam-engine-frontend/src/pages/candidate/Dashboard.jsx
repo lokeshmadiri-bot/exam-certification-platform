@@ -74,11 +74,11 @@ export default function CandidateDashboard() {
       <div className="hero-greet bg-gradient-to-r from-[#0B1F38] to-[#15365e] rounded-[20px] p-[26px_28px] text-white relative overflow-hidden mb-[22px]">
         <div className="wm absolute -right-[30px] -bottom-[50px] w-[230px] h-[230px] rounded-full bg-gradient-radial from-[#2F6BFF]/30 to-transparent"></div>
         <span className="eyebrow font-mono text-[11px] tracking-[1.4px] uppercase text-[#7fa6e6]">Candidate Dashboard</span>
-        <h1 className="font-display font-bold text-[25px] mt-1.5 mb-1">Welcome back, Aarav</h1>
+        <h1 className="font-display font-bold text-[25px] mt-1.5 mb-1">Welcome back, {user.firstName} </h1>
         <p className="text-[#b9c9e2] text-[13.5px] max-w-[560px] leading-relaxed">
           Your skill path is fully active. Select a stack below to start your timed certification, or view your historical badges.
         </p>
-        
+
         <div className="meta flex gap-[22px] mt-[18px]">
           <div>
             <span className="n font-display font-bold text-xl">{attempts.filter(a => a.resultStatus === 'PASSED').length}</span>
@@ -97,7 +97,7 @@ export default function CandidateDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        {exams.filter(e => e.status === 'ACTIVE').slice(0, 3).map((exam) => {
+        {exams.filter(e => e.status === 'ACTIVE').map((exam) => {
           const style = getStackIcon(exam.stack);
           const locked = isLocked(exam.id);
           const daysLeft = getLockDaysLeft(exam.id);
@@ -113,7 +113,7 @@ export default function CandidateDashboard() {
                   <div className="sub text-[11.5px] text-[#5C6B82] capitalize">{exam.stack} Certification</div>
                 </div>
               </div>
-              
+
               <div className="facts flex gap-4 my-4 text-xs text-[#5C6B82]">
                 <span>Duration <b className="text-[#0E1B2E] font-mono font-semibold">{exam.durationMinutes}m</b></span>
                 <span>Questions <b className="text-[#0E1B2E] font-mono font-semibold">{exam.perAttempt}</b></span>
@@ -130,7 +130,7 @@ export default function CandidateDashboard() {
                 ) : (
                   <>
                     <span className="chip ok bg-[#e7f7f0] text-[#0a7a52]">Available</span>
-                    <button 
+                    <button
                       onClick={() => navigate(`/candidate/instructions/${exam.id}`)}
                       className="btn bg-[#2F6BFF] hover:bg-[#2256d6] text-white flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-semibold rounded-lg shadow-sm"
                     >
@@ -153,26 +153,23 @@ export default function CandidateDashboard() {
       <div className="result-list flex flex-col gap-2.5">
         {attempts.filter(a => a.resultStatus !== 'IN_PROGRESS').length > 0 ? (
           attempts.filter(a => a.resultStatus !== 'IN_PROGRESS').slice(0, 3).map((attempt) => {
-            const style = getStackIcon(attempt.exam.stack);
+            const style = getStackIcon(attempt.stack);
             return (
-              <div key={attempt.id} className="result-row flex items-center gap-3.5 p-[14px_16px] bg-white border border-[#E4EAF2] rounded-2xl shadow-sm">
+              <div key={attempt.attemptId} className="result-row flex items-center gap-3.5 p-[14px_16px] bg-white border border-[#E4EAF2] rounded-2xl shadow-sm">
                 <div className="ic w-10 h-10 rounded-xl bg-[#F4F7FC] text-[#2F6BFF] flex items-center justify-center shrink-0">
                   <CheckCircle className="w-5 h-5 text-[#2F6BFF]" />
                 </div>
                 <div>
-                  <b className="font-semibold text-sm text-[#0E1B2E]">{attempt.exam.title} Certification</b>
+                  <b className="font-semibold text-sm text-[#0E1B2E]">{attempt.examTitle} Certification</b>
                   <div className="d text-[11.5px] text-[#5C6B82] flex items-center gap-1.5 mt-0.5">
                     <Clock className="w-3.5 h-3.5" />
-                    <span>Completed on {new Date(attempt.createdAt).toLocaleDateString()}</span>
+                    <span>Completed on {new Date(attempt.submittedAt).toLocaleDateString()}</span>
                   </div>
                 </div>
                 <span className={`tier-badge ml-auto flex items-center gap-2 font-bold font-display text-[13px] px-3 py-1 rounded-full text-white ${getTierColor(attempt.assignedLevel)}`}>
                   <i>{attempt.assignedLevel}</i>
                   <span className="text-[11.5px] font-medium hidden sm:inline">
-                    {attempt.assignedLevel === 'L1' ? 'Expert' :
-                     attempt.assignedLevel === 'L2' ? 'Advanced' :
-                     attempt.assignedLevel === 'L3' ? 'Intermediate' :
-                     attempt.assignedLevel === 'L4' ? 'Beginner' : 'Needs Training'}
+                    {attempt.competencyTitle}
                   </span>
                 </span>
               </div>
