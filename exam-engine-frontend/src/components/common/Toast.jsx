@@ -15,12 +15,39 @@ export default function Toast({ message, show, onClose }) {
 
   return (
     <div
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#0B1F38] text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-[13.5px] font-medium transition-all duration-300 transform translate-y-0"
+      style={{
+        position: 'fixed',
+        bottom: '24px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 9999,
+        backgroundColor: '#0B1F38',
+        color: '#FFFFFF',
+        padding: '12px 20px',
+        borderRadius: '12px',
+        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        fontSize: '13.5px',
+        fontWeight: '500',
+        pointerEvents: 'none'
+      }}
     >
-      <div className="bg-[#34d27b]/20 p-1 rounded-full text-[#34d27b]">
-        <Check className="w-4.5 h-4.5" />
+      <div 
+        style={{
+          backgroundColor: 'rgba(52, 210, 123, 0.15)',
+          padding: '6px',
+          borderRadius: '50%',
+          color: '#34d27b',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        <Check style={{ width: '18px', height: '18px' }} />
       </div>
-      <span>{message}</span>
+      <span style={{ color: '#FFFFFF' }}>{message}</span>
     </div>
   );
 }
