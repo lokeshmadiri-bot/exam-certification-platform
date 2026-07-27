@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, Menu, Command, Award, ShieldCheck } from 'lucide-react';
+import { Search, Bell, Menu, Command } from 'lucide-react';
 import NotificationsPanel from '../../admin/a2/NotificationsPanel';
 
 export default function Topbar({ user, title, onMenuToggle, onOpenCmdPalette }) {
@@ -12,18 +12,6 @@ export default function Topbar({ user, title, onMenuToggle, onOpenCmdPalette }) 
     { id: 2, title: 'Integrity alert', desc: 'Tab switch strike on attempt #A-90412', time: '11:05', unread: true },
     { id: 3, title: 'System override approved', desc: 'Aarav Mehta override requested', time: '09:40', unread: false }
   ];
-
-  const handleRoleToggle = (targetRole) => {
-    // Modify active user role in local storage and redirect
-    const updatedUser = { ...user, role: targetRole === 'admin' ? 'ROLE_ADMIN' : 'ROLE_CANDIDATE' };
-    localStorage.setItem('user', JSON.stringify(updatedUser));
-    
-    if (targetRole === 'admin') {
-      window.location.href = '/admin';
-    } else {
-      window.location.href = '/candidate';
-    }
-  };
 
   return (
     <header className="topbar sticky top-0 z-30 flex items-center gap-[18px] px-[30px] py-3.5 bg-white/85 backdrop-blur-[10px] border-b border-[#E4EAF2]">
@@ -43,71 +31,61 @@ export default function Topbar({ user, title, onMenuToggle, onOpenCmdPalette }) 
         <input type="text" placeholder="Search exams, candidates or logs..." className="bg-transparent border-none outline-none text-[13px] text-[#0E1B2E] w-full" />
       </div>
 
-      {/* Role Switcher (Mockup Preview Only) */}
-      <div className="seg ml-auto flex bg-[#F4F7FC] border border-[#E4EAF2] rounded-xl p-[3px]">
-        <button
-          onClick={() => handleRoleToggle('cand')}
-          className={`px-3.5 py-[7px] rounded-lg text-[12.5px] font-semibold flex items-center gap-1.5 transition-all ${user?.role === 'ROLE_CANDIDATE' ? 'bg-white text-[#2F6BFF] shadow-[0_1px_2px_rgba(11,31,56,0.06)]' : 'text-[#5C6B82] hover:text-[#0E1B2E]'}`}
+      <div className="ml-auto flex items-center gap-[18px]">
+        {/* Quick Command Hint */}
+        <button 
+          onClick={onOpenCmdPalette}
+          className="kbd-hint hidden md:inline-flex items-center gap-1 text-[11px] font-mono text-[#8A99AE] border border-[#E4EAF2] rounded-[7px] px-2 py-1 hover:text-[#0E1B2E] hover:bg-[#F4F7FC] transition-all"
         >
-          <Award className="w-3.5 h-3.5" />
-          <span>Candidate</span>
+          <Command className="w-3 h-3" />
+          <span>K</span>
         </button>
-        <button
-          onClick={() => handleRoleToggle('admin')}
-          className={`px-3.5 py-[7px] rounded-lg text-[12.5px] font-semibold flex items-center gap-1.5 transition-all ${user?.role === 'ROLE_ADMIN' ? 'bg-white text-[#2F6BFF] shadow-[0_1px_2px_rgba(11,31,56,0.06)]' : 'text-[#5C6B82] hover:text-[#0E1B2E]'}`}
-        >
-          <ShieldCheck className="w-3.5 h-3.5" />
-          <span>Admin</span>
-        </button>
-      </div>
 
-      {/* Quick Command Hint */}
-      <button 
-        onClick={onOpenCmdPalette}
-        className="kbd-hint hidden md:inline-flex items-center gap-1 text-[11px] font-mono text-[#8A99AE] border border-[#E4EAF2] rounded-[7px] px-2 py-1 hover:text-[#0E1B2E] hover:bg-[#F4F7FC] transition-all"
-      >
-        <Command className="w-3 h-3" />
-        <span>K</span>
-      </button>
+        {/* Notification Icon */}
+        {user?.role === 'ROLE_ADMIN' ? (
+          <NotificationsPanel />
+        ) : (
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="icon-btn w-[38px] h-[38px] rounded-xl flex items-center justify-center text-[#5C6B82] hover:bg-[#F4F7FC] hover:text-[#0E1B2E] relative"
+            >
+              <Bell className="w-[18px] h-[18px]" />
+              <span className="dot absolute top-2 right-2.5 w-1.5 h-1.5 bg-[#F2A93B] rounded-full border border-white"></span>
+            </button>
 
-      {/* Notification Icon */}
-      {user?.role === 'ROLE_ADMIN' ? (
-        <NotificationsPanel />
-      ) : (
-        <div className="relative">
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="icon-btn w-[38px] h-[38px] rounded-xl flex items-center justify-center text-[#5C6B82] hover:bg-[#F4F7FC] hover:text-[#0E1B2E] relative"
-          >
-            <Bell className="w-[18px] h-[18px]" />
-            <span className="dot absolute top-2 right-2.5 w-1.5 h-1.5 bg-[#F2A93B] rounded-full border border-white"></span>
-          </button>
-
-          {/* Notifications Panel */}
-          {showNotifications && (
-            <div className="notif absolute right-0 top-[52px] w-[330px] bg-white border border-[#E4EAF2] rounded-xl shadow-2xl z-50 overflow-hidden animate-[fade_0.2s_ease]">
-              <div className="nh flex items-center justify-between px-4 py-3 border-b border-[#EEF2F8]">
-                <b className="font-display text-[14px] text-[#0E1B2E]">Notifications</b>
-                <button onClick={() => setShowNotifications(false)} className="text-[12px] text-[#2F6BFF] font-semibold hover:underline">
-                  Close
-                </button>
-              </div>
-              <div className="max-h-[300px] overflow-y-auto">
-                {notifications.map((notif) => (
-                  <div key={notif.id} className="ni flex gap-3 px-4 py-3 border-b border-[#EEF2F8] hover:bg-[#F4F7FC]">
-                    {notif.unread && <span className="d w-2 h-2 rounded-full bg-[#2F6BFF] mt-1.5 shrink-0" />}
-                    <div>
-                      <b className="text-[13px] font-semibold text-[#0E1B2E]">{notif.title}</b>
-                      <span className="text-[12px] text-[#5C6B82] block leading-tight mt-0.5">{notif.desc}</span>
-                    </div>
-                    <span className="text-[11px] text-[#8A99AE] font-mono ml-auto">{notif.time}</span>
+            {/* Notifications Panel */}
+            {showNotifications && (
+              <>
+                <div 
+                  style={{ position: 'fixed', inset: 0, zIndex: 99, background: 'transparent' }} 
+                  onClick={() => setShowNotifications(false)} 
+                />
+                <div className="notif absolute right-0 top-[52px] w-[330px] bg-white border border-[#E4EAF2] rounded-xl shadow-2xl z-[100] overflow-hidden animate-[fade_0.2s_ease]">
+                  <div className="nh flex items-center justify-between px-4 py-3 border-b border-[#EEF2F8]">
+                    <b className="font-display text-[14px] text-[#0E1B2E]">Notifications</b>
+                    <button onClick={() => setShowNotifications(false)} className="text-[12px] text-[#2F6BFF] font-semibold hover:underline">
+                      Close
+                    </button>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+                  <div className="max-h-[300px] overflow-y-auto">
+                    {notifications.map((notif) => (
+                      <div key={notif.id} className="ni flex gap-3 px-4 py-3 border-b border-[#EEF2F8] hover:bg-[#F4F7FC]">
+                        {notif.unread && <span className="d w-2 h-2 rounded-full bg-[#2F6BFF] mt-1.5 shrink-0" />}
+                        <div>
+                          <b className="text-[13px] font-semibold text-[#0E1B2E]">{notif.title}</b>
+                          <span className="text-[12px] text-[#5C6B82] block leading-tight mt-0.5">{notif.desc}</span>
+                        </div>
+                        <span className="text-[11px] text-[#8A99AE] font-mono ml-auto">{notif.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </header>
   );
 }
