@@ -123,7 +123,7 @@ export default function CandidateInstructions() {
         </div>
 
         {/* Right Side: Format & Consent */}
-        <div className="space-y-4">
+        <div className="flex flex-col" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           <div className="card pad bg-white">
             <h3 className="font-display font-semibold text-sm text-[#0E1B2E] mb-3.5">{t.fmt}</h3>
 
@@ -157,16 +157,16 @@ export default function CandidateInstructions() {
           </div>
 
           <div className="card pad bg-white">
-            <div
-              onClick={() => setAgreed(!agreed)}
-              className="switch flex items-center gap-3 border border-[#E4EAF2] hover:border-[#c3d2ea] rounded-xl p-[14px_16px] cursor-pointer bg-white mb-4 transition-all"
-            >
-              <div className="t flex-1">
-                <b className="text-[13.5px] font-semibold text-[#0E1B2E] block">{t.agt}</b>
-                <span className="text-[12px] text-[#5C6B82] block leading-snug mt-0.5">{t.ag}</span>
+            <div className="switch">
+              <div className="t">
+                <b className="block">{t.agt}</b>
+                <span className="block mt-0.5">{t.ag}</span>
               </div>
-              <span className={`toggle shrink-0 w-11 h-[25px] rounded-full relative cursor-pointer transition-all ${agreed ? 'bg-[#2F6BFF]' : 'bg-[#c8d3e3]'}`}>
-                <i className={`absolute top-0.5 w-[21px] h-[21px] rounded-full bg-white transition-all shadow-[0_1px_3px_rgba(0,0,0,0.2)] ${agreed ? 'left-[18px]' : 'left-0.5'}`} />
+              <span 
+                onClick={() => setAgreed(!agreed)}
+                className={`toggle ${agreed ? '' : 'off'}`}
+              >
+                <i />
               </span>
             </div>
 
