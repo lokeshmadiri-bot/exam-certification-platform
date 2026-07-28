@@ -163,4 +163,32 @@ export const adminService = {
   }
 };
 
+export const candidateService = {
+  // Candidate Dashboard
+  getDashboard: async () => {
+    const response = await api.get('/candidate/dashboard');
+    return response.data;
+  },
+
+  // Candidate Attempt History
+  getMyAttempts: async () => {
+    const response = await api.get('/candidate/attempts');
+    return response.data;
+  },
+
+  // Candidate Attempt Details
+  getAttemptDetails: async (attemptId) => {
+    const response = await api.get(`/candidate/attempts/${attemptId}`);
+    return response.data;
+  },
+
+  // Candidate Results
+  getMyResults: async () => {
+    const response = await api.get('/candidate/results');
+    return response.data;
+  }
+};
+
+
 export default api;
+

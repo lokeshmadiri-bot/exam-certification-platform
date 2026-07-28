@@ -35,7 +35,4 @@ public class AttemptHistoryResponseDTO {
     private ResultPublishStatus resultPublishStatus;
 
     private String assignedLevel;
-
-private String competencyTitle;
-private Integer score;
 }

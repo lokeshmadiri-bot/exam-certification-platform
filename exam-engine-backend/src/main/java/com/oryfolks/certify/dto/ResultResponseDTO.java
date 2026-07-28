@@ -45,4 +45,4 @@ public class ResultResponseDTO {
      * Null until admin publishes.
      */
     private LocalDateTime publishedAt;
-}
+}   

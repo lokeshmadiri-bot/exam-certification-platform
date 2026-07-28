@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Award, CheckCircle, Clock } from 'lucide-react';
-import { examService, attemptService } from '../../services/api';
+import { examService, attemptService, candidateService } from '../../services/api';
 
 export default function CandidateDashboard() {
   const navigate = useNavigate();
@@ -13,7 +13,7 @@ export default function CandidateDashboard() {
     async function loadData() {
       try {
         const examsRes = await examService.getAllExams();
-        const attemptsRes = await attemptService.getMyAttempts();
+        const attemptsRes = await candidateService.getMyAttempts();
         setExams(examsRes.data || []);
         setAttempts(attemptsRes.data || []);
       } catch (err) {
@@ -53,17 +53,17 @@ export default function CandidateDashboard() {
 
   // Segment exams: available vs locked retry (locked if attempt taken in last 30 days)
   const isLocked = (examId) => {
-    const lastAttempt = attempts.find(a => a.exam.id === examId);
+    const lastAttempt = attempts.find(a => a.examId === examId);
     if (!lastAttempt) return false;
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    return new Date(lastAttempt.createdAt) > thirtyDaysAgo;
+    return new Date(lastAttempt.submittedAt) > thirtyDaysAgo;
   };
 
   const getLockDaysLeft = (examId) => {
-    const lastAttempt = attempts.find(a => a.exam.id === examId);
+    const lastAttempt = attempts.find(a => a.examId === examId);
     if (!lastAttempt) return 0;
-    const diffTime = Math.abs(new Date() - new Date(lastAttempt.createdAt));
+    const diffTime = Math.abs(new Date() - new Date(lastAttempt.submittedAt));
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return Math.max(0, 30 - diffDays);
   };
@@ -74,7 +74,7 @@ export default function CandidateDashboard() {
       <div className="hero-greet bg-gradient-to-r from-[#0B1F38] to-[#15365e] rounded-[20px] p-[26px_28px] text-white relative overflow-hidden mb-[22px]">
         <div className="wm absolute -right-[30px] -bottom-[50px] w-[230px] h-[230px] rounded-full bg-gradient-radial from-[#2F6BFF]/30 to-transparent"></div>
         <span className="eyebrow font-mono text-[11px] tracking-[1.4px] uppercase text-[#7fa6e6]">Candidate Dashboard</span>
-        <h1 className="font-display font-bold text-[25px] mt-1.5 mb-1">Welcome back, {user.firstName} </h1>
+        <h1 className="font-display font-bold text-[25px] mt-1.5 mb-1">Welcome back, Aarav</h1>
         <p className="text-[#b9c9e2] text-[13.5px] max-w-[560px] leading-relaxed">
           Your skill path is fully active. Select a stack below to start your timed certification, or view your historical badges.
         </p>
@@ -97,13 +97,13 @@ export default function CandidateDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        {exams.filter(e => e.status === 'ACTIVE').map((exam) => {
+        {exams.filter(e => e.status === 'ACTIVE').slice(0, 3).map((exam) => {
           const style = getStackIcon(exam.stack);
-          const locked = isLocked(exam.id);
-          const daysLeft = getLockDaysLeft(exam.id);
+          const locked = isLocked(exam.examId);
+          const daysLeft = getLockDaysLeft(exam.examId);
 
           return (
-            <div key={exam.id} className="exam-card bg-white border border-[#E4EAF2] rounded-2xl p-[18px] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex flex-col">
+            <div key={exam.examId} className="exam-card bg-white border border-[#E4EAF2] rounded-2xl p-[18px] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex flex-col">
               <div className="top flex items-center gap-3 mb-3.5">
                 <div className="ic w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: style.bg, color: style.fg }}>
                   <Award className="w-5.5 h-5.5" />
@@ -131,7 +131,7 @@ export default function CandidateDashboard() {
                   <>
                     <span className="chip ok bg-[#e7f7f0] text-[#0a7a52]">Available</span>
                     <button
-                      onClick={() => navigate(`/candidate/instructions/${exam.id}`)}
+                      onClick={() => navigate(`/candidate/instructions/${exam.examId}`)}
                       className="btn bg-[#2F6BFF] hover:bg-[#2256d6] text-white flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-semibold rounded-lg shadow-sm"
                     >
                       <span>Start</span>
@@ -169,7 +169,10 @@ export default function CandidateDashboard() {
                 <span className={`tier-badge ml-auto flex items-center gap-2 font-bold font-display text-[13px] px-3 py-1 rounded-full text-white ${getTierColor(attempt.assignedLevel)}`}>
                   <i>{attempt.assignedLevel}</i>
                   <span className="text-[11.5px] font-medium hidden sm:inline">
-                    {attempt.competencyTitle}
+                    {attempt.assignedLevel === 'L1' ? 'Expert' :
+                      attempt.assignedLevel === 'L2' ? 'Advanced' :
+                        attempt.assignedLevel === 'L3' ? 'Intermediate' :
+                          attempt.assignedLevel === 'L4' ? 'Beginner' : 'Needs Training'}
                   </span>
                 </span>
               </div>
