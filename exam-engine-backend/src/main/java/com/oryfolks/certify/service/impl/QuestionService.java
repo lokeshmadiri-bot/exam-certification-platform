@@ -42,12 +42,16 @@ public class QuestionService {
     /** Persist the approved/edited AI-generated questions to the DB. */
     @Transactional
     public List<Question> saveGeneratedQuestions(SaveGeneratedQuestionsRequest req) {
-        Exam exam = examRepository.findById(req.getExamId())
-                .orElseThrow(() -> new ResourceNotFoundException("Exam not found: " + req.getExamId()));
+        Exam exam = null;
+        if (req.getExamId() != null) {
+            exam = examRepository.findById(req.getExamId()).orElse(null);
+        }
 
+        Exam finalExam = exam;
         List<Question> questions = req.getQuestions().stream()
                 .map(dto -> Question.builder()
-                        .exam(exam)
+                        .exam(finalExam)
+                        .stack(dto.getStack())
                         .questionText(dto.getQuestionText())
                         .codeSnippet(dto.getCodeSnippet() != null && !dto.getCodeSnippet().isBlank()
                                 ? dto.getCodeSnippet() : null)
@@ -56,7 +60,7 @@ public class QuestionService {
                         .level(dto.getLevel() != null ? dto.getLevel() : "L3")
                         .difficulty(dto.getDifficulty() != null ? dto.getDifficulty() : "MEDIUM")
                         .marks(dto.getMarks() != null ? dto.getMarks() : 1)
-                        .correctOption(dto.getCorrectOption())
+                        .correctOption(dto.getCorrectOption() != null ? dto.getCorrectOption() : "A")
                         .optionA(dto.getOptionA())
                         .optionB(dto.getOptionB())
                         .optionC(dto.getOptionC())
@@ -68,6 +72,7 @@ public class QuestionService {
                         .modelAnswer(dto.getModelAnswer())
                         .explanation(dto.getExplanation())
                         .isActive(true)
+                        .status("ACTIVE")
                         .source(dto.getSource() != null ? dto.getSource() : "AI")
                         .aiModel(dto.getAiModel() != null ? dto.getAiModel() : "Gemini-2.5-Flash")
                         .build())
