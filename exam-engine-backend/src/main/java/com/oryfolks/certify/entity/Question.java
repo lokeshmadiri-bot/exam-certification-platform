@@ -24,7 +24,7 @@ public class Question {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "exam_id", nullable = false)
+    @JoinColumn(name = "exam_id", nullable = true)
     @JsonIgnore
     private Exam exam;
 
@@ -32,6 +32,9 @@ public class Question {
     @JoinColumn(name = "section_id")
     @JsonIgnore
     private Section section;
+
+    @Column(name = "stack", length = 50)
+    private String stack;
 
     @NotBlank(message = "Question text is required.")
     @Column(name = "question_text", nullable = false, columnDefinition = "TEXT")
@@ -48,6 +51,10 @@ public class Question {
 
     @Column(name = "level", length = 10)
     private String level;
+
+    @Column(name = "status", length = 20)
+    @Builder.Default
+    private String status = "ACTIVE";
 
     @NotBlank(message = "Difficulty is required.")
     @Column(nullable = false, length = 20)
