@@ -7,6 +7,18 @@
 
 const BASE = "/api/admin";
 
+/**
+ * Unwrap the backend ApiResponse envelope.
+ * The backend always returns: { success, message, data, timestamp }
+ * We want callers to receive `data` directly.
+ */
+function unwrap(json) {
+  if (json !== null && typeof json === "object" && "success" in json && "data" in json) {
+    return json.data;
+  }
+  return json;
+}
+
 async function get(path, params = {}) {
   const qs = new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== "" && v != null)
@@ -15,7 +27,7 @@ async function get(path, params = {}) {
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error(`GET ${path} → ${res.status}`);
-  return res.json();
+  return unwrap(await res.json());
 }
 
 async function post(path, body) {
@@ -25,7 +37,7 @@ async function post(path, body) {
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`POST ${path} → ${res.status}`);
-  return res.json();
+  return unwrap(await res.json());
 }
 
 function authHeaders() {

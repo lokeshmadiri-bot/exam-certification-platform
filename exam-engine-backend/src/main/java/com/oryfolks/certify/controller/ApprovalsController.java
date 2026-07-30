@@ -31,6 +31,9 @@ public class ApprovalsController {
     @Autowired
     private AccessAuditLogRepository auditLogRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @GetMapping("/pending")
     public ResponseEntity<ApiResponse<List<ApprovalRequest>>> getPendingApprovals() {
         List<ApprovalRequest> pending = approvalRepository.findByStatusOrderByRequestedAtDesc("PENDING");
@@ -93,6 +96,19 @@ public class ApprovalsController {
                     governanceSettingRepository.save(gs);
                 } catch (Exception ignored) {}
             }
+        } else if ("CANDIDATE_UNLOCK".equalsIgnoreCase(req.getType())) {
+            try {
+                UUID candidateId = UUID.fromString(req.getTargetId());
+                User candidate = userRepository.findById(candidateId).orElse(null);
+                String candName = candidate != null ? candidate.getFullName() : req.getTargetId();
+                auditLogRepository.save(AccessAuditLog.builder()
+                        .userName(adminName)
+                        .action("Approved 30-day exam retry override lock for candidate: " + candName)
+                        .module("Candidates")
+                        .oldValue("LOCKED")
+                        .newValue("UNLOCKED")
+                        .build());
+            } catch (Exception ignored) {}
         }
 
         ApprovalRequest saved = approvalRepository.save(req);

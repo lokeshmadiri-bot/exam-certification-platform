@@ -14,6 +14,35 @@ import "./a1.css";
 const RETENTION_OPTIONS = [90, 180, 365];
 const TABS = ["Retention", "Security", "AI Settings", "AI Parameters", "Audit Log", "Approvals"];
 
+
+// Backend field names used in updateAIParameters / updateAISettings API calls.
+const SENSITIVITY_PRESETS = {
+    LOW: {
+        faceDetectionIntervalSec: 5,
+        detectionConfidence: 0.30,
+        gazeDeviationDeg: 45,
+        absenceTriggerMisses: 8,
+        alertWindowSec: 20,
+        snapshotResolution: "160x120",
+    },
+    MEDIUM: {
+        faceDetectionIntervalSec: 3,
+        detectionConfidence: 0.20,
+        gazeDeviationDeg: 35,
+        absenceTriggerMisses: 5,
+        alertWindowSec: 15,
+        snapshotResolution: "160x120",
+    },
+    HIGH: {
+        faceDetectionIntervalSec: 2,
+        detectionConfidence: 0.15,
+        gazeDeviationDeg: 25,
+        absenceTriggerMisses: 3,
+        alertWindowSec: 10,
+        snapshotResolution: "320x240",
+    },
+};
+
 export default function GovernanceSettingsPage() {
     const [tab, setTab] = useState("Retention");
     const [gov, setGov] = useState(null);
@@ -22,8 +51,8 @@ export default function GovernanceSettingsPage() {
     const [savedMsg, setSavedMsg] = useState("");
 
     const loadGov = () => fetchGovernanceSettings().then(setGov);
-    const loadAudit = () => fetchAuditLog().then((res) => setAudit(res.rows));
-    const loadApprovals = () => fetchPendingApprovals().then(setApprovals);
+    const loadAudit = () => fetchAuditLog().then((res) => setAudit(res?.rows || (Array.isArray(res) ? res : [])));
+    const loadApprovals = () => fetchPendingApprovals().then((res) => setApprovals(Array.isArray(res) ? res : (res?.rows || [])));
 
     useEffect(() => { loadGov(); }, []);
     useEffect(() => { if (tab === "Audit Log") loadAudit(); }, [tab]);
@@ -56,8 +85,29 @@ export default function GovernanceSettingsPage() {
                 <>
                     {tab === "Retention" && <RetentionTab gov={gov} onSaved={() => { loadGov(); flash("Retention change requested — awaiting a second admin."); }} />}
                     {tab === "Security" && <SecurityTab gov={gov} onSaved={(s) => { setGov((g) => ({ ...g, security: s })); flash("Security settings saved."); }} />}
-                    {tab === "AI Settings" && <AISettingsTab gov={gov} onSaved={(s) => { setGov((g) => ({ ...g, aiSettings: s })); flash("AI settings saved."); }} />}
-                    {tab === "AI Parameters" && <AIParametersTab gov={gov} onSaved={(p) => { setGov((g) => ({ ...g, aiParameters: p })); flash("AI parameters saved."); }} />}
+                    {tab === "AI Settings" && (
+                        <AISettingsTab
+                            gov={gov}
+                            onSaved={(aiSettings, aiParameters) => {
+                                // Lift both aiSettings and (optionally) aiParameters into shared gov state
+                                setGov((g) => ({
+                                    ...g,
+                                    aiSettings,
+                                    ...(aiParameters ? { aiParameters } : {}),
+                                }));
+                                flash(aiParameters
+                                    ? `AI sensitivity set to ${aiSettings.sensitivity} — parameters auto-updated.`
+                                    : "AI settings saved."
+                                );
+                            }}
+                        />
+                    )}
+                    {tab === "AI Parameters" && (
+                        <AIParametersTab
+                            gov={gov}
+                            onSaved={(p) => { setGov((g) => ({ ...g, aiParameters: p })); flash("AI parameters saved."); }}
+                        />
+                    )}
                 </>
             )}
 
@@ -177,15 +227,30 @@ function AISettingsTab({ gov, onSaved }) {
         setBusy(true);
         const saved = await updateAISettings({ flagNotFail: next.flagNotFail });
         setBusy(false);
-        onSaved(saved);
+        // No preset change — only pass aiSettings update
+        onSaved(saved, null);
     };
 
-    const setSensitivity = async (sensitivity) => {
+    const handleSensitivityChange = async (sensitivity) => {
+        const preset = SENSITIVITY_PRESETS[sensitivity];
         setSettings((s) => ({ ...s, sensitivity }));
         setBusy(true);
-        const saved = await updateAISettings({ sensitivity });
-        setBusy(false);
-        onSaved(saved);
+        try {
+            // 1. Persist the new sensitivity
+            const savedSettings = await updateAISettings({ sensitivity });
+            // 2. Immediately persist the matching preset AI parameters
+            const savedParams = await updateAIParameters(preset);
+            // Lift both updates into parent gov state together
+            onSaved(savedSettings, savedParams);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const SENSITIVITY_META = {
+        LOW: { label: "Low", desc: "More tolerant — fewer false positives.", color: "#2e7d32" },
+        MEDIUM: { label: "Medium", desc: "Defaults — balanced detection.", color: "#e65100" },
+        HIGH: { label: "High", desc: "More strict — faster detection and alerts.", color: "#c62828" },
     };
 
     return (
@@ -198,14 +263,27 @@ function AISettingsTab({ gov, onSaved }) {
                 disabled={busy}
                 onChange={toggleFlagNotFail}
             />
-            <div className="a1-field" style={{ marginTop: 14, maxWidth: 220 }}>
+            <div className="a1-field" style={{ marginTop: 14, maxWidth: 260 }}>
                 <label>Sensitivity</label>
-                <select value={settings.sensitivity} disabled={busy} onChange={(e) => setSensitivity(e.target.value)}>
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
+                <select value={settings.sensitivity} disabled={busy} onChange={(e) => handleSensitivityChange(e.target.value)}>
+                    <option value="LOW">Low — tolerant</option>
+                    <option value="MEDIUM">Medium — efault</option>
+                    <option value="HIGH">High — strict</option>
                 </select>
             </div>
+            {settings.sensitivity && (
+                <div className="a1-banner a1-banner-slim" style={{
+                    marginTop: 12,
+                    background: `${SENSITIVITY_META[settings.sensitivity]?.color}18`,
+                    borderLeft: `3px solid ${SENSITIVITY_META[settings.sensitivity]?.color}`,
+                    color: SENSITIVITY_META[settings.sensitivity]?.color,
+                }}>
+                    <strong>{SENSITIVITY_META[settings.sensitivity]?.label}:</strong>{" "}
+                    {SENSITIVITY_META[settings.sensitivity]?.desc}{" "}
+                    AI Parameters will be auto-updated to match.
+                </div>
+            )}
+            {busy && <div className="a1-sub" style={{ marginTop: 8 }}>Applying preset and saving parameters…</div>}
         </div>
     );
 }
@@ -221,24 +299,87 @@ const AI_PARAM_FIELDS = [
     { key: "snapshotResolution", label: "Snapshot Resolution", unit: "" },
 ];
 
+// Shows what sensitivity level the current parameter values match (if any)
+function detectPresetMatch(params) {
+    for (const [level, preset] of Object.entries(SENSITIVITY_PRESETS)) {
+        const matches = Object.entries(preset).every(([k, v]) =>
+            String(params[k]) === String(v)
+        );
+        if (matches) return level;
+    }
+    return null; // custom values
+}
+
 function AIParametersTab({ gov, onSaved }) {
+    // Re-initialize from gov whenever the parent updates (e.g. after sensitivity auto-preset)
     const [params, setParams] = useState(gov.aiParameters);
     const [busy, setBusy] = useState(false);
+
+    // Sync with parent gov.aiParameters when it changes (e.g. after AISettingsTab applies a preset)
+    React.useEffect(() => {
+        setParams(gov.aiParameters);
+    }, [gov.aiParameters]);
 
     const setField = (key, value) => setParams((p) => ({ ...p, [key]: value }));
 
     const save = async (e) => {
         e.preventDefault();
         setBusy(true);
-        const saved = await updateAIParameters(params);
+        // Save AI parameters
+        const savedParams = await updateAIParameters(params);
+        // Also persist current sensitivity so it stays in sync
+        const currentSensitivity = gov.aiSettings?.sensitivity;
+        if (currentSensitivity) {
+            await updateAISettings({ sensitivity: currentSensitivity });
+        }
         setBusy(false);
-        onSaved(saved);
+        onSaved(savedParams);
     };
+
+    const presetMatch = detectPresetMatch(params);
+    const PRESET_COLORS = { LOW: "#2e7d32", MEDIUM: "#e65100", HIGH: "#c62828" };
 
     return (
         <div className="a1-card">
             <h2>AI Parameters</h2>
-            <p className="a1-sub">Proctoring detection thresholds, exactly as defined in the BRD.</p>
+            <p className="a1-sub">Proctoring detection thresholds. Automatically set by Sensitivity — editable manually.</p>
+
+            {/* Preset source badge */}
+            <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 10 }}>
+                <span className="a1-sub">Preset source:</span>
+                {presetMatch ? (
+                    <span style={{
+                        padding: "2px 10px",
+                        borderRadius: 12,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        background: `${PRESET_COLORS[presetMatch]}18`,
+                        color: PRESET_COLORS[presetMatch],
+                        border: `1px solid ${PRESET_COLORS[presetMatch]}40`,
+                    }}>
+                        {presetMatch.charAt(0) + presetMatch.slice(1).toLowerCase()} sensitivity
+                    </span>
+                ) : (
+                    <span style={{ padding: "2px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: "#f0f0f0", color: "#555" }}>
+                        Custom
+                    </span>
+                )}
+            </div>
+
+            {/* Quick preset buttons */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                {Object.keys(SENSITIVITY_PRESETS).map((level) => (
+                    <button
+                        key={level}
+                        type="button"
+                        className={`a1-btn a1-btn-sm ${presetMatch === level ? "a1-btn-primary" : "a1-btn-ghost"}`}
+                        onClick={() => setParams(SENSITIVITY_PRESETS[level])}
+                    >
+                        {level.charAt(0) + level.slice(1).toLowerCase()}
+                    </button>
+                ))}
+            </div>
+
             <form onSubmit={save}>
                 <table className="a1-band-table">
                     <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
@@ -250,8 +391,11 @@ function AIParametersTab({ gov, onSaved }) {
                                     <input
                                         className="a1-band-input"
                                         style={{ width: 120 }}
-                                        value={params[f.key]}
-                                        onChange={(e) => setField(f.key, f.key === "snapshotResolution" ? e.target.value : Number(e.target.value))}
+                                        value={params[f.key] ?? ""}
+                                        onChange={(e) => setField(
+                                            f.key,
+                                            f.key === "snapshotResolution" ? e.target.value : Number(e.target.value)
+                                        )}
                                     />
                                     {f.unit && <span className="a1-sub" style={{ marginLeft: 6 }}>{f.unit}</span>}
                                 </td>

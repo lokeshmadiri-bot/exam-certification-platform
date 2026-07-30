@@ -1,5 +1,8 @@
 package com.oryfolks.certify.controller;
 
+import com.oryfolks.certify.dto.GenerateQuestionRequest;
+import com.oryfolks.certify.dto.GeneratedQuestionDTO;
+import com.oryfolks.certify.dto.SaveGeneratedQuestionsRequest;
 import com.oryfolks.certify.entity.AccessAuditLog;
 import com.oryfolks.certify.entity.Exam;
 import com.oryfolks.certify.entity.Question;
@@ -7,6 +10,7 @@ import com.oryfolks.certify.repository.AccessAuditLogRepository;
 import com.oryfolks.certify.repository.ExamRepository;
 import com.oryfolks.certify.repository.QuestionRepository;
 import com.oryfolks.certify.response.ApiResponse;
+import com.oryfolks.certify.service.impl.GeminiService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,6 +32,9 @@ public class AdminQuestionController {
 
     @Autowired
     private AccessAuditLogRepository auditLogRepository;
+
+    @Autowired
+    private GeminiService geminiService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> getQuestions(
@@ -80,6 +87,13 @@ public class AdminQuestionController {
         if (question.getStatus() == null) question.setStatus("ACTIVE");
         if (question.getIsActive() == null) question.setIsActive(true);
         if (question.getSource() == null) question.setSource("MANUAL");
+
+        if (question.getExam() == null) {
+            List<Exam> allExams = examRepository.findAll();
+            if (!allExams.isEmpty()) {
+                question.setExam(allExams.get(0));
+            }
+        }
 
         Question saved = questionRepository.save(question);
 

@@ -73,6 +73,11 @@ public class GovernanceController {
             Principal principal) {
 
         GovernanceSetting gs = getOrInitSettings();
+
+        // Capture previous values for audit log
+        String oldEncryption = String.valueOf(gs.getEncryption());
+        String oldWatermark = String.valueOf(gs.getWatermark());
+
         if (payload.containsKey("encryption")) {
             gs.setEncryption(Boolean.parseBoolean(payload.get("encryption").toString()));
         }
@@ -81,12 +86,15 @@ public class GovernanceController {
         }
         governanceSettingRepository.save(gs);
 
+        String oldValue = String.format("encryption=%s, watermark=%s", oldEncryption, oldWatermark);
+        String newValue = String.format("encryption=%s, watermark=%s", gs.getEncryption(), gs.getWatermark());
+
         auditLogRepository.save(AccessAuditLog.builder()
                 .userName(principal != null ? principal.getName() : "Admin User")
                 .action("UPDATE_SECURITY")
                 .module("Governance")
-                .oldValue("-")
-                .newValue(payload.toString())
+                .oldValue(oldValue)
+                .newValue(newValue)
                 .build());
 
         Map<String, Object> res = new HashMap<>();
@@ -101,6 +109,11 @@ public class GovernanceController {
             Principal principal) {
 
         GovernanceSetting gs = getOrInitSettings();
+
+        // Capture previous values for audit log
+        String oldSensitivity = gs.getSensitivity();
+        String oldFlagNotFail = String.valueOf(gs.getFlagNotFail());
+
         if (payload.containsKey("flagNotFail")) {
             gs.setFlagNotFail(Boolean.parseBoolean(payload.get("flagNotFail").toString()));
         }
@@ -109,12 +122,15 @@ public class GovernanceController {
         }
         governanceSettingRepository.save(gs);
 
+        String oldValue = String.format("sensitivity=%s, flagNotFail=%s", oldSensitivity, oldFlagNotFail);
+        String newValue = String.format("sensitivity=%s, flagNotFail=%s", gs.getSensitivity(), gs.getFlagNotFail());
+
         auditLogRepository.save(AccessAuditLog.builder()
                 .userName(principal != null ? principal.getName() : "Admin User")
                 .action("UPDATE_AI_SETTINGS")
                 .module("Governance")
-                .oldValue("-")
-                .newValue(payload.toString())
+                .oldValue(oldValue)
+                .newValue(newValue)
                 .build());
 
         Map<String, Object> res = new HashMap<>();
@@ -129,6 +145,15 @@ public class GovernanceController {
             Principal principal) {
 
         GovernanceSetting gs = getOrInitSettings();
+
+        // Capture previous values for audit log
+        String oldValue = String.format(
+                "faceDetectionIntervalSec=%d, detectionConfidence=%.2f, gazeDeviationDeg=%d, " +
+                "absenceTriggerMisses=%d, alertWindowSec=%d, snapshotResolution=%s",
+                gs.getFaceDetectionIntervalSec(), gs.getDetectionConfidence(),
+                gs.getGazeDeviationDeg(), gs.getAbsenceTriggerMisses(),
+                gs.getAlertWindowSec(), gs.getSnapshotResolution());
+
         if (payload.containsKey("faceDetectionIntervalSec")) {
             gs.setFaceDetectionIntervalSec(Integer.parseInt(payload.get("faceDetectionIntervalSec").toString()));
         }
@@ -149,12 +174,19 @@ public class GovernanceController {
         }
         governanceSettingRepository.save(gs);
 
+        String newValue = String.format(
+                "faceDetectionIntervalSec=%d, detectionConfidence=%.2f, gazeDeviationDeg=%d, " +
+                "absenceTriggerMisses=%d, alertWindowSec=%d, snapshotResolution=%s",
+                gs.getFaceDetectionIntervalSec(), gs.getDetectionConfidence(),
+                gs.getGazeDeviationDeg(), gs.getAbsenceTriggerMisses(),
+                gs.getAlertWindowSec(), gs.getSnapshotResolution());
+
         auditLogRepository.save(AccessAuditLog.builder()
                 .userName(principal != null ? principal.getName() : "Admin User")
                 .action("UPDATE_AI_PARAMETERS")
                 .module("Governance")
-                .oldValue("-")
-                .newValue(payload.toString())
+                .oldValue(oldValue)
+                .newValue(newValue)
                 .build());
 
         Map<String, Object> aiParameters = new HashMap<>();
@@ -178,6 +210,7 @@ public class GovernanceController {
         String note = body.getOrDefault("note", "").toString();
 
         ApprovalRequest req = ApprovalRequest.builder()
+                .id(UUID.randomUUID().toString())
                 .type("RETENTION_CHANGE")
                 .label("Change retention policy → " + days + " days")
                 .targetId("governance")
@@ -185,6 +218,8 @@ public class GovernanceController {
                 .note(note)
                 .status("PENDING")
                 .payloadJson(days + ":" + gs.getRetentionDays())
+                .requestedAt(java.time.LocalDateTime.now())
+                .createdAt(java.time.LocalDateTime.now())
                 .build();
 
         ApprovalRequest saved = approvalRepository.save(req);

@@ -11,8 +11,24 @@
 // ============================================================
 
 const BASE = "/api/admin";
+// Auth endpoints live at /api/auth (not under /api/admin)
+const AUTH_BASE = "/api/auth";
 
 // ---------------- low-level HTTP ----------------
+
+/**
+ * Unwrap the backend ApiResponse envelope.
+ * The backend always returns: { success, message, data, timestamp }
+ * We want callers to receive `data` directly.
+ */
+function unwrap(json) {
+    // If the response has the ApiResponse shape, return .data
+    if (json !== null && typeof json === "object" && "success" in json && "data" in json) {
+        return json.data;
+    }
+    // Otherwise return as-is (forward-compat for endpoints that return raw data)
+    return json;
+}
 
 async function get(path, params = {}) {
     const qs = new URLSearchParams(
@@ -22,7 +38,7 @@ async function get(path, params = {}) {
         headers: authHeaders(),
     });
     if (!res.ok) throw new Error(`GET ${path} → ${res.status}`);
-    return res.json();
+    return unwrap(await res.json());
 }
 
 async function post(path, body) {
@@ -32,7 +48,7 @@ async function post(path, body) {
         body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`POST ${path} → ${res.status}`);
-    return res.json();
+    return unwrap(await res.json());
 }
 
 async function put(path, body) {
@@ -42,7 +58,7 @@ async function put(path, body) {
         body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`PUT ${path} → ${res.status}`);
-    return res.json();
+    return unwrap(await res.json());
 }
 
 async function del(path) {
@@ -51,7 +67,26 @@ async function del(path) {
         headers: authHeaders(),
     });
     if (!res.ok) throw new Error(`DELETE ${path} → ${res.status}`);
-    return res.json();
+    return unwrap(await res.json());
+}
+
+/** Direct auth helper (bypasses BASE prefix — auth lives at /api/auth) */
+async function authPost(path, body) {
+    const res = await fetch(`${AUTH_BASE}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`POST ${AUTH_BASE}${path} → ${res.status}`);
+    return unwrap(await res.json());
+}
+
+async function authGet(path) {
+    const res = await fetch(`${AUTH_BASE}${path}`, {
+        headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`GET ${AUTH_BASE}${path} → ${res.status}`);
+    return unwrap(await res.json());
 }
 
 function authHeaders() {
@@ -73,24 +108,44 @@ const uid = (p) => `${p}-${Math.random().toString(36).slice(2, 9)}`;
 const nowIso = () => new Date().toISOString();
 
 // ---------------- Auth (Task 1 — Admin Shell) ----------------
+// Auth calls go to /api/auth (not /api/admin/auth) to match the backend AuthController.
 
-export const login = (email, password) =>
+export const login = (username, password) =>
     withFallback(
-        () => post("/auth/login", { email, password }),
-        () => mockLogin(email, password)
+        async () => {
+            // Backend AuthController expects { username, password }
+            const data = await authPost("/login", { username, password });
+            // data = { token, username, role, fullName, userId, title }
+            if (data && data.token) {
+                localStorage.setItem("admin_token", data.token);
+                const user = {
+                    name: data.fullName || data.username,
+                    email: data.username,
+                    role: data.role,
+                    userId: data.userId,
+                };
+                localStorage.setItem("admin_user", JSON.stringify(user));
+            }
+            return data;
+        },
+        () => mockLogin(username, password)
     );
 
 export const logout = () => {
     localStorage.removeItem("admin_token");
     localStorage.removeItem("admin_user");
-    return withFallback(() => post("/auth/logout", {}), { ok: true });
+    // Stateless JWT — no server-side session to invalidate, just clear localStorage
+    return Promise.resolve({ ok: true });
 };
 
 export const fetchMe = () =>
-    withFallback(() => get("/auth/me"), () => {
-        const raw = localStorage.getItem("admin_user");
-        return raw ? JSON.parse(raw) : null;
-    });
+    withFallback(
+        () => authGet("/me"),
+        () => {
+            const raw = localStorage.getItem("admin_user");
+            return raw ? JSON.parse(raw) : null;
+        }
+    );
 
 // ---------------- Exams Library (Task 2) ----------------
 
@@ -118,6 +173,12 @@ export const publishExamVersion = (id, payload) =>
     withFallback(() => post(`/exams/${id}/versions/publish`, payload), () =>
         mockPublishVersion(id, payload)
     );
+
+export const deleteExam = (id) =>
+    withFallback(() => del(`/exams/${id}`), () => mockDeleteExam(id));
+
+export const archiveExam = (id) =>
+    withFallback(() => post(`/exams/${id}/archive`, {}), () => mockArchiveExam(id));
 
 // ---------------- Authoring — Difficulty Band Editor (Task 3) ----------------
 
@@ -276,17 +337,20 @@ const MOCK = {
     auditLog: [],
 };
 
-function mockLogin(email, password) {
-    const user = MOCK.users.find((u) => u.email === email && u.password === password);
+function mockLogin(username, password) {
+    // Fallback: try matching by email or username field
+    const user = MOCK.users.find(
+        (u) => (u.email === username || u.username === username) && u.password === password
+    );
     if (!user) {
         const err = new Error("Invalid credentials");
         err.mockAuthFailure = true;
         throw err;
     }
-    const token = `mock.${btoa(email)}.${Date.now()}`;
+    const token = `mock.${btoa(username)}.${Date.now()}`;
     localStorage.setItem("admin_token", token);
-    localStorage.setItem("admin_user", JSON.stringify({ name: user.name, email: user.email, role: user.role }));
-    return { token, user: { name: user.name, email: user.email, role: user.role } };
+    localStorage.setItem("admin_user", JSON.stringify({ name: user.name, email: user.email || username, role: user.role }));
+    return { token, user: { name: user.name, email: user.email || username, role: user.role } };
 }
 
 function mockListExams(filters) {
@@ -343,6 +407,19 @@ function mockPublishVersion(id, payload) {
     exam.version = nextVersion;
     exam.updatedAt = nowIso();
     pushAudit("PUBLISH_VERSION", "Authoring", `v${nextVersion - 1}`, `v${nextVersion}`);
+    return exam;
+}
+
+function mockDeleteExam(id) {
+    MOCK.exams = MOCK.exams.filter((e) => e.id !== id);
+    pushAudit("DELETE_EXAM", "Exams Library", id, "-");
+    return { ok: true };
+}
+
+function mockArchiveExam(id) {
+    const exam = MOCK.exams.find((e) => e.id === id);
+    if (exam) exam.status = "INACTIVE";
+    pushAudit("ARCHIVE_EXAM", "Exams Library", "-", id);
     return exam;
 }
 

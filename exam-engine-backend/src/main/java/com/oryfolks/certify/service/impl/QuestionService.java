@@ -46,6 +46,12 @@ public class QuestionService {
         if (req.getExamId() != null) {
             exam = examRepository.findById(req.getExamId()).orElse(null);
         }
+        if (exam == null) {
+            List<Exam> allExams = examRepository.findAll();
+            if (!allExams.isEmpty()) {
+                exam = allExams.get(0);
+            }
+        }
 
         Exam finalExam = exam;
         List<Question> questions = req.getQuestions().stream()
@@ -61,10 +67,10 @@ public class QuestionService {
                         .difficulty(dto.getDifficulty() != null ? dto.getDifficulty() : "MEDIUM")
                         .marks(dto.getMarks() != null ? dto.getMarks() : 1)
                         .correctOption(dto.getCorrectOption() != null ? dto.getCorrectOption() : "A")
-                        .optionA(dto.getOptionA())
-                        .optionB(dto.getOptionB())
-                        .optionC(dto.getOptionC())
-                        .optionD(dto.getOptionD())
+                        .optionA(dto.getOptionA() != null && !dto.getOptionA().isBlank() ? dto.getOptionA() : "Option A")
+                        .optionB(dto.getOptionB() != null && !dto.getOptionB().isBlank() ? dto.getOptionB() : "Option B")
+                        .optionC(dto.getOptionC() != null && !dto.getOptionC().isBlank() ? dto.getOptionC() : "Option C")
+                        .optionD(dto.getOptionD() != null && !dto.getOptionD().isBlank() ? dto.getOptionD() : "Option D")
                         .language(dto.getLanguage())
                         .sampleInput(dto.getSampleInput())
                         .sampleOutput(dto.getSampleOutput())
