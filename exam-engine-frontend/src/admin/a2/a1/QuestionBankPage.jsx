@@ -51,7 +51,7 @@ export default function QuestionBankPage() {
     const [showAIGenerator, setShowAIGenerator] = useState(false);
     const [aiSavedToast, setAiSavedToast] = useState(null);
 
-    const load = () => fetchQuestions(filters).then((res) => setRows(res.rows));
+    const load = () => fetchQuestions(filters).then((res) => setRows(res?.rows || (Array.isArray(res) ? res : [])));
 
     useEffect(() => {
         load();
@@ -108,6 +108,17 @@ export default function QuestionBankPage() {
         load();
     };
 
+    const exportSelectedQuestions = () => {
+        const items = (rows || []).filter((q) => selected.size === 0 || selected.has(q.id));
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(items, null, 2));
+        const downloadAnchor = document.createElement("a");
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `questions_export_${Date.now()}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    };
+
     return (
         <div className="a1-page">
             <header className="a1-page-head">
@@ -117,6 +128,9 @@ export default function QuestionBankPage() {
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <button className="a1-btn a1-btn-ghost" onClick={load}>↻ Refresh</button>
+                    <button className="a1-btn a1-btn-ghost" onClick={exportSelectedQuestions}>
+                        ⤓ Export JSON
+                    </button>
                     <button
                         className="a1-btn a1-btn-ghost"
                         onClick={() => setShowAIGenerator(true)}

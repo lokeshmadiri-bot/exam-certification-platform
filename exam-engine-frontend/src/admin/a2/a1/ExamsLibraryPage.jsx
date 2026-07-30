@@ -6,7 +6,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-    fetchExams, duplicateExam,
+    fetchExams, duplicateExam, deleteExam,
     requestExamActivation, requestExamDeactivation,
     fetchExamVersions, publishExamVersion,
     META,
@@ -35,7 +35,7 @@ export default function ExamsLibraryPage() {
     const [publishing, setPublishing] = useState(false);
 
     const load = () =>
-        fetchExams(filters).then((res) => setRows(res.rows));
+        fetchExams(filters).then((res) => setRows(res?.rows || (Array.isArray(res) ? res : [])));
 
     useEffect(() => {
         load();
@@ -66,6 +66,13 @@ export default function ExamsLibraryPage() {
     const handleDuplicate = async (exam) => {
         await duplicateExam(exam.id);
         load();
+    };
+
+    const handleDelete = async (exam) => {
+        if (window.confirm(`Are you sure you want to delete exam "${exam.title}"?`)) {
+            await deleteExam(exam.id);
+            load();
+        }
     };
 
     const openStatusAction = (exam, target) => setStatusAction({ exam, target });
@@ -214,6 +221,9 @@ export default function ExamsLibraryPage() {
                                     <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => openVersions(exam)}>
                                         Versions
                                     </button>
+                                    <button className="a1-btn a1-btn-ghost a1-btn-sm" style={{ color: "#d9383a" }} onClick={() => handleDelete(exam)}>
+                                        Delete
+                                    </button>
                                     {exam.status !== "ACTIVE" && !exam.pendingApproval && (
                                         <button className="a1-btn a1-btn-primary a1-btn-sm" onClick={() => openStatusAction(exam, "ACTIVE")}>
                                             Activate
@@ -258,10 +268,13 @@ export default function ExamsLibraryPage() {
                                             Edit
                                         </button>
                                         <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => handleDuplicate(exam)}>
-                                            Dup
+                                            Duplicate
                                         </button>
                                         <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => openVersions(exam)}>
-                                            Ver
+                                            Versions
+                                        </button>
+                                        <button className="a1-btn a1-btn-ghost a1-btn-sm" style={{ color: "#d9383a" }} onClick={() => handleDelete(exam)}>
+                                            Delete
                                         </button>
                                         {exam.status !== "ACTIVE" && !exam.pendingApproval && (
                                             <button className="a1-btn a1-btn-primary a1-btn-sm" onClick={() => openStatusAction(exam, "ACTIVE")}>

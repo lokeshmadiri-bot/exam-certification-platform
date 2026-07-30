@@ -73,6 +73,17 @@ public class AdminExamController {
         if (exam.getStatus() == null) exam.setStatus(ExamStatus.DRAFT);
         if (exam.getVersion() == null) exam.setVersion("1");
 
+        // Sync field aliases
+        if (exam.getDurationMinutes() == null && exam.getDurationMin() != null) {
+            exam.setDurationMinutes(exam.getDurationMin());
+        }
+        if (exam.getQuestionPool() == null && exam.getQuestionPoolSize() != null) {
+            exam.setQuestionPool(exam.getQuestionPoolSize());
+        }
+        if (exam.getPerAttempt() == null && exam.getQuestionsPerAttempt() != null) {
+            exam.setPerAttempt(exam.getQuestionsPerAttempt());
+        }
+
         Exam saved = examRepository.save(exam);
 
         auditLogRepository.save(AccessAuditLog.builder()
@@ -98,9 +109,16 @@ public class AdminExamController {
         if (payload.getTitle() != null) exam.setTitle(payload.getTitle());
         if (payload.getStack() != null) exam.setStack(payload.getStack());
         if (payload.getDurationMinutes() != null) exam.setDurationMinutes(payload.getDurationMinutes());
+        else if (payload.getDurationMin() != null) exam.setDurationMinutes(payload.getDurationMin());
+
         if (payload.getPassMark() != null) exam.setPassMark(payload.getPassMark());
+
         if (payload.getQuestionPool() != null) exam.setQuestionPool(payload.getQuestionPool());
+        else if (payload.getQuestionPoolSize() != null) exam.setQuestionPool(payload.getQuestionPoolSize());
+
         if (payload.getPerAttempt() != null) exam.setPerAttempt(payload.getPerAttempt());
+        else if (payload.getQuestionsPerAttempt() != null) exam.setPerAttempt(payload.getQuestionsPerAttempt());
+
         if (payload.getInstructions() != null) exam.setInstructions(payload.getInstructions());
 
         Exam saved = examRepository.save(exam);
@@ -225,12 +243,15 @@ public class AdminExamController {
         String note = body != null ? body.getOrDefault("note", "") : "";
 
         ApprovalRequest req = ApprovalRequest.builder()
+                .id(UUID.randomUUID().toString())
                 .type("EXAM_ACTIVATE")
                 .label("Activate exam · " + exam.getTitle())
                 .targetId(id.toString())
                 .requestedBy(principal != null ? principal.getName() : "Admin User")
                 .note(note)
                 .status("PENDING")
+                .requestedAt(java.time.LocalDateTime.now())
+                .createdAt(java.time.LocalDateTime.now())
                 .build();
 
         ApprovalRequest saved = approvalRepository.save(req);
@@ -253,12 +274,15 @@ public class AdminExamController {
         String note = body != null ? body.getOrDefault("note", "") : "";
 
         ApprovalRequest req = ApprovalRequest.builder()
+                .id(UUID.randomUUID().toString())
                 .type("EXAM_DEACTIVATE")
                 .label("Deactivate exam · " + exam.getTitle())
                 .targetId(id.toString())
                 .requestedBy(principal != null ? principal.getName() : "Admin User")
                 .note(note)
                 .status("PENDING")
+                .requestedAt(java.time.LocalDateTime.now())
+                .createdAt(java.time.LocalDateTime.now())
                 .build();
 
         ApprovalRequest saved = approvalRepository.save(req);
@@ -311,5 +335,39 @@ public class AdminExamController {
                 .build());
 
         return ResponseEntity.ok(ApiResponse.success("Published v" + exam.getVersion(), saved));
+    }
+
+    @PostMapping("/{id}/archive")
+    public ResponseEntity<ApiResponse<Exam>> archiveExam(@PathVariable UUID id, Principal principal) {
+        Exam exam = examRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Exam not found: " + id));
+
+        exam.setStatus(ExamStatus.INACTIVE);
+        Exam saved = examRepository.save(exam);
+
+        auditLogRepository.save(AccessAuditLog.builder()
+                .userName(principal != null ? principal.getName() : "Admin User")
+                .action("ARCHIVE_EXAM")
+                .module("Exams Library")
+                .oldValue("-")
+                .newValue(saved.getId().toString())
+                .build());
+
+        return ResponseEntity.ok(ApiResponse.success("Exam archived successfully", saved));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Boolean>>> deleteExam(@PathVariable UUID id, Principal principal) {
+        examRepository.deleteById(id);
+
+        auditLogRepository.save(AccessAuditLog.builder()
+                .userName(principal != null ? principal.getName() : "Admin User")
+                .action("DELETE_EXAM")
+                .module("Exams Library")
+                .oldValue(id.toString())
+                .newValue("-")
+                .build());
+
+        return ResponseEntity.ok(ApiResponse.success("Exam deleted successfully", Map.of("ok", true)));
     }
 }

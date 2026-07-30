@@ -3,7 +3,7 @@
 // 30-day lock override, gated behind four-eyes approval.
 
 import React, { useEffect, useMemo, useState } from "react";
-import { fetchCandidates, requestCandidateLockOverride } from "./api";
+import { fetchCandidates, fetchExams, requestCandidateLockOverride } from "./api";
 import { TwoPersonRuleBanner, PendingApprovalBadge, RequestApprovalModal } from "./FourEyes";
 import "./a1.css";
 
@@ -17,11 +17,18 @@ const STATUS_LABEL = {
 
 export default function CandidatesPage() {
     const [rows, setRows] = useState(null);
+    const [allExams, setAllExams] = useState([]);
     const [filters, setFilters] = useState({ q: "", status: "", exam: "", locked: "" });
     const [page, setPage] = useState(1);
     const [overrideFor, setOverrideFor] = useState(null); // candidate object
 
-    const load = () => fetchCandidates(filters).then((res) => setRows(res.rows));
+    const load = () => {
+        fetchCandidates(filters).then((res) => setRows(res?.rows || res || []));
+        fetchExams().then((res) => {
+            const examsList = res?.rows || res || [];
+            setAllExams(examsList.map((e) => e.title || e.name || e));
+        }).catch(() => {});
+    };
 
     useEffect(() => {
         load();
@@ -29,9 +36,10 @@ export default function CandidatesPage() {
     }, [filters]);
 
     const examOptions = useMemo(() => {
-        if (!rows) return [];
-        return [...new Set(rows.map((c) => c.exam))];
-    }, [rows]);
+        const fromCandidates = rows ? rows.map((c) => c.exam).filter(Boolean) : [];
+        const combined = [...new Set([...allExams, ...fromCandidates])];
+        return combined.sort();
+    }, [rows, allExams]);
 
     const pageRows = useMemo(() => {
         if (!rows) return [];

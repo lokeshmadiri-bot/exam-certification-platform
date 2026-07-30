@@ -25,7 +25,7 @@ export default function AttemptsPage() {
   useEffect(() => {
     setLoading(true);
     fetchAttempts(filters).then((d) => {
-      setData(d);
+      setData(d?.rows ? d : { rows: Array.isArray(d) ? d : [], total: Array.isArray(d) ? d.length : 0 });
       setLoading(false);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

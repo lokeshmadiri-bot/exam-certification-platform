@@ -35,7 +35,10 @@ app:
       secret-key: ${AWS_SECRET_ACCESS_KEY:}
 
 # ---- Gemini AI ----
+# Set GEMINI_API_KEY env var to a valid Gemini API key (format: AIzaSy...).
+# Without a valid key, AI question generation uses the backend local fallback
+# (generic but structurally correct questions) instead of Gemini.
 gemini:
   api:
     key: ${GEMINI_API_KEY:}
-    url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent
+    url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent

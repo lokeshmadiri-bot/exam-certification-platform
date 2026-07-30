@@ -28,7 +28,7 @@ import java.util.UUID;
 @Slf4j
 public class GeminiService {
 
-    @Value("${gemini.api.key}")
+    @Value("${gemini.api.key:}")
     private String apiKey;
 
     @Value("${gemini.api.url:https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent}")
@@ -39,6 +39,13 @@ public class GeminiService {
 
     /** Generate N questions from Gemini. */
     public List<GeneratedQuestionDTO> generate(GenerateQuestionRequest req) {
+        // Fast-fail to local fallback if no valid API key is configured
+        String key = (apiKey != null) ? apiKey.trim() : "";
+        if (key.isBlank()) {
+            log.warn("No Gemini API key configured (GEMINI_API_KEY env var). Using local question fallback.");
+            return generateLocalFallback(req);
+        }
+
         String prompt = buildPrompt(req);
 
         // Build Gemini request body
@@ -58,7 +65,7 @@ public class GeminiService {
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
-        String urlWithKey = apiUrl + "?key=" + apiKey;
+        String urlWithKey = apiUrl + "?key=" + key;
 
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(urlWithKey, entity, String.class);
