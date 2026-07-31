@@ -22,8 +22,8 @@ export const examService = {
     const response = await api.post(`/exams/attempts/${attemptId}/answers`, { questionId, selectedOption, optionId });
     return response.data;
   },
-  submitAttemptNew: async (attemptId) => {
-    const response = await api.post(`/exams/attempts/${attemptId}/submit`);
+  submitAttemptNew: async (request) => {
+    const response = await api.post("/candidate/attempts/submit", request);
     return response.data;
   },
   getRemainingTime: async (attemptId) => {

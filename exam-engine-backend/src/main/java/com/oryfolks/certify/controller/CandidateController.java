@@ -4,6 +4,7 @@ import com.oryfolks.certify.dto.ApiResponse;
 import com.oryfolks.certify.dto.AttemptDetailsResponseDTO;
 import com.oryfolks.certify.dto.AttemptHistoryResponseDTO;
 import com.oryfolks.certify.dto.CandidateDashboardResponseDTO;
+import com.oryfolks.certify.dto.CandidateProfileResponseDTO;
 import com.oryfolks.certify.dto.ResultResponseDTO;
 import com.oryfolks.certify.service.CandidateService;
 import jakarta.validation.constraints.NotNull;
@@ -22,69 +23,81 @@ import java.util.UUID;
 @PreAuthorize("hasRole('CANDIDATE')")
 public class CandidateController {
 
-    private final CandidateService candidateService;
+        private final CandidateService candidateService;
 
-    /**
-     * Candidate Dashboard
-     */
-    @GetMapping("/dashboard")
-    public ResponseEntity<ApiResponse<CandidateDashboardResponseDTO>> getDashboard(
-            Principal principal) {
+        /**
+         * Candidate Dashboard
+         */
+        @GetMapping("/dashboard")
+        public ResponseEntity<ApiResponse<CandidateDashboardResponseDTO>> getDashboard(
+                        Principal principal) {
 
-        CandidateDashboardResponseDTO response = candidateService.getDashboard(principal.getName());
+                CandidateDashboardResponseDTO response = candidateService.getDashboard(principal.getName());
 
-        return ResponseEntity.ok(
-                ApiResponse.success(
-                        "Dashboard retrieved successfully.",
-                        response));
-    }
+                return ResponseEntity.ok(
+                                ApiResponse.success(
+                                                "Dashboard retrieved successfully.",
+                                                response));
+        }
 
-    /**
-     * Candidate Attempt History
-     */
-    @GetMapping("/attempts")
-    public ResponseEntity<ApiResponse<List<AttemptHistoryResponseDTO>>> getMyAttempts(
-            Principal principal) {
+        @GetMapping("/profile")
+        public ResponseEntity<ApiResponse<CandidateProfileResponseDTO>> getProfile(
+                        Principal principal) {
 
-        List<AttemptHistoryResponseDTO> response = candidateService.getMyAttempts(principal.getName());
+                CandidateProfileResponseDTO response = candidateService.getProfile(principal.getName());
 
-        return ResponseEntity.ok(
-                ApiResponse.success(
-                        "Attempt history retrieved successfully.",
-                        response));
-    }
+                return ResponseEntity.ok(
+                                ApiResponse.success(
+                                                "Candidate profile fetched successfully.",
+                                                response));
+        }
 
-    /**
-     * Candidate Attempt Details
-     */
-    @GetMapping("/attempts/{attemptId}")
-    public ResponseEntity<ApiResponse<AttemptDetailsResponseDTO>> getAttemptDetails(
-            @PathVariable @NotNull UUID attemptId,
-            Principal principal) {
+        /**
+         * Candidate Attempt History
+         */
+        @GetMapping("/attempts")
+        public ResponseEntity<ApiResponse<List<AttemptHistoryResponseDTO>>> getMyAttempts(
+                        Principal principal) {
 
-        AttemptDetailsResponseDTO response = candidateService.getAttemptDetails(
-                attemptId,
-                principal.getName());
+                List<AttemptHistoryResponseDTO> response = candidateService.getMyAttempts(principal.getName());
 
-        return ResponseEntity.ok(
-                ApiResponse.success(
-                        "Attempt details retrieved successfully.",
-                        response));
-    }
+                return ResponseEntity.ok(
+                                ApiResponse.success(
+                                                "Attempt history retrieved successfully.",
+                                                response));
+        }
 
-    /**
-     * Candidate Results
-     */
-    @GetMapping("/results")
-    public ResponseEntity<ApiResponse<List<ResultResponseDTO>>> getMyResults(
-            Principal principal) {
+        /**
+         * Candidate Attempt Details
+         */
+        @GetMapping("/attempts/{attemptId}")
+        public ResponseEntity<ApiResponse<AttemptDetailsResponseDTO>> getAttemptDetails(
+                        @PathVariable @NotNull UUID attemptId,
+                        Principal principal) {
 
-        List<ResultResponseDTO> response = candidateService.getMyResults(principal.getName());
+                AttemptDetailsResponseDTO response = candidateService.getAttemptDetails(
+                                attemptId,
+                                principal.getName());
 
-        return ResponseEntity.ok(
-                ApiResponse.success(
-                        "Results retrieved successfully.",
-                        response));
-    }
+                return ResponseEntity.ok(
+                                ApiResponse.success(
+                                                "Attempt details retrieved successfully.",
+                                                response));
+        }
+
+        /**
+         * Candidate Results
+         */
+        @GetMapping("/results")
+        public ResponseEntity<ApiResponse<List<ResultResponseDTO>>> getMyResults(
+                        Principal principal) {
+
+                List<ResultResponseDTO> response = candidateService.getMyResults(principal.getName());
+
+                return ResponseEntity.ok(
+                                ApiResponse.success(
+                                                "Results retrieved successfully.",
+                                                response));
+        }
 
 }

@@ -1,19 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Award, CheckCircle, Clock } from 'lucide-react';
-import { examService, attemptService, candidateService } from '../../services/api';
+import { examService, candidateService } from '../../services/api';
 
 export default function CandidateDashboard() {
   const navigate = useNavigate();
   const [exams, setExams] = useState([]);
   const [attempts, setAttempts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [candidate, setCandidate] = useState(null);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const examsRes = await examService.getAllExams();
-        const attemptsRes = await candidateService.getMyAttempts();
+        const [profileRes, examsRes, attemptsRes] = await Promise.all([
+          candidateService.getProfile(),
+          examService.getAllExams(),
+          candidateService.getMyAttempts()
+        ]);
+
+        setCandidate(profileRes.data || null);
         setExams(examsRes.data || []);
         setAttempts(attemptsRes.data || []);
       } catch (err) {
@@ -22,9 +28,9 @@ export default function CandidateDashboard() {
         setLoading(false);
       }
     }
+
     loadData();
   }, []);
-
   const getStackIcon = (stack) => {
     // Return SVG details or color representations based on stack name
     const configs = {
@@ -51,22 +57,7 @@ export default function CandidateDashboard() {
     return <div className="text-center py-10 font-mono text-sm text-[#8A99AE]">Loading dashboard...</div>;
   }
 
-  // Segment exams: available vs locked retry (locked if attempt taken in last 30 days)
-  const isLocked = (examId) => {
-    const lastAttempt = attempts.find(a => a.examId === examId);
-    if (!lastAttempt) return false;
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    return new Date(lastAttempt.submittedAt) > thirtyDaysAgo;
-  };
 
-  const getLockDaysLeft = (examId) => {
-    const lastAttempt = attempts.find(a => a.examId === examId);
-    if (!lastAttempt) return 0;
-    const diffTime = Math.abs(new Date() - new Date(lastAttempt.submittedAt));
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, 30 - diffDays);
-  };
 
   return (
     <div>
@@ -74,7 +65,7 @@ export default function CandidateDashboard() {
       <div className="hero-greet bg-gradient-to-r from-[#0B1F38] to-[#15365e] rounded-[20px] p-[26px_28px] text-white relative overflow-hidden mb-[22px]">
         <div className="wm absolute -right-[30px] -bottom-[50px] w-[230px] h-[230px] rounded-full bg-gradient-radial from-[#2F6BFF]/30 to-transparent"></div>
         <span className="eyebrow font-mono text-[11px] tracking-[1.4px] uppercase text-[#7fa6e6]">Candidate Dashboard</span>
-        <h1 className="font-display font-bold text-[25px] mt-1.5 mb-1">Welcome back, Aarav</h1>
+        <h1 className="font-display font-bold text-[25px] mt-1.5 mb-1">Welcome back, {candidate?.fullName || "Candidate"}</h1>
         <p className="text-[#b9c9e2] text-[13.5px] max-w-[560px] leading-relaxed">
           Your skill path is fully active. Select a stack below to start your timed certification, or view your historical badges.
         </p>
@@ -99,8 +90,14 @@ export default function CandidateDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {exams.filter(e => e.status === 'ACTIVE').slice(0, 3).map((exam) => {
           const style = getStackIcon(exam.stack);
-          const locked = isLocked(exam.examId);
-          const daysLeft = getLockDaysLeft(exam.examId);
+          const lastAttempt =
+            attempts.find(a => a.examId === exam.examId);
+
+          const canAttempt =
+            lastAttempt?.canAttempt ?? true;
+
+          const daysLeft =
+            lastAttempt?.retryDaysLeft ?? 0;
 
           return (
             <div key={exam.examId} className="exam-card bg-white border border-[#E4EAF2] rounded-2xl p-[18px] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex flex-col">
@@ -120,7 +117,7 @@ export default function CandidateDashboard() {
               </div>
 
               <div className="foot mt-auto flex items-center justify-between">
-                {locked ? (
+                {!canAttempt ? (
                   <>
                     <span className="chip warn bg-[#fdf3da] text-[#9c7400]">Locked · {daysLeft}d left</span>
                     <button className="btn ghost cursor-not-allowed opacity-50 px-3.5 py-2 text-[12.5px] font-semibold rounded-lg" disabled>
@@ -169,10 +166,7 @@ export default function CandidateDashboard() {
                 <span className={`tier-badge ml-auto flex items-center gap-2 font-bold font-display text-[13px] px-3 py-1 rounded-full text-white ${getTierColor(attempt.assignedLevel)}`}>
                   <i>{attempt.assignedLevel}</i>
                   <span className="text-[11.5px] font-medium hidden sm:inline">
-                    {attempt.assignedLevel === 'L1' ? 'Expert' :
-                      attempt.assignedLevel === 'L2' ? 'Advanced' :
-                        attempt.assignedLevel === 'L3' ? 'Intermediate' :
-                          attempt.assignedLevel === 'L4' ? 'Beginner' : 'Needs Training'}
+                    {attempt.assignedLevelTitle}
                   </span>
                 </span>
               </div>
