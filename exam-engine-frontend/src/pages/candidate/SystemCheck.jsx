@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Camera, Mic, Check, Play, ShieldAlert, Wifi, Loader } from 'lucide-react';
+import { Camera, Mic, Play, ShieldAlert, Wifi, Loader } from 'lucide-react';
 import { examService, attemptService } from '../../services/api';
 
 export default function CandidateSystemCheck() {
@@ -29,40 +29,54 @@ export default function CandidateSystemCheck() {
 
   // Request camera access
   useEffect(() => {
-
+    console.log("System Check useEffect executed");
     async function initializeSystemCheck() {
-
+      console.log("initializeSystemCheck started");
+      // Camera Check
       try {
-
-        const stream = await navigator.mediaDevices.getUserMedia({
-
+        console.log("Requesting camera permission");
+        const cameraStream = await navigator.mediaDevices.getUserMedia({
           video: {
             width: 320,
             height: 240
-          },
-
-          audio: true
-
+          }
         });
-
-        streamRef.current = stream;
-
-        if (videoRef.current) {
-
-          videoRef.current.srcObject = stream;
-
-        }
+        console.log("Camera permission granted");
 
         setCameraAccess("ready");
-        setMicAccess("ready");
+
+        streamRef.current = cameraStream;
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = cameraStream;
+        }
+
+      } catch (err) {
+
+
+        console.error("Camera Error:", err);
+
+        setCameraAccess("denied");
 
       }
 
-      catch (err) {
+      // Microphone Check
+      try {
+        console.log("Requesting microphone permission");
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: true
+        });
+        console.log("Microphone permission granted");
+        setMicAccess("ready");
 
-        console.error(err);
+        // Stop microphone stream immediately since
+        // we only wanted to check permission
+        micStream.getTracks().forEach(track => track.stop());
 
-        setCameraAccess("denied");
+      } catch (err) {
+
+        console.error("Microphone Error:", err);
+
         setMicAccess("denied");
 
       }
@@ -106,7 +120,7 @@ export default function CandidateSystemCheck() {
   const handleStartExam = async () => {
     try {
       // Create exam attempt record on the backend
-      const res = await examService.startExamAttempt(examId);
+      const res = await attemptService.startAttempt(examId);
       if (res.success) {
         // Clean stream tracks so that the runner can re-capture or preserve it
         if (streamRef.current) {
@@ -121,7 +135,10 @@ export default function CandidateSystemCheck() {
 
   if (!exam) {
     return <div className="text-center py-10 font-mono text-sm text-[#8A99AE]">Loading system check...</div>;
+
   }
+  console.log("cameraAccess =", cameraAccess);
+  console.log("micAccess =", micAccess);
 
   return (
     <div>
