@@ -5,7 +5,8 @@
 // automatically falls back to mock data so the UI still works.
 // ============================================================
 
-const BASE = "/api/admin";
+const API_HOST = import.meta.env.VITE_API_HOST || "http://localhost:8080";
+const BASE = `${API_HOST}/api/admin`;
 
 /**
  * Unwrap the backend ApiResponse envelope.

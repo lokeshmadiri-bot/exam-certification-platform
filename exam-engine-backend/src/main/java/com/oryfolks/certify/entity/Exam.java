@@ -74,6 +74,7 @@ public class Exam {
     private ExamStatus status = ExamStatus.DRAFT;
 
     @OneToMany(mappedBy = "exam", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties("exam")
     @Builder.Default
     private List<CompetencyBand> competencyBands = new ArrayList<>();
 

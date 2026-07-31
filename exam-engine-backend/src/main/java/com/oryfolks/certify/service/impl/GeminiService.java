@@ -15,40 +15,102 @@ import org.springframework.web.client.RestTemplate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
- * GeminiService — calls Gemini 2.5 Flash to generate MCQ questions,
- * parses the JSON response and maps it to GeneratedQuestionDTO list.
- *
- * API docs: https://ai.google.dev/gemini-api/docs/text-generation
+ * GeminiService — AI question generator supporting Groq Cloud (gsk_...),
+ * Grok (xAI), and Google Gemini API, with fallback to local question generation.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class GeminiService {
 
+    @Value("${groq.api.key:}")
+    private String groqApiKey;
+
+    @Value("${groq.api.url:https://api.groq.com/openai/v1/chat/completions}")
+    private String groqApiUrl;
+
+    @Value("${groq.api.model:llama-3.3-70b-versatile}")
+    private String groqModel;
+
+    @Value("${grok.api.key:}")
+    private String grokApiKey;
+
+    @Value("${grok.api.url:https://api.x.ai/v1/chat/completions}")
+    private String grokApiUrl;
+
+    @Value("${grok.api.model:grok-2-latest}")
+    private String grokModel;
+
     @Value("${gemini.api.key:}")
-    private String apiKey;
+    private String geminiApiKey;
 
     @Value("${gemini.api.url:https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent}")
-    private String apiUrl;
+    private String geminiApiUrl;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestTemplate restTemplate = new RestTemplate();
 
-    /** Generate N questions from Gemini. */
+    /** Generate N questions using Groq Cloud, Grok, Gemini, or local fallback. */
     public List<GeneratedQuestionDTO> generate(GenerateQuestionRequest req) {
-        // Fast-fail to local fallback if no valid API key is configured
-        String key = (apiKey != null) ? apiKey.trim() : "";
-        if (key.isBlank()) {
-            log.warn("No Gemini API key configured (GEMINI_API_KEY env var). Using local question fallback.");
-            return generateLocalFallback(req);
+        String groqKey = (groqApiKey != null) ? groqApiKey.trim() : "";
+        if (groqKey.isBlank() && grokApiKey != null && grokApiKey.trim().startsWith("gsk_")) {
+            groqKey = grokApiKey.trim();
         }
 
+        if (!groqKey.isBlank()) {
+            log.info("Generating questions using Groq Cloud AI API (model: {})...", groqModel);
+            return generateWithOpenAiFormat(req, groqKey, groqApiUrl, groqModel, "Groq");
+        }
+
+        String grokKey = (grokApiKey != null) ? grokApiKey.trim() : "";
+        if (!grokKey.isBlank()) {
+            log.info("Generating questions using Grok AI API (model: {})...", grokModel);
+            return generateWithOpenAiFormat(req, grokKey, grokApiUrl, grokModel, "Grok");
+        }
+
+        String geminiKey = (geminiApiKey != null) ? geminiApiKey.trim() : "";
+        if (!geminiKey.isBlank()) {
+            log.info("Generating questions using Gemini AI API...");
+            return generateWithGemini(req, geminiKey);
+        }
+
+        log.warn("No GROQ_API_KEY, GROK_API_KEY, or GEMINI_API_KEY configured. Using local question fallback.");
+        return generateLocalFallback(req);
+    }
+
+    private List<GeneratedQuestionDTO> generateWithOpenAiFormat(GenerateQuestionRequest req, String key, String endpointUrl, String model, String providerName) {
+        String prompt = buildPrompt(req);
+        String selectedModel = (model != null && !model.isBlank()) ? model : "llama-3.3-70b-versatile";
+
+        Map<String, Object> requestBody = Map.of(
+            "model", selectedModel,
+            "messages", List.of(
+                Map.of("role", "system", "content", "You are an expert technical exam question author. Respond ONLY with a valid JSON array."),
+                Map.of("role", "user", "content", prompt)
+            ),
+            "temperature", 0.7
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(key);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(endpointUrl, entity, String.class);
+            return parseOpenAiResponse(response.getBody(), req, providerName + " (" + selectedModel + ")");
+        } catch (Exception e) {
+            log.warn("{} API call failed ({}), falling back to local question generator.", providerName, e.getMessage());
+            return generateLocalFallback(req);
+        }
+    }
+
+    private List<GeneratedQuestionDTO> generateWithGemini(GenerateQuestionRequest req, String key) {
         String prompt = buildPrompt(req);
 
-        // Build Gemini request body
         Map<String, Object> requestBody = Map.of(
             "contents", List.of(
                 Map.of("parts", List.of(Map.of("text", prompt)))
@@ -64,14 +126,13 @@ public class GeminiService {
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
-        String urlWithKey = apiUrl + "?key=" + key;
+        String urlWithKey = geminiApiUrl + "?key=" + key;
 
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(urlWithKey, entity, String.class);
             return parseGeminiResponse(response.getBody(), req);
         } catch (Exception e) {
-            log.warn("Gemini API call failed ({}), generating local AI question fallback.", e.getMessage());
+            log.warn("Gemini API call failed ({}), generating local question fallback.", e.getMessage());
             return generateLocalFallback(req);
         }
     }
@@ -98,32 +159,29 @@ public class GeminiService {
                     .optionA(String.format("Optimizes memory allocation and execution speed for %s", stack))
                     .optionB("Provides thread-safe access across concurrent threads")
                     .optionC("Handles unhandled exceptions in asynchronous operations")
-                    .optionD("Generates documentation comments automatically")
+                    .optionD("Enforces static type checking at compile time")
                     .correctOption("A")
-                    .source("AI")
-                    .aiModel("Gemini-1.5-Flash")
+                    .source("AI_FALLBACK")
+                    .aiModel("Local-Fallback")
                     .examId(req.getExamId())
                     .build());
         }
         return list;
     }
 
-    /** Re-generate a single question with different wording. */
+    /** Regenerate a single question. */
     public GeneratedQuestionDTO regenerate(GeneratedQuestionDTO original) {
         GenerateQuestionRequest req = GenerateQuestionRequest.builder()
                 .stack(original.getStack())
                 .level(original.getLevel())
                 .difficulty(original.getDifficulty())
                 .type(original.getType())
-                .topic("Generate a different question from this one (do not repeat): " + original.getQuestionText())
                 .count(1)
                 .examId(original.getExamId())
                 .build();
         List<GeneratedQuestionDTO> results = generate(req);
         return results.isEmpty() ? original : results.get(0);
     }
-
-    // ------------------------------------------------------------------ //
 
     private String buildPrompt(GenerateQuestionRequest req) {
         int count = (req.getCount() != null && req.getCount() > 0) ? req.getCount() : 3;
@@ -148,7 +206,7 @@ public class GeminiService {
                 4. For CODING type, include a short code snippet in the codeSnippet field (or empty string if not needed).
                 5. marks should be 1 for EASY, 2 for MEDIUM, 3 for HARD.
 
-                Respond ONLY with a valid JSON array (no markdown, no explanation):
+                Respond ONLY with a valid JSON array (no markdown code blocks, no explanation):
                 [
                   {
                     "questionText": "...",
@@ -164,22 +222,43 @@ public class GeminiService {
                 """.formatted(count, req.getStack(), req.getLevel(), req.getDifficulty(), req.getType(), topicClause);
     }
 
-    private List<GeneratedQuestionDTO> parseGeminiResponse(String responseBody, GenerateQuestionRequest req) {
-        List<GeneratedQuestionDTO> result = new ArrayList<>();
+    private List<GeneratedQuestionDTO> parseOpenAiResponse(String responseBody, GenerateQuestionRequest req, String modelName) {
         try {
             JsonNode root = objectMapper.readTree(responseBody);
+            String jsonText = root.path("choices").get(0).path("message").path("content").asText();
+            return parseQuestionsJsonString(jsonText, req, modelName);
+        } catch (Exception e) {
+            log.warn("Failed to parse OpenAI-format JSON response: {}", e.getMessage());
+            return generateLocalFallback(req);
+        }
+    }
 
-            // Extract text from candidates[0].content.parts[0].text
-            String jsonText = root
-                    .path("candidates").get(0)
-                    .path("content")
-                    .path("parts").get(0)
-                    .path("text").asText();
+    private List<GeneratedQuestionDTO> parseGeminiResponse(String responseBody, GenerateQuestionRequest req) {
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            String jsonText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
+            return parseQuestionsJsonString(jsonText, req, "Gemini-2.5-Flash");
+        } catch (Exception e) {
+            log.warn("Failed to parse Gemini response: {}", e.getMessage());
+            return generateLocalFallback(req);
+        }
+    }
 
-            // Parse the JSON array embedded in the response
-            List<Map<String, Object>> questions = objectMapper.readValue(
-                    jsonText, new TypeReference<>() {}
-            );
+    private List<GeneratedQuestionDTO> parseQuestionsJsonString(String jsonText, GenerateQuestionRequest req, String modelName) {
+        List<GeneratedQuestionDTO> result = new ArrayList<>();
+        try {
+            String cleanText = jsonText.trim();
+            if (cleanText.startsWith("```json")) {
+                cleanText = cleanText.substring(7);
+            } else if (cleanText.startsWith("```")) {
+                cleanText = cleanText.substring(3);
+            }
+            if (cleanText.endsWith("```")) {
+                cleanText = cleanText.substring(0, cleanText.length() - 3);
+            }
+            cleanText = cleanText.trim();
+
+            List<Map<String, Object>> questions = objectMapper.readValue(cleanText, new TypeReference<>() {});
 
             for (int i = 0; i < questions.size(); i++) {
                 Map<String, Object> q = questions.get(i);
@@ -198,14 +277,13 @@ public class GeminiService {
                         .optionD(str(q, "optionD"))
                         .correctOption(str(q, "correctOption"))
                         .source("AI")
-                        .aiModel("Gemini-2.5-Flash")
+                        .aiModel(modelName)
                         .examId(req.getExamId())
                         .build());
             }
         } catch (Exception e) {
-            log.error("Failed to parse Gemini response: {}", e.getMessage());
-            log.debug("Raw response body: {}", responseBody);
-            throw new RuntimeException("Could not parse Gemini response: " + e.getMessage(), e);
+            log.error("Failed to parse AI JSON array: {}", e.getMessage());
+            return generateLocalFallback(req);
         }
         return result;
     }
