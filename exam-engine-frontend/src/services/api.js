@@ -120,7 +120,9 @@ export const attemptService = {
     return response.data;
   },
   startAttempt: async (examId) => {
-    const response = await api.post(`/attempts/start?examId=${examId}`);
+    const response = await api.post("/candidate/attempts/start", {
+      examId
+    });
     return response.data;
   },
   recordTabSwitch: async (attemptId, offset) => {
@@ -167,6 +169,11 @@ export const candidateService = {
   // Candidate Dashboard
   getDashboard: async () => {
     const response = await api.get('/candidate/dashboard');
+    return response.data;
+  },
+
+  getProfile: async () => {
+    const response = await api.get("/candidate/profile");
     return response.data;
   },
 

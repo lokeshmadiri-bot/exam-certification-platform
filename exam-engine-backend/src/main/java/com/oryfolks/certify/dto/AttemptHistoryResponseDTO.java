@@ -35,4 +35,10 @@ public class AttemptHistoryResponseDTO {
     private ResultPublishStatus resultPublishStatus;
 
     private String assignedLevel;
+
+    private String assignedLevelTitle;
+
+    private Boolean canAttempt;
+
+    private Integer retryDaysLeft;
 }

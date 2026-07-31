@@ -35,21 +35,7 @@ export default function CandidateCatalog() {
     return configs[stack] || { bg: '#eef2f8', fg: '#5C6B82' };
   };
 
-  const isLocked = (examId) => {
-    const lastAttempt = attempts.find(a => a.examId === examId);
-    if (!lastAttempt) return false;
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    return new Date(lastAttempt.submittedAt) > thirtyDaysAgo;
-  };
 
-  const getLockDaysLeft = (examId) => {
-    const lastAttempt = attempts.find(a => a.examId === examId);
-    if (!lastAttempt) return 0;
-    const diffTime = Math.abs(new Date() - new Date(lastAttempt.submittedAt));
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, 30 - diffDays);
-  };
 
   if (loading) {
     return <div className="text-center py-10 font-mono text-sm text-[#8A99AE]">Loading catalog...</div>;
@@ -68,8 +54,13 @@ export default function CandidateCatalog() {
       <div className="exam-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {exams.filter(e => e.status === 'ACTIVE').map((exam) => {
           const style = getStackIcon(exam.stack);
-          const locked = isLocked(exam.examId);
-          const daysLeft = getLockDaysLeft(exam.examId);
+          const lastAttempt = attempts.find(
+            a => a.examId === exam.examId
+          );
+
+          const canAttempt = lastAttempt?.canAttempt ?? true;
+
+          const daysLeft = lastAttempt?.retryDaysLeft ?? 0;
 
           return (
             <div key={exam.examId} className="exam-card bg-white border border-[#E4EAF2] rounded-2xl p-[18px] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex flex-col">
@@ -89,7 +80,7 @@ export default function CandidateCatalog() {
               </div>
 
               <div className="foot mt-auto flex items-center justify-between">
-                {locked ? (
+                {!canAttempt ? (
                   <>
                     <span className="chip warn bg-[#fdf3da] text-[#9c7400]">Locked · {daysLeft}d left</span>
                     <button className="btn ghost cursor-not-allowed opacity-50 px-3.5 py-2 text-[12.5px] font-semibold rounded-lg" disabled>
