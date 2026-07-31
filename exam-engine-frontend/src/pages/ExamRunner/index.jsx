@@ -60,6 +60,7 @@ function ExamRunnerContent() {
     setQuestions,
     selectedAnswers,
     timeRemaining,
+    setTimeRemaining,
     strikes,
     setStrikes,
     setWarningToast,
@@ -89,7 +90,7 @@ function ExamRunnerContent() {
     async function loadAttempt() {
       try {
         setAttemptId(attemptId);
-        
+
         // Fetch detailed runner data (sections, questions, previously saved answers)
         const runnerRes = await examService.getRunnerData(attemptId);
         const data = runnerRes.data;
@@ -98,11 +99,11 @@ function ExamRunnerContent() {
           navigate('/candidate/terminated');
           return;
         }
-        
+
         setExamTitle(data.examTitle || 'Certification Exam');
         setInitialStrikeCount(data.strikeCount || 0);
         setStrikes(data.strikeCount || 0);
-        
+
         // Assemble flat questions list from sections
         const allQuestions = [];
         const loadedSections = data.sections || [];
@@ -114,7 +115,7 @@ function ExamRunnerContent() {
             });
           }
         });
-        
+
         setSections(loadedSections);
         setQuestions(allQuestions);
         setAnswers(data.answers || {});
@@ -127,20 +128,57 @@ function ExamRunnerContent() {
     loadAttempt();
   }, [attemptId, setQuestions, setLoading, setAttemptId, setSections, setAnswers, navigate, setStrikes]);
 
-  const handleGradingSubmit = async () => {
+  const handleGradingSubmit = async (forceSubmit = false) => {
+
     setShowThanks(true);
 
+    const request = {
+      attemptId,
+      forceSubmit: false,
+      answers: Object.entries(answers).map(([questionId, selectedOption]) => ({
+        questionId,
+        selectedOption
+      }))
+    };
+    console.log("Submit Request:", JSON.stringify(request, null, 2));
     try {
-      const res = await examService.submitAttemptNew(attemptId);
+
+      const res = await examService.submitAttemptNew(request);
+
       if (res.success) {
-        if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-        try { if (document.exitFullscreen) document.exitFullscreen(); } catch (_) {}
+
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+        }
+
+        if (document.fullscreenElement) {
+          if (document.fullscreenElement) {
+            try {
+              await document.exitFullscreen();
+            } catch (e) {
+              console.warn("Unable to exit fullscreen", e);
+            }
+          }
+        }
+
         setShowThanks(false);
         setShowThankYouPage(true);
+
       }
+
     } catch (err) {
-      console.error('Failed to submit attempt:', err);
+
+      setShowThanks(false);
+
+      console.error("Submit Error:", err);
+
+      if (err.response) {
+        console.log("Status:", err.response.status);
+        console.log("Response:", err.response.data);
+      }
+
     }
+
   };
 
   useExamTimer(handleGradingSubmit);
@@ -205,7 +243,7 @@ function ExamRunnerContent() {
 
   const handleFinalSubmitAnyway = async () => {
     setShowViolationSummary(false);
-    stopAndUploadRecording(attemptId).catch(() => {});
+    stopAndUploadRecording(attemptId).catch(() => { });
     await handleGradingSubmit();
   };
 
@@ -213,7 +251,7 @@ function ExamRunnerContent() {
 
   const handleFrontendTerminate = () => {
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-    try { if (document.exitFullscreen) document.exitFullscreen(); } catch (_) {}
+    try { if (document.exitFullscreen) document.exitFullscreen(); } catch (_) { }
     navigate('/candidate/terminated');
   };
 
