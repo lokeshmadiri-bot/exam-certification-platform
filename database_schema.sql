@@ -147,3 +147,36 @@ CREATE TABLE IF NOT EXISTS ai_flag (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     snapshot_url VARCHAR(500)
 );
+
+-- 13. Approval Requests Table
+CREATE TABLE IF NOT EXISTS approval_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    request_type VARCHAR(50) NOT NULL, -- CANDIDATE_UNLOCK, EXAM_PUBLISH
+    target_id VARCHAR(100) NOT NULL,
+    candidate_id VARCHAR(100),
+    requested_by_id VARCHAR(100),
+    candidate_name VARCHAR(100),
+    exam_title VARCHAR(100),
+    reason TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- PENDING, APPROVED, REJECTED
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 14. Governance Settings Table
+CREATE TABLE IF NOT EXISTS governance_settings (
+    id BIGINT PRIMARY KEY DEFAULT 1,
+    retention_days INT NOT NULL DEFAULT 180,
+    encryption BOOLEAN NOT NULL DEFAULT TRUE,
+    watermark BOOLEAN NOT NULL DEFAULT TRUE,
+    ai_flag_but_do_not_fail BOOLEAN NOT NULL DEFAULT TRUE,
+    ai_sensitivity VARCHAR(20) NOT NULL DEFAULT 'MEDIUM',
+    face_detection_interval_sec INT DEFAULT 3,
+    detection_confidence DOUBLE PRECISION DEFAULT 0.20,
+    gaze_deviation_deg INT DEFAULT 35,
+    absence_trigger_misses INT DEFAULT 5,
+    alert_window_sec INT DEFAULT 15,
+    snapshot_resolution VARCHAR(30) DEFAULT '160x120',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
