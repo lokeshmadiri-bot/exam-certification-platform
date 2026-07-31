@@ -38,6 +38,7 @@ public class AdminExamController {
     private ApprovalRequestRepository approvalRepository;
 
     @GetMapping
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getExams(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String stack,

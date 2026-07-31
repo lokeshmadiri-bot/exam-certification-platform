@@ -31,10 +31,37 @@ public class GovernanceController {
 
     private GovernanceSetting getOrInitSettings() {
         List<GovernanceSetting> all = governanceSettingRepository.findAll();
+        GovernanceSetting gs;
         if (all.isEmpty()) {
-            return governanceSettingRepository.save(GovernanceSetting.builder().build());
+            gs = new GovernanceSetting();
+            gs.setId(1L);
+            gs.setRetentionDays(180);
+            gs.setEncryption(true);
+            gs.setWatermark(true);
+            gs.setFlagNotFail(true);
+            gs.setSensitivity("MEDIUM");
+            gs.setFaceDetectionIntervalSec(3);
+            gs.setDetectionConfidence(0.20);
+            gs.setGazeDeviationDeg(35);
+            gs.setAbsenceTriggerMisses(5);
+            gs.setAlertWindowSec(15);
+            gs.setSnapshotResolution("160x120");
+            return governanceSettingRepository.save(gs);
+        } else {
+            gs = all.get(0);
         }
-        return all.get(0);
+        if (gs.getRetentionDays() == null) gs.setRetentionDays(180);
+        if (gs.getEncryption() == null) gs.setEncryption(true);
+        if (gs.getWatermark() == null) gs.setWatermark(true);
+        if (gs.getFlagNotFail() == null) gs.setFlagNotFail(true);
+        if (gs.getSensitivity() == null) gs.setSensitivity("MEDIUM");
+        if (gs.getFaceDetectionIntervalSec() == null) gs.setFaceDetectionIntervalSec(3);
+        if (gs.getDetectionConfidence() == null) gs.setDetectionConfidence(0.20);
+        if (gs.getGazeDeviationDeg() == null) gs.setGazeDeviationDeg(35);
+        if (gs.getAbsenceTriggerMisses() == null) gs.setAbsenceTriggerMisses(5);
+        if (gs.getAlertWindowSec() == null) gs.setAlertWindowSec(15);
+        if (gs.getSnapshotResolution() == null) gs.setSnapshotResolution("160x120");
+        return gs;
     }
 
     @GetMapping("/settings")

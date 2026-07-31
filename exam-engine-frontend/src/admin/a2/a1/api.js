@@ -10,9 +10,10 @@
 // read by every other A1/A2 screen.
 // ============================================================
 
-const BASE = "/api/admin";
+const API_HOST = import.meta.env.VITE_API_HOST || "http://localhost:8080";
+const BASE = `${API_HOST}/api/admin`;
 // Auth endpoints live at /api/auth (not under /api/admin)
-const AUTH_BASE = "/api/auth";
+const AUTH_BASE = `${API_HOST}/api/auth`;
 
 // ---------------- low-level HTTP ----------------
 

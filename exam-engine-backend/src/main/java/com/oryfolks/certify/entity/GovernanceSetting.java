@@ -16,8 +16,7 @@ import java.time.LocalDateTime;
 public class GovernanceSetting {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long id = 1L;
 
     @Builder.Default
     @Column(name = "retention_days", nullable = false)
@@ -32,11 +31,11 @@ public class GovernanceSetting {
     private Boolean watermark = true;
 
     @Builder.Default
-    @Column(name = "flag_not_fail", nullable = false)
+    @Column(name = "ai_flag_but_do_not_fail", nullable = false)
     private Boolean flagNotFail = true;
 
     @Builder.Default
-    @Column(name = "sensitivity", nullable = false, length = 20)
+    @Column(name = "ai_sensitivity", nullable = false, length = 20)
     private String sensitivity = "MEDIUM";
 
     @Builder.Default

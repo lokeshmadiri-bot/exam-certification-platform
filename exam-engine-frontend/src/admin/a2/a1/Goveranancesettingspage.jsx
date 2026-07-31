@@ -267,7 +267,7 @@ function AISettingsTab({ gov, onSaved }) {
                 <label>Sensitivity</label>
                 <select value={settings.sensitivity} disabled={busy} onChange={(e) => handleSensitivityChange(e.target.value)}>
                     <option value="LOW">Low — tolerant</option>
-                    <option value="MEDIUM">Medium — efault</option>
+                    <option value="MEDIUM">Medium — default</option>
                     <option value="HIGH">High — strict</option>
                 </select>
             </div>
