@@ -2,9 +2,9 @@ package com.oryfolks.certify.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "approval_requests")
@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 public class ApprovalRequest {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
     @Column(name = "request_type", nullable = false, length = 50)
@@ -31,12 +30,10 @@ public class ApprovalRequest {
     @Column(name = "requested_by_id", nullable = false, length = 100)
     private String requestedBy;
 
-    @CreationTimestamp
-    @Column(name = "requested_at", nullable = false, updatable = false)
+    @Column(name = "requested_at", nullable = false)
     private LocalDateTime requestedAt;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "note", columnDefinition = "TEXT")
@@ -57,4 +54,18 @@ public class ApprovalRequest {
 
     @Column(name = "payload_json", columnDefinition = "TEXT")
     private String payloadJson;
+
+    @PrePersist
+    public void prePersist() {
+        if (this.id == null || this.id.isBlank()) {
+            this.id = UUID.randomUUID().toString();
+        }
+        if (this.requestedAt == null) {
+            this.requestedAt = LocalDateTime.now();
+        }
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+    }
 }
+

@@ -196,7 +196,7 @@ export default function ExamsLibraryPage() {
                                 >
                                     {STACK_ICONS[exam.stack] || "📝"}
                                 </div>
-                                <div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
                                     <div className="a1-exam-card-title">{exam.title}</div>
                                     <div className="a1-exam-card-sub">{exam.stack} · v{exam.version}</div>
                                 </div>
@@ -207,9 +207,11 @@ export default function ExamsLibraryPage() {
                                 <span>Pass <b>{exam.passMark}%</b></span>
                             </div>
                             <div className="a1-exam-card-foot">
-                                <div>
-                                    <StatusPill status={exam.status} />
-                                    {exam.pendingApproval && <PendingApprovalBadge />}
+                                <div className="a1-exam-card-status-row">
+                                    <div>
+                                        <StatusPill status={exam.status} />
+                                        {exam.pendingApproval && <PendingApprovalBadge />}
+                                    </div>
                                 </div>
                                 <div className="a1-exam-card-actions">
                                     <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => navigate(`/admin/authoring?examId=${exam.id}`)}>

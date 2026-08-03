@@ -237,30 +237,37 @@ public class AdminExamController {
             @PathVariable UUID id,
             @RequestBody(required = false) Map<String, String> body,
             Principal principal) {
+        try {
+            Exam exam = examRepository.findById(id)
+                    .orElseThrow(() -> new com.oryfolks.certify.exception.ResourceNotFoundException("Exam not found with id: " + id));
 
-        Exam exam = examRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Exam not found: " + id));
+            String note = body != null ? body.getOrDefault("note", "") : "";
 
-        String note = body != null ? body.getOrDefault("note", "") : "";
+            ApprovalRequest req = ApprovalRequest.builder()
+                    .type("EXAM_ACTIVATE")
+                    .label("Activate exam · " + exam.getTitle())
+                    .targetId(id.toString())
+                    .requestedBy(principal != null && principal.getName() != null ? principal.getName() : "Admin User")
+                    .note(note)
+                    .status("PENDING")
+                    .requestedAt(java.time.LocalDateTime.now())
+                    .createdAt(java.time.LocalDateTime.now())
+                    .build();
 
-        ApprovalRequest req = ApprovalRequest.builder()
-                .id(UUID.randomUUID().toString())
-                .type("EXAM_ACTIVATE")
-                .label("Activate exam · " + exam.getTitle())
-                .targetId(id.toString())
-                .requestedBy(principal != null ? principal.getName() : "Admin User")
-                .note(note)
-                .status("PENDING")
-                .requestedAt(java.time.LocalDateTime.now())
-                .createdAt(java.time.LocalDateTime.now())
-                .build();
+            ApprovalRequest saved = approvalRepository.save(req);
 
-        ApprovalRequest saved = approvalRepository.save(req);
-
-        Map<String, Object> res = new HashMap<>();
-        res.put("ok", true);
-        res.put("approval", saved);
-        return ResponseEntity.ok(ApiResponse.success("Activation approval requested", res));
+            Map<String, Object> res = new HashMap<>();
+            res.put("ok", true);
+            res.put("approval", saved);
+            return ResponseEntity.ok(ApiResponse.success("Activation approval requested", res));
+        } catch (com.oryfolks.certify.exception.ResourceNotFoundException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("Failed to request activation: " + e.getMessage()));
+        }
     }
 
     @PostMapping("/{id}/deactivate")
@@ -268,30 +275,37 @@ public class AdminExamController {
             @PathVariable UUID id,
             @RequestBody(required = false) Map<String, String> body,
             Principal principal) {
+        try {
+            Exam exam = examRepository.findById(id)
+                    .orElseThrow(() -> new com.oryfolks.certify.exception.ResourceNotFoundException("Exam not found with id: " + id));
 
-        Exam exam = examRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Exam not found: " + id));
+            String note = body != null ? body.getOrDefault("note", "") : "";
 
-        String note = body != null ? body.getOrDefault("note", "") : "";
+            ApprovalRequest req = ApprovalRequest.builder()
+                    .type("EXAM_DEACTIVATE")
+                    .label("Deactivate exam · " + exam.getTitle())
+                    .targetId(id.toString())
+                    .requestedBy(principal != null && principal.getName() != null ? principal.getName() : "Admin User")
+                    .note(note)
+                    .status("PENDING")
+                    .requestedAt(java.time.LocalDateTime.now())
+                    .createdAt(java.time.LocalDateTime.now())
+                    .build();
 
-        ApprovalRequest req = ApprovalRequest.builder()
-                .id(UUID.randomUUID().toString())
-                .type("EXAM_DEACTIVATE")
-                .label("Deactivate exam · " + exam.getTitle())
-                .targetId(id.toString())
-                .requestedBy(principal != null ? principal.getName() : "Admin User")
-                .note(note)
-                .status("PENDING")
-                .requestedAt(java.time.LocalDateTime.now())
-                .createdAt(java.time.LocalDateTime.now())
-                .build();
+            ApprovalRequest saved = approvalRepository.save(req);
 
-        ApprovalRequest saved = approvalRepository.save(req);
-
-        Map<String, Object> res = new HashMap<>();
-        res.put("ok", true);
-        res.put("approval", saved);
-        return ResponseEntity.ok(ApiResponse.success("Deactivation approval requested", res));
+            Map<String, Object> res = new HashMap<>();
+            res.put("ok", true);
+            res.put("approval", saved);
+            return ResponseEntity.ok(ApiResponse.success("Deactivation approval requested", res));
+        } catch (com.oryfolks.certify.exception.ResourceNotFoundException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("Failed to request deactivation: " + e.getMessage()));
+        }
     }
 
     @GetMapping("/{id}/versions")
