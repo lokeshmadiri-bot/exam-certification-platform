@@ -229,32 +229,37 @@ public class GovernanceController {
 
     @PostMapping("/retention/request")
     public ResponseEntity<ApiResponse<Map<String, Object>>> requestRetentionChange(
-            @RequestBody Map<String, Object> body,
+            @RequestBody(required = false) Map<String, Object> body,
             Principal principal) {
+        try {
+            GovernanceSetting gs = getOrInitSettings();
+            Object daysObj = body != null ? body.get("days") : null;
+            int days = daysObj != null ? Integer.parseInt(daysObj.toString()) : 180;
+            String note = (body != null && body.get("note") != null) ? body.get("note").toString() : "";
 
-        GovernanceSetting gs = getOrInitSettings();
-        int days = Integer.parseInt(body.get("days").toString());
-        String note = body.getOrDefault("note", "").toString();
+            ApprovalRequest req = ApprovalRequest.builder()
+                    .type("RETENTION_CHANGE")
+                    .label("Change retention policy → " + days + " days")
+                    .targetId("governance")
+                    .requestedBy(principal != null && principal.getName() != null ? principal.getName() : "Admin User")
+                    .note(note)
+                    .status("PENDING")
+                    .payloadJson(days + ":" + (gs != null && gs.getRetentionDays() != null ? gs.getRetentionDays() : 180))
+                    .requestedAt(java.time.LocalDateTime.now())
+                    .createdAt(java.time.LocalDateTime.now())
+                    .build();
 
-        ApprovalRequest req = ApprovalRequest.builder()
-                .id(UUID.randomUUID().toString())
-                .type("RETENTION_CHANGE")
-                .label("Change retention policy → " + days + " days")
-                .targetId("governance")
-                .requestedBy(principal != null ? principal.getName() : "Admin User")
-                .note(note)
-                .status("PENDING")
-                .payloadJson(days + ":" + gs.getRetentionDays())
-                .requestedAt(java.time.LocalDateTime.now())
-                .createdAt(java.time.LocalDateTime.now())
-                .build();
+            ApprovalRequest saved = approvalRepository.save(req);
 
-        ApprovalRequest saved = approvalRepository.save(req);
-
-        Map<String, Object> res = new HashMap<>();
-        res.put("ok", true);
-        res.put("approval", saved);
-        return ResponseEntity.ok(ApiResponse.success("Retention change requested", res));
+            Map<String, Object> res = new HashMap<>();
+            res.put("ok", true);
+            res.put("approval", saved);
+            return ResponseEntity.ok(ApiResponse.success("Retention change requested", res));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("Failed to request retention change: " + e.getMessage()));
+        }
     }
 
     @GetMapping("/audit-log")
@@ -268,7 +273,7 @@ public class GovernanceController {
             logs = logs.stream().filter(l -> l.getModule() != null && l.getModule().equalsIgnoreCase(module)).toList();
         }
         if (user != null && !user.isBlank()) {
-            logs = logs.stream().filter(l -> l.getUser().toLowerCase().contains(user.toLowerCase())).toList();
+            logs = logs.stream().filter(l -> l.getUserName() != null && l.getUserName().toLowerCase().contains(user.toLowerCase())).toList();
         }
 
         Map<String, Object> result = new HashMap<>();
