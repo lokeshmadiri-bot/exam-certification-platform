@@ -1,0 +1,33 @@
+# Node / Frontend
+exam-engine-frontend/node_modules/
+exam-engine-frontend/dist/
+exam-engine-frontend/dist-ssr/
+exam-engine-frontend/*.local
+exam-engine-frontend/.env
+
+# Maven / Java / Backend
+exam-engine-backend/target/
+exam-engine-backend/*.class
+exam-engine-backend/*.log
+exam-engine-backend/*.jar
+exam-engine-backend/*.war
+exam-engine-backend/*.ear
+exam-engine-backend/.env
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Uploads snapshot directory
+exam-engine-backend/uploads/
+uploads/

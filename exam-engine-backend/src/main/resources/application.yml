@@ -1,0 +1,58 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:certify}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:SecretKeyToGenerateJWTsSecretKeyToGenerateJWTsSecretKeyToGenerateJWTs}
+    expiration-ms: 86400000 # 24 hours
+  storage:
+    provider: ${STORAGE_PROVIDER:local} # local or s3
+    local:
+      upload-dir: ${UPLOAD_DIR:uploads}
+    s3:
+      bucket-name: ${AWS_S3_BUCKET:oryfolks-certify-snapshots}
+      region: ${AWS_REGION:us-east-1}
+      access-key: ${AWS_ACCESS_KEY_ID:}
+      secret-key: ${AWS_SECRET_ACCESS_KEY:}
+
+# ---- AI Question Generation (Groq / Grok / Gemini) ----
+groq:
+  api:
+    key: ${GROQ_API_KEY:${GROK_API_KEY:}}
+    url: ${GROQ_API_URL:https://api.groq.com/openai/v1/chat/completions}
+    model: ${GROQ_MODEL:llama-3.3-70b-versatile}
+
+grok:
+  api:
+    key: ${GROK_API_KEY:}
+    url: ${GROK_API_URL:https://api.x.ai/v1/chat/completions}
+    model: ${GROK_MODEL:grok-2-latest}
+
+gemini:
+  api:
+    key: ${GEMINI_API_KEY:}
+    url: ${GEMINI_API_URL:https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent}
