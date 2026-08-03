@@ -54,11 +54,11 @@ export default function GovernanceSettingsPage() {
     const loadAudit = () => fetchAuditLog().then((res) => setAudit(res?.rows || (Array.isArray(res) ? res : [])));
     const loadApprovals = () => fetchPendingApprovals().then((res) => setApprovals(Array.isArray(res) ? res : (res?.rows || [])));
 
-    useEffect(() => { loadGov(); }, []);
+    useEffect(() => { loadGov(); loadApprovals(); }, []);
     useEffect(() => { if (tab === "Audit Log") loadAudit(); }, [tab]);
     useEffect(() => { if (tab === "Approvals") loadApprovals(); }, [tab]);
 
-    const flash = (msg) => { setSavedMsg(msg); setTimeout(() => setSavedMsg(""), 2500); };
+    const flash = (msg) => { setSavedMsg(msg); loadApprovals(); setTimeout(() => setSavedMsg(""), 2500); };
 
     return (
         <div className="a1-page">

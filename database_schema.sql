@@ -150,17 +150,31 @@ CREATE TABLE IF NOT EXISTS ai_flag (
 
 -- 13. Approval Requests Table
 CREATE TABLE IF NOT EXISTS approval_requests (
+    id VARCHAR(100) PRIMARY KEY,
+    request_type VARCHAR(50) NOT NULL,
+    label VARCHAR(255) NOT NULL,
+    target_id VARCHAR(100),
+    requested_by_id VARCHAR(100) NOT NULL,
+    requested_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    note TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    resolved_by VARCHAR(100),
+    resolved_at TIMESTAMP,
+    resolution_note TEXT,
+    payload_json TEXT
+);
+
+-- 14. Access Audit Logs Table
+CREATE TABLE IF NOT EXISTS access_audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    request_type VARCHAR(50) NOT NULL, -- CANDIDATE_UNLOCK, EXAM_PUBLISH
-    target_id VARCHAR(100) NOT NULL,
-    candidate_id VARCHAR(100),
-    requested_by_id VARCHAR(100),
-    candidate_name VARCHAR(100),
-    exam_title VARCHAR(100),
-    reason TEXT,
-    status VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- PENDING, APPROVED, REJECTED
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    user_name VARCHAR(100),
+    action VARCHAR(255) NOT NULL,
+    module VARCHAR(100),
+    old_value TEXT,
+    new_value TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 14. Governance Settings Table
