@@ -7,7 +7,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    fetchQuestions, createQuestion, updateQuestion, deleteQuestion, bulkUpdateQuestions, META,
+    fetchQuestions, fetchExams, createQuestion, updateQuestion, deleteQuestion, bulkUpdateQuestions, META,
 } from "./api";
 import AIQuestionGenerator from "./AIQuestionGenerator";
 import "./a1.css";
@@ -18,6 +18,7 @@ const DIFFICULTY_OPTIONS = ["EASY", "MEDIUM", "HARD"];
 const LANGUAGE_OPTIONS = ["Java", "JavaScript", "Python", "SQL", "C++"];
 
 const emptyQuestion = {
+    examId: "",
     questionText: "",
     stack: META.STACKS[0],
     topic: "",
@@ -42,6 +43,7 @@ const emptyQuestion = {
 
 export default function QuestionBankPage() {
     const [rows, setRows] = useState(null);
+    const [exams, setExams] = useState([]);
     const [filters, setFilters] = useState({ q: "", stack: "", type: "", level: "", status: "" });
     const [page, setPage] = useState(1);
     const [selected, setSelected] = useState(new Set());
@@ -51,7 +53,10 @@ export default function QuestionBankPage() {
     const [showAIGenerator, setShowAIGenerator] = useState(false);
     const [aiSavedToast, setAiSavedToast] = useState(null);
 
-    const load = () => fetchQuestions(filters).then((res) => setRows(res?.rows || (Array.isArray(res) ? res : [])));
+    const load = () => {
+        fetchQuestions(filters).then((res) => setRows(res?.rows || (Array.isArray(res) ? res : [])));
+        fetchExams().then((res) => setExams(res?.rows || (Array.isArray(res) ? res : [])));
+    };
 
     useEffect(() => {
         load();
@@ -210,6 +215,7 @@ export default function QuestionBankPage() {
                                 <input type="checkbox" checked={pageRows.length > 0 && pageRows.every((q) => selected.has(q.id))} onChange={toggleSelectAllPage} />
                             </th>
                             <th>Question</th>
+                            <th>Exam</th>
                             <th>Stack</th>
                             <th>Type</th>
                             <th>Difficulty</th>
@@ -229,6 +235,11 @@ export default function QuestionBankPage() {
                                         {q.questionText || q.title}
                                     </div>
                                     {q.topic && <span className="a1-sub" style={{ fontSize: 11, color: "var(--a1-mut)" }}>Topic: {q.topic} · Marks: {q.marks || 1}</span>}
+                                </td>
+                                <td>
+                                    <span className="a1-pill a1-pill-navy" style={{ fontWeight: 600 }}>
+                                        {q.exam?.title || (exams.find((e) => e.id === (q.examId || q.exam?.id))?.title) || "Assigned Exam"}
+                                    </span>
                                 </td>
                                 <td>{q.stack}</td>
                                 <td><span className="a1-pill a1-pill-navy">{TYPE_LABEL[q.type] || q.type}</span></td>
@@ -282,6 +293,7 @@ export default function QuestionBankPage() {
             {editing && (
                 <QuestionModal
                     question={editing}
+                    exams={exams}
                     onCancel={() => setEditing(null)}
                     onSave={saveQuestion}
                 />
@@ -312,6 +324,7 @@ export default function QuestionBankPage() {
             {/* AI Generator Modal */}
             {showAIGenerator && (
                 <AIQuestionGenerator
+                    exams={exams}
                     onClose={() => setShowAIGenerator(false)}
                     onSaved={(count) => {
                         setShowAIGenerator(false);
@@ -329,8 +342,9 @@ export default function QuestionBankPage() {
 // Supports MCQ (Options A-D with Radio Button Selection),
 // Coding (Starter Code, Inputs/Outputs), and Descriptive types.
 // ============================================================
-function QuestionModal({ question, onCancel, onSave }) {
+function QuestionModal({ question, exams = [], onCancel, onSave }) {
     const [form, setForm] = useState({
+        examId: question.exam?.id || question.examId || (exams[0]?.id || ""),
         questionText: question.questionText || question.title || "",
         stack: question.stack || META.STACKS[0],
         topic: question.topic || "",
@@ -366,7 +380,10 @@ function QuestionModal({ question, onCancel, onSave }) {
         e.preventDefault();
         setBusy(true);
         try {
-            await onSave(form);
+            await onSave({
+                ...form,
+                exam: form.examId ? { id: form.examId } : null,
+            });
         } finally {
             setBusy(false);
         }
@@ -383,6 +400,21 @@ function QuestionModal({ question, onCancel, onSave }) {
                 <form onSubmit={submit}>
                     {/* Common Header Fields */}
                     <div className="a1-form-grid" style={{ marginBottom: 12 }}>
+                        <div className="a1-field" style={{ gridColumn: "span 2" }}>
+                            <label>Exam Association *</label>
+                            <select
+                                required
+                                value={form.examId}
+                                onChange={(e) => setField("examId", e.target.value)}
+                            >
+                                <option value="">-- Select Exam --</option>
+                                {exams.map((ex) => (
+                                    <option key={ex.id} value={ex.id}>
+                                        {ex.title} ({ex.stack})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                         <div className="a1-field">
                             <label>Stack *</label>
                             <select value={form.stack} onChange={(e) => setField("stack", e.target.value)}>
