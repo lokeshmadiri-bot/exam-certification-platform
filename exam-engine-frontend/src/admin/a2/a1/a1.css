@@ -168,19 +168,18 @@
 .a1-view-toggle button.a1-vt-active { background: var(--a1-navy-soft); color: var(--a1-navy); }
 
 /* ---- Exam cards ---- */
-.a1-exam-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-@media (max-width: 1100px) { .a1-exam-cards { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 700px) { .a1-exam-cards { grid-template-columns: 1fr; } }
-.a1-exam-card { background: #fff; border: 1px solid var(--a1-line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; transition: all .18s; }
+.a1-exam-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+.a1-exam-card { background: #fff; border: 1px solid var(--a1-line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; transition: all .18s; min-width: 0; box-sizing: border-box; }
 .a1-exam-card:hover { box-shadow: 0 6px 20px rgba(22, 53, 92, .1); transform: translateY(-2px); border-color: #cddcf0; }
-.a1-exam-card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.a1-exam-card-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
 .a1-exam-card-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-.a1-exam-card-title { font-size: 15px; font-weight: 700; color: var(--a1-navy); margin: 0; }
-.a1-exam-card-sub { font-size: 11.5px; color: var(--a1-mut); margin-top: 2px; }
-.a1-exam-card-facts { display: flex; gap: 16px; font-size: 12px; color: var(--a1-mut); padding: 10px 0; border-top: 1px solid var(--a1-line); border-bottom: 1px solid var(--a1-line); margin: 6px 0 12px; }
+.a1-exam-card-title { font-size: 15px; font-weight: 700; color: var(--a1-navy); margin: 0; line-height: 1.35; word-break: break-word; }
+.a1-exam-card-sub { font-size: 11.5px; color: var(--a1-mut); margin-top: 4px; }
+.a1-exam-card-facts { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--a1-mut); padding: 10px 0; border-top: 1px solid var(--a1-line); border-bottom: 1px solid var(--a1-line); margin: 6px 0 12px; }
 .a1-exam-card-facts b { color: var(--a1-ink); font-family: "Consolas", monospace; }
-.a1-exam-card-foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; }
-.a1-exam-card-actions { display: flex; gap: 6px; }
+.a1-exam-card-foot { display: flex; flex-direction: column; gap: 10px; margin-top: auto; padding-top: 6px; }
+.a1-exam-card-status-row { display: flex; align-items: center; justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 6px; }
+.a1-exam-card-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; width: 100%; }
 
 /* ---- Pending approval badge (inline) ---- */
 .a1-pending-badge { display: inline-flex; align-items: center; gap: 4px; background: var(--a1-amber-soft); color: #9a6210; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-left: 6px; }

@@ -85,10 +85,13 @@ public class AdminQuestionController {
     @PostMapping
     public ResponseEntity<ApiResponse<Question>> createQuestion(@RequestBody Question question, Principal principal) {
         if (question.getStatus() == null) question.setStatus("ACTIVE");
-        if (question.getIsActive() == null) question.setIsActive(true);
+        question.setIsActive("ACTIVE".equalsIgnoreCase(question.getStatus()));
         if (question.getSource() == null) question.setSource("MANUAL");
 
-        if (question.getExam() == null) {
+        if (question.getExam() != null && question.getExam().getId() != null) {
+            Exam exam = examRepository.findById(question.getExam().getId()).orElse(null);
+            question.setExam(exam);
+        } else {
             List<Exam> allExams = examRepository.findAll();
             if (!allExams.isEmpty()) {
                 question.setExam(allExams.get(0));
@@ -117,6 +120,10 @@ public class AdminQuestionController {
         Question existing = questionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Question not found: " + id));
 
+        if (payload.getExam() != null && payload.getExam().getId() != null) {
+            Exam exam = examRepository.findById(payload.getExam().getId()).orElse(null);
+            if (exam != null) existing.setExam(exam);
+        }
         if (payload.getQuestionText() != null) existing.setQuestionText(payload.getQuestionText());
         if (payload.getStack() != null) existing.setStack(payload.getStack());
         if (payload.getTopic() != null) existing.setTopic(payload.getTopic());
@@ -124,7 +131,14 @@ public class AdminQuestionController {
         if (payload.getLevel() != null) existing.setLevel(payload.getLevel());
         if (payload.getDifficulty() != null) existing.setDifficulty(payload.getDifficulty());
         if (payload.getMarks() != null) existing.setMarks(payload.getMarks());
-        if (payload.getStatus() != null) existing.setStatus(payload.getStatus());
+        if (payload.getStatus() != null) {
+            existing.setStatus(payload.getStatus());
+            existing.setIsActive("ACTIVE".equalsIgnoreCase(payload.getStatus()));
+        }
+        if (payload.getIsActive() != null) {
+            existing.setIsActive(payload.getIsActive());
+            existing.setStatus(Boolean.TRUE.equals(payload.getIsActive()) ? "ACTIVE" : "INACTIVE");
+        }
         if (payload.getOptionA() != null) existing.setOptionA(payload.getOptionA());
         if (payload.getOptionB() != null) existing.setOptionB(payload.getOptionB());
         if (payload.getOptionC() != null) existing.setOptionC(payload.getOptionC());
@@ -180,10 +194,14 @@ public class AdminQuestionController {
                     if (opt.isPresent()) {
                         Question q = opt.get();
                         if (patch.containsKey("status")) {
-                            q.setStatus(patch.get("status").toString());
+                            String st = patch.get("status").toString();
+                            q.setStatus(st);
+                            q.setIsActive("ACTIVE".equalsIgnoreCase(st));
                         }
                         if (patch.containsKey("isActive")) {
-                            q.setIsActive(Boolean.parseBoolean(patch.get("isActive").toString()));
+                            boolean act = Boolean.parseBoolean(patch.get("isActive").toString());
+                            q.setIsActive(act);
+                            q.setStatus(act ? "ACTIVE" : "INACTIVE");
                         }
                         questionRepository.save(q);
                         updatedCount++;
