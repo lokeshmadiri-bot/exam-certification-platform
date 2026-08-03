@@ -426,11 +426,11 @@ function mockArchiveExam(id) {
 
 function mockRequestExamStatus(examId, targetStatus, note) {
     const exam = MOCK.exams.find((e) => e.id === examId);
-    if (!exam) throw new Error("Exam not found");
+    const title = exam ? exam.title : `Exam (${String(examId).slice(0, 8)}…)`;
     const approval = {
         id: uid("APR"),
         type: targetStatus === "ACTIVE" ? "EXAM_ACTIVATE" : "EXAM_DEACTIVATE",
-        label: `${targetStatus === "ACTIVE" ? "Activate" : "Deactivate"} exam · ${exam.title}`,
+        label: `${targetStatus === "ACTIVE" ? "Activate" : "Deactivate"} exam · ${title}`,
         targetId: examId,
         requestedBy: currentAdmin(),
         requestedAt: nowIso(),
@@ -439,7 +439,7 @@ function mockRequestExamStatus(examId, targetStatus, note) {
         payload: { targetStatus },
     };
     MOCK.approvals.unshift(approval);
-    exam.pendingApproval = approval.id;
+    if (exam) exam.pendingApproval = approval.id;
     return { ok: true, approval };
 }
 

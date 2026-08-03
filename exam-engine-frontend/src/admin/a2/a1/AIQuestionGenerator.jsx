@@ -27,9 +27,9 @@ const DEFAULT_FORM = {
 
 const LEVEL_LABELS = { L1: "L1 · Beginner", L2: "L2 · Elementary", L3: "L3 · Intermediate", L4: "L4 · Advanced", L5: "L5 · Expert" };
 
-export default function AIQuestionGenerator({ examId, onClose, onSaved }) {
+export default function AIQuestionGenerator({ examId, exams = [], onClose, onSaved }) {
     const [step, setStep] = useState("form"); // "form" | "preview" | "saving"
-    const [form, setForm] = useState({ ...DEFAULT_FORM, examId: examId || "" });
+    const [form, setForm] = useState({ ...DEFAULT_FORM, examId: examId || (exams[0]?.id || "") });
     const [questions, setQuestions] = useState([]);
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState(null);
@@ -171,12 +171,23 @@ export default function AIQuestionGenerator({ examId, onClose, onSaved }) {
                                 />
                             </div>
                             <div className="a1-field">
-                                <label>Exam ID (optional)</label>
-                                <input
-                                    placeholder="e.g. EXM-101 or leave blank"
-                                    value={form.examId}
-                                    onChange={(e) => setField("examId", e.target.value)}
-                                />
+                                <label>Target Exam</label>
+                                {exams.length > 0 ? (
+                                    <select value={form.examId} onChange={(e) => setField("examId", e.target.value)}>
+                                        <option value="">-- Select Exam --</option>
+                                        {exams.map((ex) => (
+                                            <option key={ex.id} value={ex.id}>
+                                                {ex.title} ({ex.stack})
+                                            </option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input
+                                        placeholder="e.g. Exam UUID or leave blank"
+                                        value={form.examId}
+                                        onChange={(e) => setField("examId", e.target.value)}
+                                    />
+                                )}
                             </div>
                         </div>
                         <div className="a1-field" style={{ marginBottom: 18 }}>
