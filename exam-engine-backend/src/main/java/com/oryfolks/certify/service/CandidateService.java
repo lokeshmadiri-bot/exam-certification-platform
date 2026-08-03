@@ -205,7 +205,7 @@ public class CandidateService {
                 boolean canAttempt = true;
                 int retryDaysLeft = 0;
 
-                if (false && attempt.getEndTime() != null) {
+                if (attempt.getEndTime() != null) {
 
                         LocalDateTime retryDate = attempt.getEndTime().plusDays(30);
 
