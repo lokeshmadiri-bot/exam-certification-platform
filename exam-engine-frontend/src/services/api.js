@@ -116,7 +116,7 @@ export const attemptService = {
     return response.data;
   },
   getMyAttempts: async () => {
-    const response = await api.get('/attempts/my-attempts');
+    const response = await api.get('/candidate/attempts/my-attempts');
     return response.data;
   },
   startAttempt: async (examId) => {

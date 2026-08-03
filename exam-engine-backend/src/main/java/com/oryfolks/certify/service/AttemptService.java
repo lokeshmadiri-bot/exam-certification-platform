@@ -120,7 +120,7 @@ public class AttemptService {
                         System.out.println("Current Time    : " + LocalDateTime.now());
                         System.out.println("==================================");
 
-                        if (false && LocalDateTime.now().isBefore(nextEligibleDate)) {
+                        if (LocalDateTime.now().isBefore(nextEligibleDate)) {
 
                                 long remainingDays = java.time.Duration
                                                 .between(LocalDateTime.now(), nextEligibleDate)
