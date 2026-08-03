@@ -48,7 +48,7 @@ groq:
  
 grok:
   api:
-    key: ${GROQ_API_KEY:${GROK_API_KEY:}}
+    key: ${GROK_API_KEY:}
     url: ${GROK_API_URL:https://api.x.ai/v1/chat/completions}
     model: ${GROK_MODEL:grok-2-latest}
  
