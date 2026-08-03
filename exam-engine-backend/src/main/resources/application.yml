@@ -37,13 +37,13 @@ app:
 # ---- AI Question Generation (Groq / Grok / Gemini) ----
 groq:
   api:
-    key: ${GROQ_API_KEY:${GROK_API_KEY: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}}
+    key: ${GROQ_API_KEY:${GROK_API_KEY:}}
     url: ${GROQ_API_URL:https://api.groq.com/openai/v1/chat/completions}
     model: ${GROQ_MODEL:llama-3.3-70b-versatile}
  
 grok:
   api:
-    key: ${GROK_API_KEY:}
+    key: ${GROQ_API_KEY:${GROK_API_KEY:}}
     url: ${GROK_API_URL:https://api.x.ai/v1/chat/completions}
     model: ${GROK_MODEL:grok-2-latest}
  
