@@ -42,7 +42,7 @@ async function post(path, body) {
 }
 
 function authHeaders() {
-  const token = localStorage.getItem("admin_token"); // shared admin shell token (Day 1)
+  const token = localStorage.getItem("admin_token") || localStorage.getItem("token") || localStorage.getItem("auth_token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
