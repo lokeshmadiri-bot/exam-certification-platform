@@ -155,8 +155,14 @@ export const adminService = {
     const response = await api.get('/admin/candidates');
     return response.data;
   },
-  approveOverride: async (candidateId) => {
-    const response = await api.post(`/admin/candidates/${candidateId}/override`);
+  approveOverride: async (candidateId, examId) => {
+    const response = await api.post(
+      `/admin/candidates/${candidateId}/override`,
+      {
+        examId
+      }
+    );
+
     return response.data;
   },
   getAuditLogs: async () => {
