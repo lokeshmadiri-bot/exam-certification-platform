@@ -248,9 +248,13 @@ export const regenerateAIQuestion = (question) =>
 export const fetchCandidates = (filters = {}) =>
     withFallback(() => get("/candidates", filters), () => mockListCandidates(filters));
 
-export const requestCandidateLockOverride = (id, note) =>
-    withFallback(() => post(`/candidates/${id}/lock-override/request`, { note }), () =>
-        mockRequestLockOverride(id, note)
+export const approveCandidateOverride = (candidateId, examId) =>
+    withFallback(
+        () =>
+            post(`/candidates/${candidateId}/override`, {
+                examId,
+            }),
+        () => ({ ok: true })
     );
 
 // ---------------- Governance & Settings (Task 6) ----------------

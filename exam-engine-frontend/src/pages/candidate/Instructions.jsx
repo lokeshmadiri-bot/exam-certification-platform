@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ShieldCheck, Monitor, HelpCircle, RefreshCw, ChevronRight } from 'lucide-react';
+import { ShieldCheck, Monitor, RefreshCw, ChevronRight } from 'lucide-react';
 import { examService } from '../../services/api';
 
 export default function CandidateInstructions() {
@@ -29,15 +29,12 @@ export default function CandidateInstructions() {
       r1: "Switching tabs, minimising or resizing the window each count as a strike. After 3 strikes the exam ends automatically.",
       r2t: "Camera & lighting",
       r2: "Sit facing a light source and avoid backlight. Keep your face fully in frame for the whole exam.",
-      r3t: "Raise hand if you need help",
-      r3: "Use Raise Hand to signal the invigilator. It pauses proctoring and answering. You may raise it up to 5 times.",
       r4t: "Refresh, back or closing = ended",
       r4: "Refreshing the page, pressing back or closing the tab submits your answers and ends the attempt. You cannot re-enter.",
       fmt: "Format at a glance",
-      sec: "Sections",
       q: "Questions",
       dur: "Duration",
-      autos: "You answer one section at a time and may revisit previous sections before final submission. Your responses are saved automatically while you progress through the exam.",
+      autos: "Your answers are saved automatically while you progress through the exam. You may review and modify your answers before submitting the exam.",
       agt: "I have read and agree to the rules",
       ag: "Including online proctoring, webcam recording, exam integrity monitoring and automatic termination conditions.",
       proceed: "Proceed to system check"
@@ -102,16 +99,6 @@ export default function CandidateInstructions() {
 
             <div className="instr flex gap-3.5">
               <div className="ic shrink-0 w-[38px] h-[38px] rounded-xl bg-[#eaf1ff] text-[#2F6BFF] flex items-center justify-center">
-                <HelpCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <b className="text-[13.5px] font-semibold text-[#0E1B2E]">{t.r3t}</b>
-                <p className="text-[12.5px] text-[#5C6B82] leading-relaxed mt-0.5">{t.r3}</p>
-              </div>
-            </div>
-
-            <div className="instr flex gap-3.5">
-              <div className="ic shrink-0 w-[38px] h-[38px] rounded-xl bg-[#eaf1ff] text-[#2F6BFF] flex items-center justify-center">
                 <RefreshCw className="w-5 h-5" />
               </div>
               <div>
@@ -128,10 +115,7 @@ export default function CandidateInstructions() {
             <h3 className="font-display font-semibold text-sm text-[#0E1B2E] mb-3.5">{t.fmt}</h3>
 
             <div className="space-y-2.5 text-[13px] border-b border-[#EEF2F8] pb-3.5">
-              <div className="flex justify-between">
-                <span className="text-[#5C6B82]">{t.sec}</span>
-                <b className="font-mono text-[#0E1B2E] font-semibold">9 sections</b>
-              </div>
+              
               <div className="flex justify-between">
                 <span className="text-[#5C6B82]">{t.q}</span>
                 <b className="font-mono text-[#0E1B2E] font-semibold">{exam.perAttempt} MCQs</b>

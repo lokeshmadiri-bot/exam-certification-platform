@@ -38,9 +38,9 @@ export default function NotificationsPanel() {
 
   return (
     <div style={{ position: "relative", display: "inline-block" }}>
-      <button 
-        className="a2-bell" 
-        onClick={() => setOpen((o) => !o)} 
+      <button
+        className="a2-bell"
+        onClick={() => setOpen((o) => !o)}
         aria-label="Notifications"
         style={{
           width: "38px",
@@ -71,17 +71,17 @@ export default function NotificationsPanel() {
       {open && (
         <>
           {/* Transparent click-catcher to close on click outside, without darkening screen */}
-          <div 
-            style={{ 
-              position: "fixed", 
-              inset: 0, 
-              zIndex: 99, 
-              background: "transparent" 
-            }} 
-            onClick={() => setOpen(false)} 
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 99,
+              background: "transparent"
+            }}
+            onClick={() => setOpen(false)}
           />
-          
-          <aside 
+
+          <aside
             style={{
               position: "absolute",
               right: 0,
@@ -99,7 +99,7 @@ export default function NotificationsPanel() {
               animation: "fade 0.2s ease"
             }}
           >
-            <div 
+            <div
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -112,14 +112,14 @@ export default function NotificationsPanel() {
               <h2 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#0E1B2E" }}>Notifications</h2>
               <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
                 {unread > 0 && (
-                  <button 
+                  <button
                     onClick={handleMarkAllRead}
                     style={{ fontSize: "12px", color: "#2F6BFF", fontWeight: "600", cursor: "pointer" }}
                   >
                     Mark all read
                   </button>
                 )}
-                <button 
+                <button
                   onClick={() => setOpen(false)}
                   style={{ fontSize: "12.5px", color: "#8A99AE", fontWeight: "600", cursor: "pointer" }}
                 >
@@ -127,7 +127,7 @@ export default function NotificationsPanel() {
                 </button>
               </div>
             </div>
-            
+
             <div style={{ overflowY: "auto", flex: 1, maxHeight: "440px" }}>
               {items.length === 0 ? (
                 <div style={{ padding: "32px", textAlign: "center", color: "#8A99AE", fontSize: "13px" }}>
@@ -164,10 +164,10 @@ export default function NotificationsPanel() {
                       >
                         <span className={`a2-notif-dot ${dotClass}`} style={{ marginTop: "6px" }} />
                         <div style={{ flex: 1 }}>
-                          <div 
-                            style={{ 
-                              fontSize: "13.5px", 
-                              color: "#0E1B2E", 
+                          <div
+                            style={{
+                              fontSize: "13.5px",
+                              color: "#0E1B2E",
                               fontWeight: isUnread ? "600" : "500",
                               lineHeight: "1.4"
                             }}
