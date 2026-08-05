@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS exam_attempts (
     candidate_id UUID REFERENCES users(id) ON DELETE CASCADE,
     exam_id UUID REFERENCES exams(id) ON DELETE CASCADE,
     score INT,
+    retry_override_approved BOOLEAN NOT NULL DEFAULT FALSE;
     assigned_level VARCHAR(10), -- L1 - L5
     result_status VARCHAR(20) NOT NULL, -- PASSED, NOT_PASSED, TERMINATED, IN_PROGRESS
     start_time TIMESTAMP NOT NULL,

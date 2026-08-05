@@ -18,6 +18,8 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> 
 
     List<ExamAttempt> findAllByOrderByCreatedAtDesc();
 
+    Optional<ExamAttempt> findFirstByCandidateIdOrderByCreatedAtDesc(UUID candidateId);
+
     long countByCandidateId(UUID candidateId);
 
     long countByCandidateIdAndResultStatus(
