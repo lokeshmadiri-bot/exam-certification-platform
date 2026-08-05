@@ -12,22 +12,25 @@ import java.util.UUID;
 
 @Repository
 public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> {
-    List<ExamAttempt> findByCandidateIdOrderByCreatedAtDesc(UUID candidateId);
 
-    Optional<ExamAttempt> findFirstByCandidateIdAndExamIdOrderByCreatedAtDesc(UUID candidateId, UUID examId);
+        List<ExamAttempt> findByCandidateIdOrderByCreatedAtDesc(UUID candidateId);
 
-    List<ExamAttempt> findAllByOrderByCreatedAtDesc();
+        Optional<ExamAttempt> findFirstByCandidateIdOrderByCreatedAtDesc(UUID candidateId);
 
-    long countByCandidateId(UUID candidateId);
+        Optional<ExamAttempt> findFirstByCandidateIdAndExamIdOrderByCreatedAtDesc(UUID candidateId, UUID examId);
 
-    long countByCandidateIdAndResultStatus(
-            UUID candidateId,
-            ResultStatus resultStatus);
+        List<ExamAttempt> findAllByOrderByCreatedAtDesc();
 
-    long countByCandidateIdAndResultPublishStatus(
-            UUID candidateId,
-            ResultPublishStatus resultPublishStatus);
+        long countByCandidateId(UUID candidateId);
 
-    List<ExamAttempt> findByCandidateIdOrderByEndTimeDesc(UUID candidateId);
+        long countByCandidateIdAndResultStatus(
+                        UUID candidateId,
+                        ResultStatus resultStatus);
+
+        long countByCandidateIdAndResultPublishStatus(
+                        UUID candidateId,
+                        ResultPublishStatus resultPublishStatus);
+
+        List<ExamAttempt> findByCandidateIdOrderByEndTimeDesc(UUID candidateId);
 
 }

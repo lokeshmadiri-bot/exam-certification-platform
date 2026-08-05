@@ -23,6 +23,7 @@ import com.oryfolks.certify.dto.SubmitExamRequestDTO;
 import com.oryfolks.certify.dto.SubmitExamResponseDTO;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -105,32 +106,34 @@ public class AttemptService {
 
                         ExamAttempt lastAttempt = existingAttempt.get();
 
-                        LocalDateTime referenceDate = lastAttempt.getEndTime() != null
-                                        ? lastAttempt.getEndTime()
-                                        : lastAttempt.getCreatedAt();
+                        // Skip the 30-day lock if an admin has approved an override
+                        if (!Boolean.TRUE.equals(lastAttempt.getRetryOverrideApproved())) {
 
-                        LocalDateTime nextEligibleDate = referenceDate.plusDays(30);
+                                LocalDateTime referenceDate = lastAttempt.getEndTime() != null
+                                                ? lastAttempt.getEndTime()
+                                                : lastAttempt.getCreatedAt();
 
-                        System.out.println("==================================");
-                        System.out.println("Attempt ID      : " + lastAttempt.getId());
-                        System.out.println("Created At      : " + lastAttempt.getCreatedAt());
-                        System.out.println("End Time        : " + lastAttempt.getEndTime());
-                        System.out.println("Reference Date  : " + referenceDate);
-                        System.out.println("Next Eligible   : " + nextEligibleDate);
-                        System.out.println("Current Time    : " + LocalDateTime.now());
-                        System.out.println("==================================");
+                                LocalDateTime nextEligibleDate = referenceDate.plusDays(30);
 
-                        if (LocalDateTime.now().isBefore(nextEligibleDate)) {
+                                if (LocalDateTime.now().isBefore(nextEligibleDate)) {
 
-                                long remainingDays = java.time.Duration
-                                                .between(LocalDateTime.now(), nextEligibleDate)
-                                                .toDays();
+                                        long remainingDays = Duration
+                                                        .between(LocalDateTime.now(), nextEligibleDate)
+                                                        .toDays();
 
-                                throw new BadRequestException(
-                                                "You have already attempted this exam. "
-                                                                + "You can retake it after "
-                                                                + nextEligibleDate.toLocalDate()
-                                                                + " (" + remainingDays + " day(s) remaining).");
+                                        throw new BadRequestException(
+                                                        "You have already attempted this exam. "
+                                                                        + "You can retake it after "
+                                                                        + nextEligibleDate.toLocalDate()
+                                                                        + " (" + remainingDays + " day(s) remaining).");
+                                }
+                        }
+
+                        // Consume the override after it has been used
+                        if (Boolean.TRUE.equals(lastAttempt.getRetryOverrideApproved())) {
+
+                                lastAttempt.setRetryOverrideApproved(false);
+                                attemptRepository.save(lastAttempt);
                         }
                 }
 
@@ -141,6 +144,7 @@ public class AttemptService {
                                 .resultStatus(ResultStatus.IN_PROGRESS)
                                 .startTime(LocalDateTime.now())
                                 .tabSwitchCount(0)
+                                .retryOverrideApproved(false)
                                 .build();
 
                 attempt = attemptRepository.save(attempt);
