@@ -1,5 +1,5 @@
 import React from 'react';
-import { HelpCircle, AlertTriangle, ShieldCheck, RefreshCw, MessageSquare } from 'lucide-react';
+import { AlertTriangle, ShieldCheck } from 'lucide-react';
 
 export default function CandidateHelp() {
   return (
@@ -42,9 +42,6 @@ export default function CandidateHelp() {
             </p>
             <p>
               <b>Back Button:</b> Navigating backwards terminates your session.
-            </p>
-            <p>
-              <b>Raise Hand:</b> You can pause proctoring up to 5 times if you have technical difficulties. Use the button in the runner.
             </p>
           </div>
         </div>

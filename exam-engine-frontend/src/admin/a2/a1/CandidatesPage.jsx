@@ -3,16 +3,18 @@
 // 30-day lock override, gated behind four-eyes approval.
 
 import React, { useEffect, useMemo, useState } from "react";
-import { fetchCandidates, fetchExams, requestCandidateLockOverride } from "./api";
-import { TwoPersonRuleBanner, PendingApprovalBadge, RequestApprovalModal } from "./FourEyes";
+import { fetchCandidates, fetchExams, approveCandidateOverride } from "./api";
+import { RequestApprovalModal } from "./FourEyes";
 import "./a1.css";
 
 const PAGE_SIZE = 8;
 
 const STATUS_LABEL = {
-    COMPLETED: "Completed",
-    IN_PROGRESS: "In progress",
-    NOT_STARTED: "Not started",
+    PASSED: "Passed",
+    FAILED: "Failed",
+    TERMINATED: "Terminated",
+    IN_PROGRESS: "In Progress",
+    NOT_STARTED: "Not Started",
 };
 
 export default function CandidatesPage() {
@@ -22,12 +24,15 @@ export default function CandidatesPage() {
     const [page, setPage] = useState(1);
     const [overrideFor, setOverrideFor] = useState(null); // candidate object
 
-    const load = () => {
-        fetchCandidates(filters).then((res) => setRows(res?.rows || res || []));
-        fetchExams().then((res) => {
-            const examsList = res?.rows || res || [];
+    const load = async () => {
+        const res = await fetchCandidates(filters);
+        setRows(res?.rows || res || []);
+
+        try {
+            const exams = await fetchExams();
+            const examsList = exams?.rows || exams || [];
             setAllExams(examsList.map((e) => e.title || e.name || e));
-        }).catch(() => {});
+        } catch (e) { }
     };
 
     useEffect(() => {
@@ -36,7 +41,7 @@ export default function CandidatesPage() {
     }, [filters]);
 
     const examOptions = useMemo(() => {
-        const fromCandidates = rows ? rows.map((c) => c.exam).filter(Boolean) : [];
+        const fromCandidates = rows ? rows.map((c) => c.examTitle).filter(Boolean) : [];
         const combined = [...new Set([...allExams, ...fromCandidates])];
         return combined.sort();
     }, [rows, allExams]);
@@ -49,10 +54,16 @@ export default function CandidatesPage() {
 
     const totalPages = rows ? Math.max(1, Math.ceil(rows.length / PAGE_SIZE)) : 1;
 
-    const submitOverride = async (note) => {
-        await requestCandidateLockOverride(overrideFor.id, note);
+    const submitOverride = async () => {
+        console.log("Override For:", overrideFor);
+        await approveCandidateOverride(
+            overrideFor.candidateId,
+            overrideFor.examId
+        );
+        alert("Candidate unlocked successfully.");
+
         setOverrideFor(null);
-        load();
+        await load();
     };
 
     return (
@@ -65,7 +76,6 @@ export default function CandidatesPage() {
                 <button className="a1-btn a1-btn-ghost" onClick={load}>↻ Refresh</button>
             </header>
 
-            <TwoPersonRuleBanner text="Overriding a candidate's 30-day lock requires approval from a second administrator." />
 
             <div className="a1-filterbar">
                 <div className="a1-field">
@@ -115,28 +125,25 @@ export default function CandidatesPage() {
                     </thead>
                     <tbody>
                         {pageRows.map((c) => (
-                            <tr key={c.id}>
-                                <td>{c.name}</td>
+                            <tr key={`${c.candidateId}-${c.examId}`}>
+                                <td>{c.candidateName}</td>
                                 <td className="a1-mono">{c.email}</td>
-                                <td>{c.exam}</td>
+                                <td>{c.examTitle}</td>
                                 <td><span className="a1-pill">{STATUS_LABEL[c.status] || c.status}</span></td>
                                 <td>
                                     {c.locked ? (
                                         <>
                                             <span className="a1-pill a1-pill-red">Locked</span>
-                                            {c.lockedUntil && <div className="a1-approval-meta">until {new Date(c.lockedUntil).toLocaleDateString()}</div>}
                                         </>
                                     ) : (
                                         <span className="a1-pill a1-pill-green">Unlocked</span>
                                     )}
-                                    {c.pendingApproval && <> <PendingApprovalBadge /></>}
                                 </td>
                                 <td>{c.lastAttempt ? new Date(c.lastAttempt).toLocaleDateString() : "—"}</td>
                                 <td>
                                     {c.locked && (
                                         <button
                                             className="a1-btn a1-btn-amber a1-btn-sm"
-                                            disabled={!!c.pendingApproval}
                                             onClick={() => setOverrideFor(c)}
                                         >
                                             Override Lock
@@ -159,9 +166,9 @@ export default function CandidatesPage() {
 
             <RequestApprovalModal
                 open={!!overrideFor}
-                title={overrideFor ? `Override lock for ${overrideFor.name}?` : ""}
-                description="The candidate becomes able to attempt the exam again once a second administrator approves this request."
-                confirmLabel="Request unlock"
+                title={overrideFor ? `Override lock for ${overrideFor.candidateName}?` : ""}
+                description="This will immediately remove the 30-day retry lock for this certification exam."
+                confirmLabel="Approve Override"
                 tone="amber"
                 onCancel={() => setOverrideFor(null)}
                 onConfirm={submitOverride}
