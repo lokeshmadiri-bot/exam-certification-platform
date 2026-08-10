@@ -285,6 +285,28 @@ public class AdminController {
             @RequestParam(required = false) String to) {
 
         List<ExamAttempt> attempts = attemptRepository.findAllByOrderByCreatedAtDesc();
+        if (from != null && !from.isBlank()) {
+                        try {
+                                java.time.LocalDate fromDate = java.time.LocalDate.parse(from);
+                                attempts = attempts.stream().filter(a -> {
+                                        java.time.LocalDateTime dt = a.getSubmittedAt() != null ? a.getSubmittedAt()
+                                                        : a.getCreatedAt();
+                                        return dt != null && !dt.toLocalDate().isBefore(fromDate);
+                                }).toList();
+                        } catch (Exception ignored) {
+                        }
+                }
+                if (to != null && !to.isBlank()) {
+                        try {
+                                java.time.LocalDate toDate = java.time.LocalDate.parse(to);
+                                attempts = attempts.stream().filter(a -> {
+                                        java.time.LocalDateTime dt = a.getSubmittedAt() != null ? a.getSubmittedAt()
+                                                        : a.getCreatedAt();
+                                        return dt != null && !dt.toLocalDate().isAfter(toDate);
+                                }).toList();
+                        } catch (Exception ignored) {
+                        }
+                }
 
         List<Map<String, Object>> rows = attempts.stream().map(this::mapAttemptSummary).toList();
 
