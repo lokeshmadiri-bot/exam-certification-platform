@@ -450,7 +450,7 @@ function mockRequestExamStatus(examId, targetStatus, note) {
 function mockGetBands(examId) {
     return (
         MOCK.bandsByExam[examId] || {
-            L1: [0, 20], L2: [21, 40], L3: [41, 60], L4: [61, 80], L5: [81, 100],
+            L1: [90, 100], L2: [75, 89], L3: [60, 74], L4: [40, 59], L5: [0, 39],
         }
     );
 }
