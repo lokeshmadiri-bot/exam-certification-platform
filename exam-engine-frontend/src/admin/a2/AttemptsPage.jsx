@@ -81,7 +81,7 @@ export default function AttemptsPage() {
           <table className="a2-table a2-table-hover">
             <thead>
               <tr>
-                <th>Attempt</th><th>Candidate</th><th>Stack</th><th>Level</th>
+                <th>Exam</th><th>Candidate</th><th>Stack</th><th>Level</th>
                 <th>Result</th><th>Score</th><th>Flags</th><th>Submitted</th>
               </tr>
             </thead>
@@ -92,7 +92,7 @@ export default function AttemptsPage() {
                     className="a2-clickable"
                     onClick={() => setExpanded(expanded === r.id ? null : r.id)}
                   >
-                    <td className="a2-mono">{r.id}</td>
+                    <td>{r.exam}</td>
                     <td>{r.candidate}</td>
                     <td>{r.stack}</td>
                     <td><span className={`a2-pill a2-lvl-${r.level}`}>{r.level}</span></td>

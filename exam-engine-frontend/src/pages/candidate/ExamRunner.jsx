@@ -205,9 +205,19 @@ export default function ExamRunner() {
 
   const selectOption = (opt) => {
     const qId = questions[currentIdx].id;
-    setSelectedAnswers({
-      ...selectedAnswers,
-      [qId]: opt
+
+    console.log("Clicked Question:", qId);
+    console.log("Selected Option:", opt);
+
+    setSelectedAnswers(prev => {
+      const updated = {
+        ...prev,
+        [qId]: opt
+      };
+
+      console.log("Updated selectedAnswers:", updated);
+
+      return updated;
     });
   };
 
@@ -220,13 +230,14 @@ export default function ExamRunner() {
   const handleGradingSubmit = async () => {
     setShowConfirmSubmit(false);
     setShowThanks(true);
+    console.log("selectedAnswers before submit:", selectedAnswers);
 
     // Assemble submissions array
     const submissions = Object.keys(selectedAnswers).map(qId => ({
       questionId: qId,
       selectedOption: selectedAnswers[qId]
     }));
-
+    console.log("Submissions:", submissions);
     try {
       const res = await attemptService.submitAttempt(attemptId, submissions);
       if (res.success) {
