@@ -1,51 +1,23 @@
 package com.oryfolks.certify.service;
 
-import com.oryfolks.certify.repository.ExamAttemptRepository;
-import com.oryfolks.certify.repository.ExamRepository;
-import com.oryfolks.certify.repository.UserRepository;
-import com.oryfolks.certify.repository.QuestionRepository;
-import com.oryfolks.certify.repository.AttemptAnswerRepository;
-import com.oryfolks.certify.repository.AnswerRepository;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
+import com.oryfolks.certify.dto.AnswerSubmission;
 import com.oryfolks.certify.dto.StartExamRequestDTO;
 import com.oryfolks.certify.dto.StartExamResponseDTO;
-import com.oryfolks.certify.entity.Exam;
-import com.oryfolks.certify.entity.ExamAttempt;
-import com.oryfolks.certify.entity.User;
-import com.oryfolks.certify.enums.ExamStatus;
-import com.oryfolks.certify.enums.ResultStatus;
-import com.oryfolks.certify.exception.ResourceNotFoundException;
-import com.oryfolks.certify.exception.BadRequestException;
-
 import com.oryfolks.certify.dto.SubmitExamRequestDTO;
 import com.oryfolks.certify.dto.SubmitExamResponseDTO;
-
-import java.time.LocalDateTime;
-import java.util.Optional;
-import java.util.UUID;
-
-import com.oryfolks.certify.dto.AnswerSubmission;
-
-import com.oryfolks.certify.entity.AttemptAnswer;
-import com.oryfolks.certify.entity.Question;
-import com.oryfolks.certify.entity.Answer;
-
+import com.oryfolks.certify.entity.*;
+import com.oryfolks.certify.enums.ExamStatus;
+import com.oryfolks.certify.enums.ResultStatus;
+import com.oryfolks.certify.exception.BadRequestException;
+import com.oryfolks.certify.exception.ResourceNotFoundException;
+import com.oryfolks.certify.repository.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import org.springframework.web.multipart.MultipartFile;
 
-import com.oryfolks.certify.entity.ExamAttempt;
-import com.oryfolks.certify.entity.IntegrityViolation;
-
-import com.oryfolks.certify.repository.IntegrityViolationRepository;
-import com.oryfolks.certify.service.StorageService;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.HashSet;
+import java.time.LocalDateTime;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -66,6 +38,8 @@ public class AttemptService {
 
         private final AnswerRepository answerRepository;
 
+        private final ExamAttemptQuestionRepository examAttemptQuestionRepository;
+
         private final StorageService storageService;
 
         public StartExamResponseDTO startExam(
@@ -73,7 +47,7 @@ public class AttemptService {
                         String username) {
 
                 User candidate = userRepository.findByUsername(username)
-                                .orElseThrow(() -> new ResourceNotFoundException("Candidate not found: " + username));
+                                .orElseThrow(() -> new ResourceNotFoundException("Candidate not found."));
 
                 Exam exam = examRepository.findById(request.getExamId())
                                 .orElseThrow(() -> new ResourceNotFoundException("Exam not found."));
@@ -134,6 +108,22 @@ public class AttemptService {
                         }
                 }
 
+                List<Question> activeQuestions = questionRepository.findByExamIdAndIsActiveTrue(exam.getId());
+                Integer requiredCount = exam.getPerAttempt();
+                if (requiredCount == null) {
+                        requiredCount = exam.getQuestionsPerAttempt();
+                }
+                int required = (requiredCount != null && requiredCount > 0) ? requiredCount : activeQuestions.size();
+
+                if (activeQuestions.size() < required) {
+                        throw new BadRequestException("Not enough active questions available for this exam. Required: "
+                                        + required + ", Available: " + activeQuestions.size());
+                }
+
+                List<Question> poolCopy = new ArrayList<>(activeQuestions);
+                Collections.shuffle(poolCopy);
+                List<Question> selectedQuestions = poolCopy.subList(0, required);
+
                 ExamAttempt attempt = ExamAttempt.builder()
                                 .candidate(candidate)
                                 .exam(exam)
@@ -144,6 +134,17 @@ public class AttemptService {
                                 .build();
 
                 attempt = attemptRepository.save(attempt);
+
+                List<ExamAttemptQuestion> attemptQuestions = new ArrayList<>();
+                int order = 1;
+                for (Question q : selectedQuestions) {
+                        attemptQuestions.add(ExamAttemptQuestion.builder()
+                                        .attempt(attempt)
+                                        .question(q)
+                                        .questionOrder(order++)
+                                        .build());
+                }
+                examAttemptQuestionRepository.saveAll(attemptQuestions);
 
                 return StartExamResponseDTO.builder()
                                 .attemptId(attempt.getId())
@@ -240,9 +241,14 @@ public class AttemptService {
                 // Validate unanswered questions only for normal submission
                 if (!Boolean.TRUE.equals(request.getForceSubmit())) {
 
-                        int totalQuestions = questionRepository
-                                        .findByExamIdAndIsActiveTrue(attempt.getExam().getId())
-                                        .size();
+                        List<ExamAttemptQuestion> assignedQuestions = examAttemptQuestionRepository
+                                        .findByAttemptIdOrderByQuestionOrderAsc(attempt.getId());
+
+                        int totalQuestions = !assignedQuestions.isEmpty()
+                                        ? assignedQuestions.size()
+                                        : questionRepository
+                                                        .findByExamIdAndIsActiveTrue(attempt.getExam().getId())
+                                                        .size();
 
                         int answeredQuestions = request.getAnswers().size();
 
