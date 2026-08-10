@@ -1,17 +1,16 @@
 // A1 · Task 2 — Exams Library
-// Card view + table view · create/edit/duplicate exams · version history ·
+// Card view + table view · create/edit exams ·
 // publish new version · activate/deactivate (four-eyes) · search & filters ·
 // KPI cards · pagination · refresh.
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-    fetchExams, duplicateExam, deleteExam,
+    fetchExams, deleteExam,
     requestExamActivation, requestExamDeactivation,
-    fetchExamVersions, publishExamVersion,
     META,
 } from "./api";
-import { TwoPersonRuleBanner, PendingApprovalBadge, RequestApprovalModal } from "./FourEyes";
+import { PendingApprovalBadge, RequestApprovalModal } from "./FourEyes";
 import "./a1.css";
 
 const PAGE_SIZE = 9; // cards: 3×3, table: 9 rows
@@ -27,12 +26,6 @@ export default function ExamsLibraryPage() {
 
     // Four-eyes
     const [statusAction, setStatusAction] = useState(null); // { exam, target: "ACTIVE"|"INACTIVE" }
-
-    // Version history
-    const [versionModal, setVersionModal] = useState(null); // exam object
-    const [versions, setVersions] = useState([]);
-    const [publishNote, setPublishNote] = useState("");
-    const [publishing, setPublishing] = useState(false);
 
     const load = () =>
         fetchExams(filters).then((res) => setRows(res?.rows || (Array.isArray(res) ? res : [])));
@@ -63,11 +56,6 @@ export default function ExamsLibraryPage() {
     const totalPages = rows ? Math.max(1, Math.ceil(rows.length / PAGE_SIZE)) : 1;
 
     // Actions
-    const handleDuplicate = async (exam) => {
-        await duplicateExam(exam.id);
-        load();
-    };
-
     const handleDelete = async (exam) => {
         if (window.confirm(`Are you sure you want to delete exam "${exam.title}"?`)) {
             await deleteExam(exam.id);
@@ -87,29 +75,12 @@ export default function ExamsLibraryPage() {
         load();
     };
 
-    const openVersions = async (exam) => {
-        setVersionModal(exam);
-        const v = await fetchExamVersions(exam.id);
-        setVersions(v);
-    };
-
-    const handlePublish = async () => {
-        if (!versionModal) return;
-        setPublishing(true);
-        await publishExamVersion(versionModal.id, { notes: publishNote });
-        setPublishing(false);
-        setPublishNote("");
-        const v = await fetchExamVersions(versionModal.id);
-        setVersions(v);
-        load();
-    };
-
     return (
         <div className="a1-page">
             <header className="a1-page-head">
                 <div>
                     <h1>Exams Library</h1>
-                    <p className="a1-sub">Create, manage, and version your certification exams.</p>
+                    <p className="a1-sub">Create and manage your certification exams.</p>
                 </div>
                 <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                     <button className="a1-btn a1-btn-ghost" onClick={load}>↻ Refresh</button>
@@ -118,8 +89,6 @@ export default function ExamsLibraryPage() {
                     </button>
                 </div>
             </header>
-
-            <TwoPersonRuleBanner text="Activating or deactivating an exam requires approval from a second administrator." />
 
             {/* KPI row */}
             <div className="a1-kpi-row">
@@ -198,42 +167,43 @@ export default function ExamsLibraryPage() {
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div className="a1-exam-card-title">{exam.title}</div>
-                                    <div className="a1-exam-card-sub">{exam.stack} · v{exam.version}</div>
+                                    <div className="a1-exam-card-sub">{exam.stack}</div>
                                 </div>
                             </div>
-                            <div className="a1-exam-card-facts">
-                                <span>Pool <b>{exam.questionPoolSize}</b></span>
-                                <span>Per attempt <b>{exam.questionsPerAttempt}</b></span>
-                                <span>Pass <b>{exam.passMark}%</b></span>
+                            <div className="a1-exam-card-kpis">
+                                <div className="a1-exam-kpi-chip">
+                                    <span className="a1-kpi-chip-label">📝 Pool</span>
+                                    <span className="a1-kpi-chip-val">{exam.questionPoolSize}</span>
+                                </div>
+                                <div className="a1-exam-kpi-chip">
+                                    <span className="a1-kpi-chip-label">🎯 Attempt</span>
+                                    <span className="a1-kpi-chip-val">{exam.questionsPerAttempt}</span>
+                                </div>
+                                <div className="a1-exam-kpi-chip">
+                                    <span className="a1-kpi-chip-label">✅ Pass</span>
+                                    <span className="a1-kpi-chip-val">{exam.passMark}%</span>
+                                </div>
                             </div>
                             <div className="a1-exam-card-foot">
-                                <div className="a1-exam-card-status-row">
-                                    <div>
-                                        <StatusPill status={exam.status} />
-                                        {exam.pendingApproval && <PendingApprovalBadge />}
-                                    </div>
+                                <div className="a1-exam-card-status-col">
+                                    <StatusPill status={exam.status} />
+                                    {exam.pendingApproval && <PendingApprovalBadge />}
                                 </div>
                                 <div className="a1-exam-card-actions">
                                     <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => navigate(`/admin/authoring?examId=${exam.id}`)}>
-                                        Edit
+                                        ✏ Edit
                                     </button>
-                                    <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => handleDuplicate(exam)}>
-                                        Duplicate
-                                    </button>
-                                    <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => openVersions(exam)}>
-                                        Versions
-                                    </button>
-                                    <button className="a1-btn a1-btn-ghost a1-btn-sm" style={{ color: "#d9383a" }} onClick={() => handleDelete(exam)}>
-                                        Delete
+                                    <button className="a1-btn a1-btn-ghost a1-btn-sm a1-btn-danger" onClick={() => handleDelete(exam)}>
+                                        🗑 Delete
                                     </button>
                                     {exam.status !== "ACTIVE" && !exam.pendingApproval && (
                                         <button className="a1-btn a1-btn-primary a1-btn-sm" onClick={() => openStatusAction(exam, "ACTIVE")}>
-                                            Activate
+                                            ▶ Activate
                                         </button>
                                     )}
                                     {exam.status === "ACTIVE" && !exam.pendingApproval && (
                                         <button className="a1-btn a1-btn-red a1-btn-sm" onClick={() => openStatusAction(exam, "INACTIVE")}>
-                                            Deactivate
+                                            ⏸ Deactivate
                                         </button>
                                     )}
                                 </div>
@@ -246,7 +216,7 @@ export default function ExamsLibraryPage() {
                 <table className="a1-table a1-table-hover">
                     <thead>
                         <tr>
-                            <th>Exam</th><th>Stack</th><th>Version</th><th>Pool</th>
+                            <th>Exam</th><th>Stack</th><th>Pool</th>
                             <th>Per Attempt</th><th>Pass%</th><th>Status</th><th>Updated</th><th />
                         </tr>
                     </thead>
@@ -255,7 +225,6 @@ export default function ExamsLibraryPage() {
                             <tr key={exam.id}>
                                 <td style={{ fontWeight: 600 }}>{exam.title}</td>
                                 <td>{exam.stack}</td>
-                                <td className="a1-mono">v{exam.version}</td>
                                 <td className="a1-mono">{exam.questionPoolSize}</td>
                                 <td className="a1-mono">{exam.questionsPerAttempt}</td>
                                 <td className="a1-mono">{exam.passMark}%</td>
@@ -268,12 +237,6 @@ export default function ExamsLibraryPage() {
                                     <div style={{ display: "flex", gap: 6 }}>
                                         <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => navigate(`/admin/authoring?examId=${exam.id}`)}>
                                             Edit
-                                        </button>
-                                        <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => handleDuplicate(exam)}>
-                                            Duplicate
-                                        </button>
-                                        <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => openVersions(exam)}>
-                                            Versions
                                         </button>
                                         <button className="a1-btn a1-btn-ghost a1-btn-sm" style={{ color: "#d9383a" }} onClick={() => handleDelete(exam)}>
                                             Delete
@@ -323,57 +286,6 @@ export default function ExamsLibraryPage() {
                 onCancel={() => setStatusAction(null)}
                 onConfirm={submitStatusAction}
             />
-
-            {/* ---- Version history modal ---- */}
-            {versionModal && (
-                <div className="a1-modal-overlay" onClick={() => setVersionModal(null)}>
-                    <div className="a1-modal" onClick={(e) => e.stopPropagation()} style={{ width: "min(560px, 92vw)" }}>
-                        <h3>Version History · {versionModal.title}</h3>
-                        <p className="a1-sub">Current version: v{versionModal.version}</p>
-
-                        {versions.length === 0 ? (
-                            <div className="a1-empty" style={{ padding: 16 }}>No versions published yet.</div>
-                        ) : (
-                            <ul className="a1-version-list">
-                                {versions
-                                    .sort((a, b) => b.version - a.version)
-                                    .map((v) => (
-                                        <li key={v.id} className="a1-version-item">
-                                            <div>
-                                                <strong>v{v.version}</strong>
-                                                {v.notes && <span className="a1-sub" style={{ marginLeft: 8 }}>— {v.notes}</span>}
-                                            </div>
-                                            <div className="a1-version-item-meta">
-                                                {v.publishedBy} · {new Date(v.publishedAt).toLocaleDateString()}
-                                            </div>
-                                        </li>
-                                    ))}
-                            </ul>
-                        )}
-
-                        <div style={{ borderTop: `1px solid var(--a1-line)`, paddingTop: 14, marginTop: 10 }}>
-                            <label className="a1-field" style={{ marginBottom: 8 }}>
-                                <span style={{ fontWeight: 600 }}>Publish new version</span>
-                            </label>
-                            <textarea
-                                className="a1-textarea"
-                                style={{ marginTop: 0 }}
-                                placeholder="Release notes (optional)…"
-                                value={publishNote}
-                                onChange={(e) => setPublishNote(e.target.value)}
-                            />
-                            <div className="a1-modal-actions">
-                                <button className="a1-btn a1-btn-ghost" onClick={() => setVersionModal(null)}>
-                                    Close
-                                </button>
-                                <button className="a1-btn a1-btn-primary" disabled={publishing} onClick={handlePublish}>
-                                    {publishing ? "Publishing…" : "Publish v" + (versionModal.version + 1)}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
@@ -384,6 +296,9 @@ function StatusPill({ status }) {
             ? "a1-pill-green"
             : status === "INACTIVE"
               ? "a1-pill-red"
-              : "";
-    return <span className={`a1-pill ${cls}`}>{status}</span>;
+              : status === "DRAFT"
+                ? "a1-pill-amber"
+                : "";
+    const label = status ? status.charAt(0) + status.slice(1).toLowerCase() : "";
+    return <span className={`a1-pill ${cls}`}><span className="a1-pill-dot">●</span> {label}</span>;
 }

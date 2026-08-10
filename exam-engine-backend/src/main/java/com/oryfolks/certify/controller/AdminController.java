@@ -10,15 +10,15 @@ import com.oryfolks.certify.repository.ApprovalRequestRepository;
 import com.oryfolks.certify.repository.ExamAttemptRepository;
 import com.oryfolks.certify.repository.UserRepository;
 import com.oryfolks.certify.response.ApiResponse;
-import com.oryfolks.certify.exception.BadRequestException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import com.oryfolks.certify.exception.BadRequestException;
 
 import java.security.Principal;
-import java.util.*;
 import java.time.LocalDateTime;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -234,8 +234,7 @@ public class AdminController {
 
                 int totalAttempts = attempts.size();
                 long passCount = attempts.stream()
-                                .filter(a -> "PASS".equalsIgnoreCase(String.valueOf(a.getResultStatus())))
-                                .count();
+                                .filter(a -> "PASS".equalsIgnoreCase(String.valueOf(a.getResultStatus()))).count();
                 long needsReviewCount = attempts.stream()
                                 .filter(a -> "NEEDS_REVIEW".equalsIgnoreCase(String.valueOf(a.getResultStatus())))
                                 .count();
@@ -293,7 +292,6 @@ public class AdminController {
                         @RequestParam(required = false) String to) {
 
                 List<ExamAttempt> attempts = attemptRepository.findAllByOrderByCreatedAtDesc();
-
                 if (from != null && !from.isBlank()) {
                         try {
                                 java.time.LocalDate fromDate = java.time.LocalDate.parse(from);
@@ -386,11 +384,9 @@ public class AdminController {
 
                 List<Map<String, Object>> items = List.of(
                                 Map.of("id", "flag-1", "type", "TAB_SWITCH", "timestampSec", 145, "severity", "HIGH",
-                                                "description",
-                                                "Browser tab lost focus for 12 seconds"),
+                                                "description", "Browser tab lost focus for 12 seconds"),
                                 Map.of("id", "flag-2", "type", "GAZE_AWAY", "timestampSec", 310, "severity", "MEDIUM",
-                                                "description",
-                                                "Gaze directed off-screen for 8 seconds"));
+                                                "description", "Gaze directed off-screen for 8 seconds"));
 
                 Map<String, Object> res = new HashMap<>();
                 res.put("taxonomy", taxonomy);
@@ -423,9 +419,8 @@ public class AdminController {
                 ExamAttempt attempt = attemptRepository.findById(id).orElse(null);
                 if (attempt != null && payload.containsKey("result")) {
                         try {
-                                attempt.setResultStatus(
-                                                com.oryfolks.certify.enums.ResultStatus
-                                                                .valueOf(payload.get("result").toString()));
+                                attempt.setResultStatus(com.oryfolks.certify.enums.ResultStatus
+                                                .valueOf(payload.get("result").toString()));
                                 attemptRepository.save(attempt);
                         } catch (Exception ignored) {
                         }
@@ -510,12 +505,10 @@ public class AdminController {
         private Map<String, Object> mapAttemptSummary(ExamAttempt a) {
                 Map<String, Object> map = new HashMap<>();
                 map.put("id", a.getId().toString());
-                map.put("candidate",
-                                a.getCandidate() != null
-                                                ? (a.getCandidate().getFullName() != null
-                                                                ? a.getCandidate().getFullName()
-                                                                : a.getCandidate().getUsername())
-                                                : "Candidate");
+                map.put("candidate", a.getCandidate() != null
+                                ? (a.getCandidate().getFullName() != null ? a.getCandidate().getFullName()
+                                                : a.getCandidate().getUsername())
+                                : "Candidate");
                 map.put("email", a.getCandidate() != null ? a.getCandidate().getUsername() : "");
                 map.put("exam", a.getExam() != null ? a.getExam().getTitle() : "Java Certification");
                 map.put("stack", a.getExam() != null ? a.getExam().getStack() : "Java");
