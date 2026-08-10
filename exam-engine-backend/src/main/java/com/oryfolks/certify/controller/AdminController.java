@@ -457,21 +457,34 @@ public class AdminController {
     }
 
     @GetMapping("/notifications")
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getNotifications() {
-        List<ApprovalRequest> pending = approvalRepository.findByStatusOrderByRequestedAtDesc("PENDING");
-
-        List<Map<String, Object>> notifs = pending.stream().map(a -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", a.getId());
-            map.put("title", a.getLabel());
-            map.put("desc", "Requested by " + a.getRequestedBy() + (a.getNote() != null ? " · " + a.getNote() : ""));
-            map.put("time", a.getRequestedAt() != null ? a.getRequestedAt().toString() : new Date().toString());
-            map.put("read", false);
-            return map;
-        }).toList();
-
-        return ResponseEntity.ok(ApiResponse.success("Notifications retrieved", notifs));
-    }
+        public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getNotifications() {
+                List<ApprovalRequest> pending = approvalRepository.findByStatusOrderByRequestedAtDesc("PENDING");
+ 
+                List<Map<String, Object>> notifs = pending.stream().map(a -> {
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("id", a.getId());
+                        map.put("title", a.getLabel());
+                        map.put("desc", "Requested by " + a.getRequestedBy()
+                                        + (a.getNote() != null ? " · " + a.getNote() : ""));
+                        map.put("time", a.getRequestedAt() != null ? a.getRequestedAt().toString()
+                                        : new Date().toString());
+                        map.put("read", false);
+ 
+                        // Frontend specific mappings
+                        map.put("ts", a.getRequestedAt() != null ? a.getRequestedAt().toString()
+                                        : new Date().toString());
+                        map.put("text", a.getLabel());
+                        if ("FOUR_EYES_REVIEW".equalsIgnoreCase(a.getType())) {
+                                map.put("type", "ESCALATION");
+                                map.put("attemptId", a.getTargetId());
+                        } else {
+                                map.put("type", "REVIEW");
+                        }
+                        return map;
+                }).toList();
+ 
+                return ResponseEntity.ok(ApiResponse.success("Notifications retrieved", notifs));
+        }
 
     @PostMapping("/notifications/{id}/read")
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> markNotificationRead(@PathVariable String id) {
