@@ -25,6 +25,9 @@ import java.time.LocalDateTime;
 import java.time.Duration;
 import java.util.*;
 
+import com.oryfolks.certify.entity.ExamAttemptQuestion;
+import com.oryfolks.certify.repository.ExamAttemptQuestionRepository;
+
 @RestController
 @RequestMapping("/api/exams")
 public class ExamController {
@@ -43,6 +46,9 @@ public class ExamController {
 
     @Autowired
     private ExamAttemptRepository examAttemptRepository;
+
+    @Autowired
+    private ExamAttemptQuestionRepository examAttemptQuestionRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -147,7 +153,18 @@ public class ExamController {
 
         Exam exam = attempt.getExam();
         List<Section> sections = sectionRepository.findByExamId(exam.getId());
-        List<Question> questions = questionRepository.findByExamIdAndIsActiveTrue(exam.getId());
+
+        List<ExamAttemptQuestion> attemptQuestions = examAttemptQuestionRepository.findByAttemptIdOrderByQuestionOrderAsc(attemptId);
+        List<Question> questions;
+        if (!attemptQuestions.isEmpty()) {
+            questions = new ArrayList<>();
+            for (ExamAttemptQuestion eq : attemptQuestions) {
+                questions.add(eq.getQuestion());
+            }
+        } else {
+            questions = questionRepository.findByExamIdAndIsActiveTrue(exam.getId());
+        }
+
         List<Answer> savedAnswers = answerRepository.findByAttemptId(attemptId);
 
         Map<String, String> answersMap = new HashMap<>();
@@ -301,7 +318,16 @@ public class ExamController {
         }
 
         Exam exam = attempt.getExam();
-        List<Question> questions = questionRepository.findByExamId(exam.getId());
+        List<ExamAttemptQuestion> attemptQuestions = examAttemptQuestionRepository.findByAttemptIdOrderByQuestionOrderAsc(attemptId);
+        List<Question> questions;
+        if (!attemptQuestions.isEmpty()) {
+            questions = new ArrayList<>();
+            for (ExamAttemptQuestion eq : attemptQuestions) {
+                questions.add(eq.getQuestion());
+            }
+        } else {
+            questions = questionRepository.findByExamId(exam.getId());
+        }
         List<Answer> savedAnswers = answerRepository.findByAttemptId(attemptId);
 
         int totalMarks = 0;
@@ -414,7 +440,16 @@ public class ExamController {
 
     private void terminateAttemptInternal(ExamAttempt attempt) {
         Exam exam = attempt.getExam();
-        List<Question> questions = questionRepository.findByExamId(exam.getId());
+        List<ExamAttemptQuestion> attemptQuestions = examAttemptQuestionRepository.findByAttemptIdOrderByQuestionOrderAsc(attempt.getId());
+        List<Question> questions;
+        if (!attemptQuestions.isEmpty()) {
+            questions = new ArrayList<>();
+            for (ExamAttemptQuestion eq : attemptQuestions) {
+                questions.add(eq.getQuestion());
+            }
+        } else {
+            questions = questionRepository.findByExamId(exam.getId());
+        }
         List<Answer> savedAnswers = answerRepository.findByAttemptId(attempt.getId());
 
         int totalMarks = 0;
