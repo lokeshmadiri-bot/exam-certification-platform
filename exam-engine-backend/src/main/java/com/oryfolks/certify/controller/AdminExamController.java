@@ -212,15 +212,6 @@ public class AdminExamController {
                 case L5 -> "Needs Training";
             };
 
-
-            String title = switch (lvl) {
-                case L1 -> "Expert";
-                case L2 -> "Advanced";
-                case L3 -> "Intermediate";
-                case L4 -> "Beginner";
-                case L5 -> "Needs Training";
-            };
-
             bandList.add(CompetencyBand.builder()
                     .exam(exam)
                     .levelName(lvl)
