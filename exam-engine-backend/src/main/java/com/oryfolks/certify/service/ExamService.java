@@ -13,6 +13,7 @@
     import com.oryfolks.certify.dto.CompetencyBandDTO;
     import com.oryfolks.certify.dto.ExamDetailsResponseDTO;
     import com.oryfolks.certify.entity.CompetencyBand;
+    import com.oryfolks.certify.enums.CompetencyLevel;
     
     import java.util.UUID;
 
@@ -102,7 +103,16 @@
         @Transactional
         public Exam createExam(Exam exam) {
 
-            if (exam.getCompetencyBands() != null) {
+            if (exam.getCompetencyBands() == null || exam.getCompetencyBands().isEmpty()) {
+                List<CompetencyBand> defaultBands = List.of(
+                        CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L1).title("Expert").minScore(90).maxScore(100).build(),
+                        CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L2).title("Advanced").minScore(75).maxScore(89).build(),
+                        CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L3).title("Intermediate").minScore(60).maxScore(74).build(),
+                        CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L4).title("Beginner").minScore(40).maxScore(59).build(),
+                        CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L5).title("Needs Training").minScore(0).maxScore(39).build()
+                );
+                exam.setCompetencyBands(defaultBands);
+            } else {
                 for (CompetencyBand band : exam.getCompetencyBands()) {
                     band.setExam(exam);
                 }

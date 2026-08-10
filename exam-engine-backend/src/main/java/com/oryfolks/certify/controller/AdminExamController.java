@@ -173,11 +173,11 @@ public class AdminExamController {
         Map<String, int[]> map = new LinkedHashMap<>();
         List<CompetencyBand> bands = exam.getCompetencyBands();
         if (bands == null || bands.isEmpty()) {
-            map.put("L1", new int[]{0, 20});
-            map.put("L2", new int[]{21, 40});
-            map.put("L3", new int[]{41, 60});
-            map.put("L4", new int[]{61, 80});
-            map.put("L5", new int[]{81, 100});
+            map.put("L1", new int[]{90, 100});
+            map.put("L2", new int[]{75, 89});
+            map.put("L3", new int[]{60, 74});
+            map.put("L4", new int[]{40, 59});
+            map.put("L5", new int[]{0, 39});
         } else {
             for (CompetencyBand b : bands) {
                 map.put(b.getLevelName().name(), new int[]{b.getMinScore(), b.getMaxScore()});
@@ -204,11 +204,19 @@ public class AdminExamController {
             List<Integer> range = entry.getValue();
             int min = range.get(0);
             int max = range.get(1);
+            String title = switch (lvl) {
+                case L1 -> "Expert";
+                case L2 -> "Advanced";
+                case L3 -> "Intermediate";
+                case L4 -> "Beginner";
+                case L5 -> "Needs Training";
+            };
+
 
             bandList.add(CompetencyBand.builder()
                     .exam(exam)
                     .levelName(lvl)
-                    .title(lvl.name() + " Band")
+                    .title(title)
                     .minScore(min)
                     .maxScore(max)
                     .build());

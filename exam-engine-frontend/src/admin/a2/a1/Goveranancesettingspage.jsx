@@ -135,7 +135,6 @@ function RetentionTab({ gov, onSaved }) {
     return (
         <div className="a1-card">
             <h2>Retention Policy</h2>
-            <TwoPersonRuleBanner text="Changing the retention policy requires approval from a second administrator." />
             <p className="a1-sub">Keep exam results for:</p>
             <div className="a1-form-grid" style={{ maxWidth: 420 }}>
                 {RETENTION_OPTIONS.map((d) => (
