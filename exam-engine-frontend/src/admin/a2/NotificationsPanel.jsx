@@ -172,10 +172,15 @@ export default function NotificationsPanel() {
                               lineHeight: "1.4"
                             }}
                           >
-                            {n.text}
+                          {n.text || n.title}
+                            {(n.desc || n.description) && (
+                              <div style={{ fontSize: "12px", color: "#8A99AE", fontWeight: "normal", marginTop: "2px" }}>
+                                {n.desc || n.description}
+                              </div>
+                            )}
                           </div>
                           <div style={{ fontSize: "11px", color: "#8A99AE", marginTop: "4px" }}>
-                            {new Date(n.ts).toLocaleString()}
+                            {new Date(n.ts || n.time).toLocaleString()}
                           </div>
                         </div>
                       </li>
