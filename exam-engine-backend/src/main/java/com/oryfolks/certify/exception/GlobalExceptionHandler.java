@@ -20,84 +20,81 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /**
-     * Handles resource not found exceptions.
-     */
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ApiResponse<Void>> handleResourceNotFound(
-            ResourceNotFoundException ex) {
+        /**
+         * Handles resource not found exceptions.
+         */
+        @ExceptionHandler(ResourceNotFoundException.class)
+        public ResponseEntity<ApiResponse<Void>> handleResourceNotFound(
+                        ResourceNotFoundException ex) {
 
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error(ex.getMessage()));
-    }
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
 
-    /**
-     * Handles invalid request exceptions.
-     */
-    @ExceptionHandler(BadRequestException.class)
-    public ResponseEntity<ApiResponse<Void>> handleBadRequest(
-            BadRequestException ex) {
+        /**
+         * Handles invalid request exceptions.
+         */
+        @ExceptionHandler(BadRequestException.class)
+        public ResponseEntity<ApiResponse<Void>> handleBadRequest(
+                        BadRequestException ex) {
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ex.getMessage()));
-    }
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
 
-    /**
-     * Handles unauthorized exceptions.
-     */
-    @ExceptionHandler(UnauthorizedException.class)
-    public ResponseEntity<ApiResponse<Void>> handleUnauthorized(
-            UnauthorizedException ex) {
+        /**
+         * Handles unauthorized exceptions.
+         */
+        @ExceptionHandler(UnauthorizedException.class)
+        public ResponseEntity<ApiResponse<Void>> handleUnauthorized(
+                        UnauthorizedException ex) {
 
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error(ex.getMessage()));
-    }
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
 
-    /**
-     * Handles Spring Security access denied exceptions.
-     */
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(
-            AccessDeniedException ex) {
+        /**
+         * Handles Spring Security access denied exceptions.
+         */
+        @ExceptionHandler(AccessDeniedException.class)
+        public ResponseEntity<ApiResponse<Void>> handleAccessDenied(
+                        AccessDeniedException ex) {
 
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error(
-                        "You do not have permission to perform this action."));
-    }
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                .body(ApiResponse.error(
+                                                "You do not have permission to perform this action."));
+        }
 
-    /**
-     * Handles request validation failures.
-     */
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationExceptions(
-            MethodArgumentNotValidException ex) {
+        /**
+         * Handles request validation failures.
+         */
+        @ExceptionHandler(MethodArgumentNotValidException.class)
+        public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationExceptions(
+                        MethodArgumentNotValidException ex) {
 
-        Map<String, String> errors = new HashMap<>();
+                Map<String, String> errors = new HashMap<>();
 
-        ex.getBindingResult()
-                .getFieldErrors()
-                .forEach(error ->
-                        errors.put(
-                                error.getField(),
-                                error.getDefaultMessage()));
+                ex.getBindingResult()
+                                .getFieldErrors()
+                                .forEach(error -> errors.put(
+                                                error.getField(),
+                                                error.getDefaultMessage()));
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(
-                        "Validation failed.",
-                        errors));
-    }
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                .body(ApiResponse.error(
+                                                "Validation failed.",
+                                                errors));
+        }
 
-    /**
-     * Handles all unexpected exceptions.
-     */
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleException(
-            Exception ex) {
+        /**
+         * Handles all unexpected exceptions.
+         */
+        @ExceptionHandler(Exception.class)
+        public ResponseEntity<ApiResponse<String>> handleException(Exception ex) {
 
-        log.error("Unexpected exception occurred", ex);
+                ex.printStackTrace();
 
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(
-                        "An unexpected error occurred. Please contact the administrator."));
-    }
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
 }
