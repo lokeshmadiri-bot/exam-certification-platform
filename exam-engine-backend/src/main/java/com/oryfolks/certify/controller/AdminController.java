@@ -10,15 +10,15 @@ import com.oryfolks.certify.repository.ApprovalRequestRepository;
 import com.oryfolks.certify.repository.ExamAttemptRepository;
 import com.oryfolks.certify.repository.UserRepository;
 import com.oryfolks.certify.response.ApiResponse;
-import com.oryfolks.certify.exception.BadRequestException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import com.oryfolks.certify.exception.BadRequestException;
 
 import java.security.Principal;
-import java.util.*;
 import java.time.LocalDateTime;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -43,55 +43,55 @@ public class AdminController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String exam,
             @RequestParam(required = false) String locked) {
-
+ 
         List<User> candidates = userRepository.findByRole(UserRole.ROLE_CANDIDATE);
-
+ 
         List<Map<String, Object>> rows = new ArrayList<>();
         for (User c : candidates) {
-
+ 
             List<ExamAttempt> attempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(c.getId());
-
+ 
             for (ExamAttempt attempt : attempts) {
-
+ 
                 Map<String, Object> map = new HashMap<>();
-
+ 
                 map.put("candidateId", c.getId().toString());
                 map.put("candidateName",
                         c.getFullName() != null ? c.getFullName() : c.getUsername());
-
+ 
                 map.put("email",
                         c.getUsername().contains("@")
                                 ? c.getUsername()
                                 : c.getUsername() + "@certify.com");
-
+ 
                 map.put("examId", attempt.getExam().getId().toString());
                 map.put("examTitle", attempt.getExam().getTitle());
-
+ 
                 map.put("status", attempt.getResultStatus().name());
-
+ 
                 boolean isLocked = false;
-
+ 
                 if (attempt.getEndTime() != null &&
                         !Boolean.TRUE.equals(attempt.getRetryOverrideApproved())) {
-
+ 
                     isLocked = LocalDateTime.now()
                             .isBefore(attempt.getEndTime().plusDays(30));
                 }
-
+ 
                 map.put("locked", isLocked);
-
+ 
                 map.put("retryOverrideApproved",
                         attempt.getRetryOverrideApproved());
-
+ 
                 map.put("lastAttempt",
                         attempt.getEndTime() != null
                                 ? attempt.getEndTime()
                                 : attempt.getCreatedAt());
-
+ 
                 rows.add(map);
             }
         }
-
+ 
         if (q != null && !q.isBlank()) {
             String query = q.toLowerCase();
             rows = rows.stream().filter(r -> r.get("candidateName").toString().toLowerCase().contains(query)
@@ -107,7 +107,7 @@ public class AdminController {
             boolean lockBool = Boolean.parseBoolean(locked);
             rows = rows.stream().filter(r -> ((Boolean) r.get("locked")) == lockBool).toList();
         }
-
+ 
         Map<String, Object> result = new HashMap<>();
         result.put("rows", rows);
         result.put("total", rows.size());
@@ -128,8 +128,7 @@ public class AdminController {
         ApprovalRequest req = ApprovalRequest.builder()
                 .id(UUID.randomUUID().toString())
                 .type("CANDIDATE_UNLOCK")
-                .label("Unlock candidate · "
-                        + (candidate.getFullName() != null ? candidate.getFullName() : candidate.getUsername()))
+                .label("Unlock candidate · " + (candidate.getFullName() != null ? candidate.getFullName() : candidate.getUsername()))
                 .targetId(id.toString())
                 .requestedBy(principal != null ? principal.getName() : "Admin User")
                 .note(note)
@@ -151,30 +150,30 @@ public class AdminController {
             @PathVariable UUID candidateId,
             @RequestBody Map<String, UUID> request,
             Principal principal) {
-
+ 
         System.out.println("========== APPROVE OVERRIDE ==========");
         System.out.println("Candidate ID: " + candidateId);
         System.out.println("Request Body: " + request);
-
+ 
         UUID examId = request.get("examId");
-
+ 
         if (examId == null) {
             throw new BadRequestException("Exam ID is required.");
         }
-
+ 
         User candidate = userRepository.findById(candidateId)
                 .orElseThrow(() -> new RuntimeException("Candidate not found: " + candidateId));
-
+ 
         ExamAttempt latestAttempt = attemptRepository
                 .findFirstByCandidateIdAndExamIdOrderByCreatedAtDesc(
                         candidateId,
                         examId)
                 .orElseThrow(() -> new RuntimeException("No exam attempt found for this exam."));
-
+ 
         latestAttempt.setRetryOverrideApproved(true);
-
+ 
         attemptRepository.save(latestAttempt);
-
+ 
         auditLogRepository.save(
                 AccessAuditLog.builder()
                         .userName(principal != null ? principal.getName() : "Admin")
@@ -187,13 +186,13 @@ public class AdminController {
                         .oldValue("LOCKED")
                         .newValue("UNLOCKED")
                         .build());
-
+ 
         Map<String, Object> response = new HashMap<>();
         response.put("candidateId", candidateId);
         response.put("examId", examId);
         response.put("candidateName", candidate.getFullName());
         response.put("examTitle", latestAttempt.getExam().getTitle());
-
+ 
         return ResponseEntity.ok(
                 ApiResponse.success(
                         "Candidate unlocked successfully.",
@@ -221,7 +220,7 @@ public class AdminController {
     }
 
     // ------------------------------------------------------------------ //
-    // A2 Analytics & Attempt Review Endpoints
+    //  A2 Analytics & Attempt Review Endpoints
     // ------------------------------------------------------------------ //
 
     @GetMapping("/analytics/dashboard")
@@ -229,10 +228,8 @@ public class AdminController {
         List<ExamAttempt> attempts = attemptRepository.findAllByOrderByCreatedAtDesc();
 
         int totalAttempts = attempts.size();
-        long passCount = attempts.stream().filter(a -> "PASS".equalsIgnoreCase(String.valueOf(a.getResultStatus())))
-                .count();
-        long needsReviewCount = attempts.stream()
-                .filter(a -> "NEEDS_REVIEW".equalsIgnoreCase(String.valueOf(a.getResultStatus()))).count();
+        long passCount = attempts.stream().filter(a -> "PASS".equalsIgnoreCase(String.valueOf(a.getResultStatus()))).count();
+        long needsReviewCount = attempts.stream().filter(a -> "NEEDS_REVIEW".equalsIgnoreCase(String.valueOf(a.getResultStatus()))).count();
         double passRate = totalAttempts > 0 ? Math.round((double) passCount / totalAttempts * 1000.0) / 10.0 : 84.5;
 
         Map<String, Object> kpis = new HashMap<>();
@@ -242,29 +239,32 @@ public class AdminController {
         kpis.put("avgDurationMin", 42);
 
         List<Map<String, Object>> levelDistribution = List.of(
-                Map.of("level", "L1", "count", 12),
-                Map.of("level", "L2", "count", 25),
-                Map.of("level", "L3", "count", 45),
-                Map.of("level", "L4", "count", 18),
-                Map.of("level", "L5", "count", 8));
+            Map.of("level", "L1", "count", 12),
+            Map.of("level", "L2", "count", 25),
+            Map.of("level", "L3", "count", 45),
+            Map.of("level", "L4", "count", 18),
+            Map.of("level", "L5", "count", 8)
+        );
 
         List<Map<String, Object>> passRateSplit = List.of(
-                Map.of("name", "Pass", "value", (int) passCount),
-                Map.of("name", "Fail", "value", Math.max(0, totalAttempts - (int) passCount - (int) needsReviewCount)),
-                Map.of("name", "Needs Review", "value", (int) needsReviewCount));
+            Map.of("name", "Pass", "value", (int) passCount),
+            Map.of("name", "Fail", "value", Math.max(0, totalAttempts - (int) passCount - (int) needsReviewCount)),
+            Map.of("name", "Needs Review", "value", (int) needsReviewCount)
+        );
 
         List<Map<String, Object>> attemptsByStack = List.of(
-                Map.of("stack", "Java", "attempts", 48),
-                Map.of("stack", "React", "attempts", 32),
-                Map.of("stack", "Python", "attempts", 24),
-                Map.of("stack", "Node", "attempts", 16),
-                Map.of("stack", "SQL", "attempts", 12));
+            Map.of("stack", "Java", "attempts", 48),
+            Map.of("stack", "React", "attempts", 32),
+            Map.of("stack", "Python", "attempts", 24),
+            Map.of("stack", "Node", "attempts", 16),
+            Map.of("stack", "SQL", "attempts", 12)
+        );
 
         List<Map<String, Object>> needsReviewQueue = attempts.stream()
-                .filter(a -> "NEEDS_REVIEW".equalsIgnoreCase(String.valueOf(a.getResultStatus())))
-                .limit(5)
-                .map(this::mapAttemptSummary)
-                .toList();
+            .filter(a -> "NEEDS_REVIEW".equalsIgnoreCase(String.valueOf(a.getResultStatus())))
+            .limit(5)
+            .map(this::mapAttemptSummary)
+            .toList();
 
         Map<String, Object> data = new HashMap<>();
         data.put("kpis", kpis);
@@ -285,6 +285,28 @@ public class AdminController {
             @RequestParam(required = false) String to) {
 
         List<ExamAttempt> attempts = attemptRepository.findAllByOrderByCreatedAtDesc();
+        if (from != null && !from.isBlank()) {
+                        try {
+                                java.time.LocalDate fromDate = java.time.LocalDate.parse(from);
+                                attempts = attempts.stream().filter(a -> {
+                                        java.time.LocalDateTime dt = a.getSubmittedAt() != null ? a.getSubmittedAt()
+                                                        : a.getCreatedAt();
+                                        return dt != null && !dt.toLocalDate().isBefore(fromDate);
+                                }).toList();
+                        } catch (Exception ignored) {
+                        }
+                }
+                if (to != null && !to.isBlank()) {
+                        try {
+                                java.time.LocalDate toDate = java.time.LocalDate.parse(to);
+                                attempts = attempts.stream().filter(a -> {
+                                        java.time.LocalDateTime dt = a.getSubmittedAt() != null ? a.getSubmittedAt()
+                                                        : a.getCreatedAt();
+                                        return dt != null && !dt.toLocalDate().isAfter(toDate);
+                                }).toList();
+                        } catch (Exception ignored) {
+                        }
+                }
 
         List<Map<String, Object>> rows = attempts.stream().map(this::mapAttemptSummary).toList();
 
@@ -310,15 +332,15 @@ public class AdminController {
         ExamAttempt attempt = attemptRepository.findById(id)
                 .orElse(null);
 
-        Map<String, Object> data = attempt != null ? mapAttemptSummary(attempt)
-                : Map.of(
-                        "id", id.toString(),
-                        "candidate", "Sample Candidate",
-                        "exam", "Java Backend Developer",
-                        "stack", "Java",
-                        "level", "L3",
-                        "score", 78,
-                        "result", "PASS");
+        Map<String, Object> data = attempt != null ? mapAttemptSummary(attempt) : Map.of(
+            "id", id.toString(),
+            "candidate", "Sample Candidate",
+            "exam", "Java Backend Developer",
+            "stack", "Java",
+            "level", "L3",
+            "score", 78,
+            "result", "PASS"
+        );
 
         return ResponseEntity.ok(ApiResponse.success("Attempt details retrieved", data));
     }
@@ -347,14 +369,14 @@ public class AdminController {
     @GetMapping("/attempts/{id}/flags")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getAttemptFlags(@PathVariable UUID id) {
         List<String> taxonomy = List.of(
-                "FACE_NOT_VISIBLE", "MULTIPLE_FACES", "GAZE_AWAY", "TAB_SWITCH",
-                "COPY_PASTE", "SECOND_DEVICE", "VOICE_DETECTED", "SCREEN_SHARE_LOST");
+            "FACE_NOT_VISIBLE", "MULTIPLE_FACES", "GAZE_AWAY", "TAB_SWITCH",
+            "COPY_PASTE", "SECOND_DEVICE", "VOICE_DETECTED", "SCREEN_SHARE_LOST"
+        );
 
         List<Map<String, Object>> items = List.of(
-                Map.of("id", "flag-1", "type", "TAB_SWITCH", "timestampSec", 145, "severity", "HIGH", "description",
-                        "Browser tab lost focus for 12 seconds"),
-                Map.of("id", "flag-2", "type", "GAZE_AWAY", "timestampSec", 310, "severity", "MEDIUM", "description",
-                        "Gaze directed off-screen for 8 seconds"));
+            Map.of("id", "flag-1", "type", "TAB_SWITCH", "timestampSec", 145, "severity", "HIGH", "description", "Browser tab lost focus for 12 seconds"),
+            Map.of("id", "flag-2", "type", "GAZE_AWAY", "timestampSec", 310, "severity", "MEDIUM", "description", "Gaze directed off-screen for 8 seconds")
+        );
 
         Map<String, Object> res = new HashMap<>();
         res.put("taxonomy", taxonomy);
@@ -371,9 +393,10 @@ public class AdminController {
         score.put("autoResult", "PASS");
         score.put("integrityPenaltyApplied", false);
         score.put("sections", List.of(
-                Map.of("name", "Core Java & Syntax", "score", 28, "max", 30),
-                Map.of("name", "Collections & Streams", "score", 25, "max", 30),
-                Map.of("name", "Concurrency & Threading", "score", 25, "max", 40)));
+            Map.of("name", "Core Java & Syntax", "score", 28, "max", 30),
+            Map.of("name", "Collections & Streams", "score", 25, "max", 30),
+            Map.of("name", "Concurrency & Threading", "score", 25, "max", 40)
+        ));
 
         return ResponseEntity.ok(ApiResponse.success("Score retrieved", score));
     }
@@ -387,11 +410,9 @@ public class AdminController {
         ExamAttempt attempt = attemptRepository.findById(id).orElse(null);
         if (attempt != null && payload.containsKey("result")) {
             try {
-                attempt.setResultStatus(
-                        com.oryfolks.certify.enums.ResultStatus.valueOf(payload.get("result").toString()));
+                attempt.setResultStatus(com.oryfolks.certify.enums.ResultStatus.valueOf(payload.get("result").toString()));
                 attemptRepository.save(attempt);
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
         }
 
         auditLogRepository.save(AccessAuditLog.builder()
@@ -460,20 +481,14 @@ public class AdminController {
     private Map<String, Object> mapAttemptSummary(ExamAttempt a) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", a.getId().toString());
-        map.put("candidate",
-                a.getCandidate() != null
-                        ? (a.getCandidate().getFullName() != null ? a.getCandidate().getFullName()
-                                : a.getCandidate().getUsername())
-                        : "Candidate");
+        map.put("candidate", a.getCandidate() != null ? (a.getCandidate().getFullName() != null ? a.getCandidate().getFullName() : a.getCandidate().getUsername()) : "Candidate");
         map.put("email", a.getCandidate() != null ? a.getCandidate().getUsername() : "");
         map.put("exam", a.getExam() != null ? a.getExam().getTitle() : "Java Certification");
         map.put("stack", a.getExam() != null ? a.getExam().getStack() : "Java");
-        map.put("level", a.getAssignedLevel() != null ? a.getAssignedLevel().name()
-                : (a.getCompetencyLevel() != null ? a.getCompetencyLevel().name() : "L3"));
+        map.put("level", a.getAssignedLevel() != null ? a.getAssignedLevel().name() : (a.getCompetencyLevel() != null ? a.getCompetencyLevel().name() : "L3"));
         map.put("score", a.getScore() != null ? a.getScore() : 0);
         map.put("result", a.getResultStatus() != null ? a.getResultStatus().name() : "NEEDS_REVIEW");
-        map.put("submittedAt", a.getSubmittedAt() != null ? a.getSubmittedAt().toString()
-                : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : new Date().toString()));
+        map.put("submittedAt", a.getSubmittedAt() != null ? a.getSubmittedAt().toString() : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : new Date().toString()));
         return map;
     }
 }

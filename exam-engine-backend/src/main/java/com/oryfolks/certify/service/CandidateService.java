@@ -201,37 +201,37 @@ public class CandidateService {
         }
 
         private AttemptHistoryResponseDTO mapAttemptHistory(ExamAttempt attempt) {
-
+ 
                 boolean canAttempt = true;
                 int retryDaysLeft = 0;
-
+ 
                 if (Boolean.TRUE.equals(attempt.getRetryOverrideApproved())) {
-
+ 
                         canAttempt = true;
                         retryDaysLeft = 0;
-
+ 
                 } else if (attempt.getEndTime() != null) {
-
+ 
                         LocalDateTime retryDate = attempt.getEndTime().plusDays(30);
-
+ 
                         canAttempt = !LocalDateTime.now().isBefore(retryDate);
-
+ 
                         if (!canAttempt) {
-
+ 
                                 retryDaysLeft = (int) ChronoUnit.DAYS.between(
                                                 LocalDate.now(),
                                                 retryDate.toLocalDate());
-
+ 
                         }
                 }
-
+ 
                 CompetencyBand band = attempt.getExam()
                                 .getCompetencyBands()
                                 .stream()
                                 .filter(cb -> cb.getLevelName() == attempt.getAssignedLevel())
                                 .findFirst()
                                 .orElse(null);
-
+ 
                 return AttemptHistoryResponseDTO.builder()
                                 .attemptId(attempt.getId())
                                 .examId(attempt.getExam().getId())
@@ -250,9 +250,8 @@ public class CandidateService {
                                                                 ? band.getTitle()
                                                                 : null)
                                 .canAttempt(canAttempt)
-
+ 
                                 .retryDaysLeft(retryDaysLeft)
                                 .build();
         }
-
 }

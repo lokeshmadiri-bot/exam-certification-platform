@@ -20,7 +20,15 @@ const emptyForm = {
     instructions: "",
 };
 
-const defaultBands = { L1: [0, 20], L2: [21, 40], L3: [41, 60], L4: [61, 80], L5: [81, 100] };
+const defaultBands = { L1: [90, 100], L2: [75, 89], L3: [60, 74], L4: [40, 59], L5: [0, 39] };
+
+const BAND_META = {
+    L1: { label: "Expert", desc: "Mastery of the stack" },
+    L2: { label: "Advanced", desc: "Strong, independent capability" },
+    L3: { label: "Intermediate", desc: "Competent with some gaps" },
+    L4: { label: "Beginner", desc: "Foundational knowledge" },
+    L5: { label: "Needs Training", desc: "Significant upskilling required" },
+};
 
 export default function AuthoringPage() {
     const navigate = useNavigate();
@@ -191,17 +199,27 @@ export default function AuthoringPage() {
                         <p className="a1-sub">Create the exam first — difficulty bands are configured per exam.</p>
                     ) : (
                         <>
-                            <p className="a1-sub">Ranges must start at 0, end at 100, and be continuous with no gaps or overlaps.</p>
+                            <p className="a1-sub">Ranges must cover 0–100% continuously with no gaps or overlaps.</p>
                             <table className="a1-band-table">
                                 <thead>
-                                    <tr><th>Level</th><th>Start</th><th>End</th></tr>
+                                    <tr>
+                                        <th>Level</th>
+                                        <th>Label & Interpretation</th>
+                                        <th>Min %</th>
+                                        <th>Max %</th>
+                                    </tr>
                                 </thead>
                                 <tbody>
                                     {LEVELS.map((lvl) => {
+                                        const meta = BAND_META[lvl] || { label: lvl, desc: "" };
                                         const rowHasError = bandErrors.some((e) => e.startsWith(lvl));
                                         return (
                                             <tr key={lvl} className={rowHasError ? "a1-band-row-error" : ""}>
                                                 <td><span className={`a1-pill a1-lvl-${lvl}`}>{lvl}</span></td>
+                                                <td>
+                                                    <div style={{ fontWeight: 600, fontSize: 13, color: "var(--a1-navy)" }}>{meta.label}</div>
+                                                    <div style={{ fontSize: 11, color: "var(--a1-mut)" }}>{meta.desc}</div>
+                                                </td>
                                                 <td>
                                                     <input
                                                         className="a1-band-input"
@@ -233,7 +251,7 @@ export default function AuthoringPage() {
                                     {bandErrors.map((e, i) => <li key={i}>⚠ {e}</li>)}
                                 </ul>
                             ) : (
-                                <div className="a1-band-ok">✓ Bands are continuous, 0–100, with no gaps or overlaps.</div>
+                                <div className="a1-band-ok">✓ Bands are continuous, 0–100%, with no gaps or overlaps.</div>
                             )}
 
                             <div className="a1-modal-actions" style={{ justifyContent: "flex-start" }}>
@@ -249,12 +267,13 @@ export default function AuthoringPage() {
     );
 }
 
-// Must start at 0, end at 100, no overlaps, no gaps, continuous ranges only.
+// Must cover 0 to 100, no overlaps, no gaps, continuous ranges only.
 function validateBands(bands) {
     const errors = [];
+    const sortedLevels = [...LEVELS].sort((a, b) => (bands[a]?.[0] ?? 0) - (bands[b]?.[0] ?? 0));
     let prevEnd = null;
 
-    LEVELS.forEach((lvl, idx) => {
+    sortedLevels.forEach((lvl, idx) => {
         const range = bands[lvl];
         const start = range?.[0];
         const end = range?.[1];
@@ -264,20 +283,20 @@ function validateBands(bands) {
             return;
         }
         if (Number(start) > Number(end)) {
-            errors.push(`${lvl}: start must not be greater than end`);
+            errors.push(`${lvl}: min score must not be greater than max score`);
             return;
         }
         if (idx === 0 && Number(start) !== 0) {
-            errors.push(`${lvl}: must start at 0`);
+            errors.push(`${lvl}: lowest band range must start at 0%`);
         }
-        if (idx === LEVELS.length - 1 && Number(end) !== 100) {
-            errors.push(`${lvl}: must end at 100`);
+        if (idx === sortedLevels.length - 1 && Number(end) !== 100) {
+            errors.push(`${lvl}: highest band range must end at 100%`);
         }
         if (prevEnd !== null) {
             if (Number(start) <= prevEnd) {
-                errors.push(`${lvl}: overlaps with the previous band`);
+                errors.push(`${lvl}: overlaps with the previous band range`);
             } else if (Number(start) > prevEnd + 1) {
-                errors.push(`${lvl}: leaves a gap after the previous band`);
+                errors.push(`${lvl}: leaves a gap after the previous band range`);
             }
         }
         prevEnd = Number(end);

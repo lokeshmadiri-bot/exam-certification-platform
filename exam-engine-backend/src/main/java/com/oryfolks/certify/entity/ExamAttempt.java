@@ -91,6 +91,10 @@ public class ExamAttempt {
     @Builder.Default
     private List<AttemptAnswer> answers = new ArrayList<>();
 
+    @Column(name = "retry_override_approved")
+    @Builder.Default
+    private Boolean retryOverrideApproved = false; 
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

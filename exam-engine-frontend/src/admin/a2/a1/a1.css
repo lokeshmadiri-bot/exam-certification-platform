@@ -56,11 +56,12 @@
 .a1-table-hover tbody tr:hover { background: var(--a1-navy-soft); }
 
 /* ---- Pills ---- */
-.a1-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--a1-navy-soft); color: var(--a1-navy); }
-.a1-pill-green { background: var(--a1-green-soft); color: var(--a1-green); }
-.a1-pill-red { background: var(--a1-red-soft); color: var(--a1-red); }
-.a1-pill-amber { background: var(--a1-amber-soft); color: #9a6210; }
-.a1-pill-navy { background: var(--a1-navy); color: #fff; }
+.a1-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--a1-navy-soft); color: var(--a1-navy); line-height: 1; }
+.a1-pill-dot { font-size: 8px; vertical-align: middle; }
+.a1-pill-green { background: #DCFCE7; color: #16A34A; }
+.a1-pill-red { background: #FEE2E2; color: #DC2626; }
+.a1-pill-amber { background: #FEF3C7; color: #D97706; }
+.a1-pill-navy { background: #1E3A5F; color: #fff; }
 .a1-lvl-L1 { background: #e9f5ee; color: #1f7a4d; }
 .a1-lvl-L2 { background: #eaf2fb; color: #2d5b96; }
 .a1-lvl-L3 { background: #fdf6e7; color: #9a6210; }
@@ -68,17 +69,19 @@
 .a1-lvl-L5 { background: #fbecea; color: #b3392f; }
 
 /* ---- Buttons ---- */
-.a1-btn { border: 1px solid transparent; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+.a1-btn { border: 1px solid transparent; border-radius: 10px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s ease; height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; }
 .a1-btn:disabled { opacity: .55; cursor: not-allowed; }
-.a1-btn-sm { padding: 4px 10px; font-size: 12px; }
-.a1-btn-primary { background: var(--a1-navy); color: #fff; }
-.a1-btn-primary:hover:not(:disabled) { background: #204a80; }
-.a1-btn-amber { background: var(--a1-amber); color: #fff; }
-.a1-btn-amber:hover:not(:disabled) { background: #bf7811; }
-.a1-btn-red { background: var(--a1-red); color: #fff; }
-.a1-btn-red:hover:not(:disabled) { background: #932e26; }
-.a1-btn-ghost { background: transparent; color: var(--a1-navy); border-color: var(--a1-line); }
-.a1-btn-ghost:hover:not(:disabled) { background: var(--a1-navy-soft); }
+.a1-btn-sm { padding: 4px 10px; font-size: 12px; height: 32px; border-radius: 8px; }
+.a1-btn-primary { background: #1E3A5F; color: #fff; }
+.a1-btn-primary:hover:not(:disabled) { background: #142843; }
+.a1-btn-amber { background: #F59E0B; color: #fff; }
+.a1-btn-amber:hover:not(:disabled) { background: #D97706; }
+.a1-btn-red { background: #DC2626; color: #fff; }
+.a1-btn-red:hover:not(:disabled) { background: #B91C1C; }
+.a1-btn-ghost { background: #FFFFFF; color: #0F172A; border-color: #E5E7EB; }
+.a1-btn-ghost:hover:not(:disabled) { background: #F8FAFC; border-color: #CBD5E1; }
+.a1-btn-danger { color: #DC2626; border-color: #FCA5A5; }
+.a1-btn-danger:hover:not(:disabled) { background: #FEE2E2; border-color: #F87171; }
 
 /* ---- Filter bar ---- */
 .a1-filterbar { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; background: #fff; border: 1px solid var(--a1-line); border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; }
@@ -168,18 +171,26 @@
 .a1-view-toggle button.a1-vt-active { background: var(--a1-navy-soft); color: var(--a1-navy); }
 
 /* ---- Exam cards ---- */
-.a1-exam-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
-.a1-exam-card { background: #fff; border: 1px solid var(--a1-line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; transition: all .18s; min-width: 0; box-sizing: border-box; }
-.a1-exam-card:hover { box-shadow: 0 6px 20px rgba(22, 53, 92, .1); transform: translateY(-2px); border-color: #cddcf0; }
-.a1-exam-card-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
-.a1-exam-card-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-.a1-exam-card-title { font-size: 15px; font-weight: 700; color: var(--a1-navy); margin: 0; line-height: 1.35; word-break: break-word; }
-.a1-exam-card-sub { font-size: 11.5px; color: var(--a1-mut); margin-top: 4px; }
-.a1-exam-card-facts { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--a1-mut); padding: 10px 0; border-top: 1px solid var(--a1-line); border-bottom: 1px solid var(--a1-line); margin: 6px 0 12px; }
-.a1-exam-card-facts b { color: var(--a1-ink); font-family: "Consolas", monospace; }
-.a1-exam-card-foot { display: flex; flex-direction: column; gap: 10px; margin-top: auto; padding-top: 6px; }
-.a1-exam-card-status-row { display: flex; align-items: center; justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 6px; }
-.a1-exam-card-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; width: 100%; }
+.a1-exam-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+@media (max-width: 1120px) { .a1-exam-cards { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 720px) { .a1-exam-cards { grid-template-columns: 1fr; } }
+
+.a1-exam-card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; min-height: 210px; max-height: 230px; box-shadow: 0 6px 18px rgba(0, 0, 0, .06); box-sizing: border-box; }
+.a1-exam-card:hover { box-shadow: 0 12px 30px rgba(0, 0, 0, .10); transform: translateY(-4px); border-color: #CBD5E1; }
+.a1-exam-card-head { display: flex; align-items: center; gap: 12px; }
+.a1-exam-card-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.a1-exam-card-title { font-size: 20px; font-weight: 700; color: #0F172A; margin: 0; line-height: 1.25; word-break: break-word; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.a1-exam-card-sub { font-size: 13px; color: #64748B; margin-top: 2px; }
+
+/* ---- KPI chips inside exam card ---- */
+.a1-exam-card-kpis { display: flex; gap: 8px; margin: 12px 0; width: 100%; }
+.a1-exam-kpi-chip { flex: 1; background: #F8FAFC; border: 1px solid #E5E7EB; border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.a1-kpi-chip-label { font-size: 11px; font-weight: 600; color: #64748B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.a1-kpi-chip-val { font-size: 14px; font-weight: 700; color: #0F172A; }
+
+.a1-exam-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: auto; }
+.a1-exam-card-status-col { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.a1-exam-card-actions { display: flex; align-items: center; gap: 6px; }
 
 /* ---- Pending approval badge (inline) ---- */
 .a1-pending-badge { display: inline-flex; align-items: center; gap: 4px; background: var(--a1-amber-soft); color: #9a6210; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-left: 6px; }

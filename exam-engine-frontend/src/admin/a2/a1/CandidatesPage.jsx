@@ -1,14 +1,14 @@
 // A1 · Task 5 — Candidates
 // Table (name/email/exam/status/locked/last attempt) · filters ·
 // 30-day lock override, gated behind four-eyes approval.
-
+ 
 import React, { useEffect, useMemo, useState } from "react";
 import { fetchCandidates, fetchExams, approveCandidateOverride } from "./api";
 import { RequestApprovalModal } from "./FourEyes";
 import "./a1.css";
-
+ 
 const PAGE_SIZE = 8;
-
+ 
 const STATUS_LABEL = {
     PASSED: "Passed",
     FAILED: "Failed",
@@ -16,44 +16,44 @@ const STATUS_LABEL = {
     IN_PROGRESS: "In Progress",
     NOT_STARTED: "Not Started",
 };
-
+ 
 export default function CandidatesPage() {
     const [rows, setRows] = useState(null);
     const [allExams, setAllExams] = useState([]);
     const [filters, setFilters] = useState({ q: "", status: "", exam: "", locked: "" });
     const [page, setPage] = useState(1);
     const [overrideFor, setOverrideFor] = useState(null); // candidate object
-
+ 
     const load = async () => {
         const res = await fetchCandidates(filters);
         setRows(res?.rows || res || []);
-
+ 
         try {
             const exams = await fetchExams();
             const examsList = exams?.rows || exams || [];
             setAllExams(examsList.map((e) => e.title || e.name || e));
         } catch (e) { }
     };
-
+ 
     useEffect(() => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters]);
-
+ 
     const examOptions = useMemo(() => {
         const fromCandidates = rows ? rows.map((c) => c.examTitle).filter(Boolean) : [];
         const combined = [...new Set([...allExams, ...fromCandidates])];
         return combined.sort();
     }, [rows, allExams]);
-
+ 
     const pageRows = useMemo(() => {
         if (!rows) return [];
         const start = (page - 1) * PAGE_SIZE;
         return rows.slice(start, start + PAGE_SIZE);
     }, [rows, page]);
-
+ 
     const totalPages = rows ? Math.max(1, Math.ceil(rows.length / PAGE_SIZE)) : 1;
-
+ 
     const submitOverride = async () => {
         console.log("Override For:", overrideFor);
         await approveCandidateOverride(
@@ -61,11 +61,11 @@ export default function CandidatesPage() {
             overrideFor.examId
         );
         alert("Candidate unlocked successfully.");
-
+ 
         setOverrideFor(null);
         await load();
     };
-
+ 
     return (
         <div className="a1-page">
             <header className="a1-page-head">
@@ -75,8 +75,8 @@ export default function CandidatesPage() {
                 </div>
                 <button className="a1-btn a1-btn-ghost" onClick={load}>↻ Refresh</button>
             </header>
-
-
+ 
+ 
             <div className="a1-filterbar">
                 <div className="a1-field">
                     <label>Search</label>
@@ -111,7 +111,7 @@ export default function CandidatesPage() {
                     </select>
                 </div>
             </div>
-
+ 
             {!rows ? (
                 <div className="a1-loading">Loading candidates…</div>
             ) : rows.length === 0 ? (
@@ -155,7 +155,7 @@ export default function CandidatesPage() {
                     </tbody>
                 </table>
             )}
-
+ 
             {rows && rows.length > PAGE_SIZE && (
                 <div style={{ display: "flex", justifyContent: "center", gap: 10, marginTop: 16 }}>
                     <button className="a1-btn a1-btn-ghost a1-btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← Prev</button>
@@ -163,7 +163,7 @@ export default function CandidatesPage() {
                     <button className="a1-btn a1-btn-ghost a1-btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next →</button>
                 </div>
             )}
-
+ 
             <RequestApprovalModal
                 open={!!overrideFor}
                 title={overrideFor ? `Override lock for ${overrideFor.candidateName}?` : ""}
