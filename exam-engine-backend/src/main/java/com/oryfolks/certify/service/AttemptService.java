@@ -6,6 +6,7 @@ import com.oryfolks.certify.dto.StartExamResponseDTO;
 import com.oryfolks.certify.dto.SubmitExamRequestDTO;
 import com.oryfolks.certify.dto.SubmitExamResponseDTO;
 import com.oryfolks.certify.entity.*;
+import com.oryfolks.certify.enums.CompetencyLevel;
 import com.oryfolks.certify.enums.ExamStatus;
 import com.oryfolks.certify.enums.ResultStatus;
 import com.oryfolks.certify.exception.BadRequestException;
@@ -176,6 +177,10 @@ public class AttemptService {
                 ExamAttempt attempt = attemptRepository.findById(attemptId)
                                 .orElseThrow(() -> new ResourceNotFoundException("Exam attempt not found."));
 
+                if (attempt.getResultStatus() != ResultStatus.IN_PROGRESS) {
+                        return;
+                }
+
                 String snapshotUrl = null;
 
                 if (snapshot != null && !snapshot.isEmpty()) {
@@ -234,8 +239,12 @@ public class AttemptService {
 
                 // Validate attempt status
                 if (attempt.getResultStatus() != ResultStatus.IN_PROGRESS) {
-                        throw new BadRequestException(
-                                        "This exam has already been submitted or completed.");
+                        return SubmitExamResponseDTO.builder()
+                                        .attemptId(attempt.getId())
+                                        .status(attempt.getResultStatus())
+                                        .message("Exam was already submitted.")
+                                        .submittedAt(attempt.getEndTime() != null ? attempt.getEndTime() : LocalDateTime.now())
+                                        .build();
                 }
 
                 // Validate unanswered questions only for normal submission
@@ -262,55 +271,98 @@ public class AttemptService {
                         }
                 }
 
-                // Convert submitted answers into AttemptAnswer entities
-                List<AttemptAnswer> attemptAnswers = new ArrayList<>();
-
-                Set<UUID> uniqueQuestionIds = new HashSet<>();
-
-                for (AnswerSubmission answer : request.getAnswers()) {
-
-                        validateSelectedOption(answer.getSelectedOption());
-
-                        if (!uniqueQuestionIds.add(answer.getQuestionId())) {
-                                throw new BadRequestException(
-                                                "Duplicate answers detected for question: " + answer.getQuestionId());
+                // Save submitted answers if present
+                if (request.getAnswers() != null && !request.getAnswers().isEmpty()) {
+                        Set<UUID> uniqueQuestionIds = new HashSet<>();
+                        List<AttemptAnswer> newAnswers = new ArrayList<>();
+                        for (AnswerSubmission answer : request.getAnswers()) {
+                                if (answer.getQuestionId() != null && answer.getSelectedOption() != null) {
+                                        if (uniqueQuestionIds.add(answer.getQuestionId())) {
+                                                Question question = questionRepository.findById(answer.getQuestionId()).orElse(null);
+                                                if (question != null) {
+                                                        newAnswers.add(AttemptAnswer.builder()
+                                                                        .attempt(attempt)
+                                                                        .question(question)
+                                                                        .selectedOption(answer.getSelectedOption())
+                                                                        .build());
+                                                }
+                                        }
+                                }
                         }
-
-                        Question question = questionRepository.findById(answer.getQuestionId())
-                                        .orElseThrow(() -> new ResourceNotFoundException(
-                                                        "Question not found: " + answer.getQuestionId()));
-
-                        if (!question.getExam().getId().equals(attempt.getExam().getId())) {
-                                throw new BadRequestException(
-                                                "Question does not belong to this exam.");
+                        if (!newAnswers.isEmpty()) {
+                                attemptAnswerRepository.deleteByAttemptId(attempt.getId());
+                                attemptAnswerRepository.saveAll(newAnswers);
                         }
-
-                        AttemptAnswer attemptAnswer = AttemptAnswer.builder()
-                                        .attempt(attempt)
-                                        .question(question)
-                                        .selectedOption(answer.getSelectedOption())
-                                        .build();
-
-                        attemptAnswers.add(attemptAnswer);
                 }
 
-                // Remove previously stored answers for this attempt (if any)
-                attemptAnswerRepository.deleteByAttemptId(attempt.getId());
+                // Fetch all saved attempt answers for evaluation
+                List<AttemptAnswer> savedAttemptAnswers = attemptAnswerRepository.findByAttemptId(attempt.getId());
 
-                // Save latest submitted answers
-                attemptAnswerRepository.saveAll(attemptAnswers);
+                // Calculate score & level
+                Exam exam = attempt.getExam();
+                List<Question> questions = questionRepository.findByExamIdAndIsActiveTrue(exam.getId());
+                if (questions.isEmpty()) {
+                        questions = questionRepository.findByExamId(exam.getId());
+                }
+                if (questions.isEmpty() && exam.getStack() != null && !exam.getStack().isBlank()) {
+                        questions = questionRepository.findByStackIgnoreCaseAndIsActiveTrue(exam.getStack());
+                        if (questions.isEmpty()) {
+                                questions = questionRepository.findByStackIgnoreCase(exam.getStack());
+                        }
+                }
+                if (questions.isEmpty()) {
+                        questions = questionRepository.findByIsActiveTrue();
+                }
 
-                // Update exam attempt
-                attempt.setResultStatus(ResultStatus.SUBMITTED);
+                int totalMarks = 0;
+                int earnedMarks = 0;
+
+                for (Question q : questions) {
+                        int qMarks = (q.getMarks() != null && q.getMarks() > 0) ? q.getMarks() : 1;
+                        totalMarks += qMarks;
+
+                        String correct = q.getCorrectOption() != null ? q.getCorrectOption().trim() : "";
+                        Optional<AttemptAnswer> ansOpt = savedAttemptAnswers.stream()
+                                        .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
+                                        .findFirst();
+
+                        if (ansOpt.isPresent() && !correct.isEmpty() && ansOpt.get().getSelectedOption() != null) {
+                                String userSelected = ansOpt.get().getSelectedOption().trim();
+                                if (correct.equalsIgnoreCase(userSelected)) {
+                                        earnedMarks += qMarks;
+                                }
+                        }
+                }
+
+                int finalScore = totalMarks > 0 ? (int) Math.round(((double) earnedMarks / totalMarks) * 100) : 0;
+                attempt.setScore(finalScore);
                 attempt.setEndTime(LocalDateTime.now());
+
+                CompetencyLevel level = CompetencyLevel.L5;
+                List<CompetencyBand> bands = exam.getCompetencyBands();
+                if (bands != null) {
+                        for (CompetencyBand band : bands) {
+                                if (finalScore >= band.getMinScore() && finalScore <= band.getMaxScore()) {
+                                        level = band.getLevelName();
+                                        break;
+                                }
+                        }
+                }
+                attempt.setAssignedLevel(level);
+
+                if (finalScore >= exam.getPassMark()) {
+                        attempt.setResultStatus(ResultStatus.PASSED);
+                } else {
+                        attempt.setResultStatus(ResultStatus.FAILED);
+                }
 
                 attemptRepository.save(attempt);
 
                 // Return response
                 return SubmitExamResponseDTO.builder()
                                 .attemptId(attempt.getId())
-                                .status(ResultStatus.SUBMITTED)
-                                .message("Exam submitted successfully. Your results will be published after admin review.")
+                                .status(attempt.getResultStatus())
+                                .message("Exam submitted successfully.")
                                 .submittedAt(attempt.getEndTime())
                                 .build();
         }
@@ -325,7 +377,11 @@ public class AttemptService {
                 Question question = questionRepository.findById(submission.getQuestionId())
                                 .orElseThrow(() -> new ResourceNotFoundException("Question not found."));
 
-                if (!question.getExam().getId().equals(attempt.getExam().getId())) {
+                if (question.getExam() == null) {
+                        question.setExam(attempt.getExam());
+                        questionRepository.save(question);
+                } else if (!question.getExam().getId().equals(attempt.getExam().getId())
+                                && (question.getStack() == null || attempt.getExam().getStack() == null || !question.getStack().equalsIgnoreCase(attempt.getExam().getStack()))) {
                         throw new BadRequestException(
                                         "Question does not belong to this exam.");
                 }

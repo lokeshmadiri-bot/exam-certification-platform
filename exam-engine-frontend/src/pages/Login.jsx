@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, Award, ShieldCheck, Info, Loader } from 'lucide-react';
-import { authService } from '../services/api';
+import { authService } from '../modules/candidate/services/api';
 import Toast from '../components/common/Toast';
 
 export default function Login() {
@@ -30,8 +30,12 @@ export default function Login() {
         setToastShow(true);
         setTimeout(() => {
           if (response.data.role === 'ROLE_ADMIN') {
+            // Store token under both keys so the admin API layer finds it
+            localStorage.setItem('admin_token', response.data.token);
             navigate('/admin');
           } else {
+            // Clear any stale admin token
+            localStorage.removeItem('admin_token');
             navigate('/candidate');
           }
         }, 1000);

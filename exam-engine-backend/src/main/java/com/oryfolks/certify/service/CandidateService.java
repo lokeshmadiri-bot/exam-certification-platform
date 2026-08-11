@@ -146,6 +146,16 @@ public class CandidateService {
                                                 .build())
                                 .toList();
 
+                CompetencyBand band = null;
+                if (attempt.getExam() != null && attempt.getExam().getCompetencyBands() != null && attempt.getAssignedLevel() != null) {
+                    band = attempt.getExam().getCompetencyBands().stream()
+                            .filter(cb -> cb.getLevelName() == attempt.getAssignedLevel())
+                            .findFirst().orElse(null);
+                }
+
+                String levelStr = attempt.getAssignedLevel() != null ? attempt.getAssignedLevel().name() : "L3";
+                String levelTitle = band != null ? band.getTitle() : "Intermediate Developer";
+
                 return AttemptDetailsResponseDTO.builder()
                                 .attemptId(attempt.getId())
                                 .examId(attempt.getExam().getId())
@@ -153,8 +163,11 @@ public class CandidateService {
                                 .stack(attempt.getExam().getStack())
                                 .startedAt(attempt.getStartTime())
                                 .submittedAt(attempt.getEndTime())
+                                .score(attempt.getScore())
                                 .resultStatus(attempt.getResultStatus())
-                                .resultPublishStatus(attempt.getResultPublishStatus())
+                                .resultPublishStatus(attempt.getResultPublishStatus() != null ? attempt.getResultPublishStatus() : ResultPublishStatus.PENDING)
+                                .assignedLevel(levelStr)
+                                .assignedLevelTitle(levelTitle)
                                 .answers(answers)
                                 .integrityViolations(violations)
                                 .build();

@@ -11,5 +11,8 @@ import java.util.UUID;
 public interface QuestionRepository extends JpaRepository<Question, UUID> {
     List<Question> findByExamIdAndIsActiveTrue(UUID examId);
     List<Question> findByExamId(UUID examId);
+    List<Question> findByStackIgnoreCaseAndIsActiveTrue(String stack);
+    List<Question> findByStackIgnoreCase(String stack);
     List<Question> findByIsActiveTrue();
+    List<Question> findAllByOrderByCreatedAtDesc();
 }

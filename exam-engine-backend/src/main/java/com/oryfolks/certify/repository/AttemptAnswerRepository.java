@@ -14,4 +14,6 @@ public interface AttemptAnswerRepository extends JpaRepository<AttemptAnswer, UU
 
     void deleteByAttemptId(UUID attemptId);
 
+    long countByAttemptId(UUID attemptId);
+
 }

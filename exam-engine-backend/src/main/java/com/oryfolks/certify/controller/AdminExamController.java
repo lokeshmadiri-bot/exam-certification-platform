@@ -1,8 +1,7 @@
 package com.oryfolks.certify.controller;
 
 import com.oryfolks.certify.entity.*;
-import com.oryfolks.certify.enums.CompetencyLevel;
-import com.oryfolks.certify.enums.ExamStatus;
+import com.oryfolks.certify.enums.*;
 import com.oryfolks.certify.repository.*;
 import com.oryfolks.certify.response.ApiResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,7 +59,6 @@ public class AdminExamController {
 
     @Autowired
     private RecordingSessionRepository recordingSessionRepository;
-
     @GetMapping
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getExams(
@@ -95,7 +93,7 @@ public class AdminExamController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<Exam>> createExam(@RequestBody Exam exam, Principal principal) {
-        if (exam.getStatus() == null) exam.setStatus(ExamStatus.DRAFT);
+        if (exam.getStatus() == null) exam.setStatus(ExamStatus.ACTIVE);
         if (exam.getVersion() == null) exam.setVersion("1");
 
         // Sync field aliases
@@ -272,32 +270,30 @@ public class AdminExamController {
             Exam exam = examRepository.findById(id)
                     .orElseThrow(() -> new com.oryfolks.certify.exception.ResourceNotFoundException("Exam not found with id: " + id));
 
-            String note = body != null ? body.getOrDefault("note", "") : "";
+            // Directly activate the exam — no approval queue needed
+            exam.setStatus(ExamStatus.ACTIVE);
+            Exam saved = examRepository.save(exam);
 
-            ApprovalRequest req = ApprovalRequest.builder()
-                    .type("EXAM_ACTIVATE")
-                    .label("Activate exam · " + exam.getTitle())
-                    .targetId(id.toString())
-                    .requestedBy(principal != null && principal.getName() != null ? principal.getName() : "Admin User")
-                    .note(note)
-                    .status("PENDING")
-                    .requestedAt(java.time.LocalDateTime.now())
-                    .createdAt(java.time.LocalDateTime.now())
-                    .build();
-
-            ApprovalRequest saved = approvalRepository.save(req);
+            auditLogRepository.save(AccessAuditLog.builder()
+                    .userName(principal != null ? principal.getName() : "Admin User")
+                    .action("ACTIVATE_EXAM")
+                    .module("Exams Library")
+                    .oldValue("DRAFT/INACTIVE")
+                    .newValue(saved.getId().toString())
+                    .build());
 
             Map<String, Object> res = new HashMap<>();
             res.put("ok", true);
-            res.put("approval", saved);
-            return ResponseEntity.ok(ApiResponse.success("Activation approval requested", res));
+            res.put("status", saved.getStatus());
+            res.put("examId", saved.getId());
+            return ResponseEntity.ok(ApiResponse.success("Exam activated successfully", res));
         } catch (com.oryfolks.certify.exception.ResourceNotFoundException e) {
             return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
                     .body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError()
-                    .body(ApiResponse.error("Failed to request activation: " + e.getMessage()));
+                    .body(ApiResponse.error("Failed to activate exam: " + e.getMessage()));
         }
     }
 
@@ -310,32 +306,30 @@ public class AdminExamController {
             Exam exam = examRepository.findById(id)
                     .orElseThrow(() -> new com.oryfolks.certify.exception.ResourceNotFoundException("Exam not found with id: " + id));
 
-            String note = body != null ? body.getOrDefault("note", "") : "";
+            // Directly deactivate the exam
+            exam.setStatus(ExamStatus.INACTIVE);
+            Exam saved = examRepository.save(exam);
 
-            ApprovalRequest req = ApprovalRequest.builder()
-                    .type("EXAM_DEACTIVATE")
-                    .label("Deactivate exam · " + exam.getTitle())
-                    .targetId(id.toString())
-                    .requestedBy(principal != null && principal.getName() != null ? principal.getName() : "Admin User")
-                    .note(note)
-                    .status("PENDING")
-                    .requestedAt(java.time.LocalDateTime.now())
-                    .createdAt(java.time.LocalDateTime.now())
-                    .build();
-
-            ApprovalRequest saved = approvalRepository.save(req);
+            auditLogRepository.save(AccessAuditLog.builder()
+                    .userName(principal != null ? principal.getName() : "Admin User")
+                    .action("DEACTIVATE_EXAM")
+                    .module("Exams Library")
+                    .oldValue("ACTIVE")
+                    .newValue(saved.getId().toString())
+                    .build());
 
             Map<String, Object> res = new HashMap<>();
             res.put("ok", true);
-            res.put("approval", saved);
-            return ResponseEntity.ok(ApiResponse.success("Deactivation approval requested", res));
+            res.put("status", saved.getStatus());
+            res.put("examId", saved.getId());
+            return ResponseEntity.ok(ApiResponse.success("Exam deactivated successfully", res));
         } catch (com.oryfolks.certify.exception.ResourceNotFoundException e) {
             return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
                     .body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError()
-                    .body(ApiResponse.error("Failed to request deactivation: " + e.getMessage()));
+                    .body(ApiResponse.error("Failed to deactivate exam: " + e.getMessage()));
         }
     }
 

@@ -13,7 +13,7 @@ import {
   BookMarked,
   LogOut
 } from 'lucide-react';
-import { authService } from '../../services/api';
+import { authService } from '../../modules/candidate/services/api';
 
 export default function Sidebar({ user, onNavClose }) {
   const navigate = useNavigate();

@@ -32,6 +32,9 @@ public class ApprovalsController {
     private AccessAuditLogRepository auditLogRepository;
 
     @Autowired
+    private ExamAttemptRepository attemptRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @GetMapping("/pending")
@@ -100,6 +103,13 @@ public class ApprovalsController {
             try {
                 UUID candidateId = UUID.fromString(req.getTargetId());
                 User candidate = userRepository.findById(candidateId).orElse(null);
+                if (candidate != null) {
+                    List<ExamAttempt> candidateAttempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(candidate.getId());
+                    for (ExamAttempt a : candidateAttempts) {
+                        a.setRetryOverrideApproved(true);
+                        attemptRepository.save(a);
+                    }
+                }
                 String candName = candidate != null ? candidate.getFullName() : req.getTargetId();
                 auditLogRepository.save(AccessAuditLog.builder()
                         .userName(adminName)

@@ -117,8 +117,4 @@ public class ExamAttempt {
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
 
-    @Builder.Default
-    @Column(name = "retry_override_approved", nullable = false)
-    private Boolean retryOverrideApproved = false;
-
 }

@@ -34,18 +34,19 @@
 
         public List<ExamCardResponseDTO> getAvailableExams() {
 
-            List<Exam> exams = examRepository.findByStatus(ExamStatus.ACTIVE);
+            List<Exam> exams = examRepository.findAll();
 
             return exams.stream()
+                    .filter(exam -> exam.getStatus() == null || exam.getStatus() == ExamStatus.ACTIVE || exam.getStatus() == ExamStatus.DRAFT)
                     .map(exam -> ExamCardResponseDTO.builder()
                             .examId(exam.getId())
                             .title(exam.getTitle())
                             .stack(exam.getStack())
-                            .durationMinutes(exam.getDurationMinutes())
-                            .perAttempt(exam.getPerAttempt())
-                            .passMark(exam.getPassMark())
-                            .version(exam.getVersion())
-                            .status(exam.getStatus())
+                            .durationMinutes(exam.getDurationMinutes() != null ? exam.getDurationMinutes() : (exam.getDurationMin() != null ? exam.getDurationMin() : 60))
+                            .perAttempt(exam.getPerAttempt() != null ? exam.getPerAttempt() : (exam.getQuestionsPerAttempt() != null ? exam.getQuestionsPerAttempt() : 25))
+                            .passMark(exam.getPassMark() != null ? exam.getPassMark() : 60)
+                            .version(exam.getVersion() != null ? exam.getVersion() : "1")
+                            .status(exam.getStatus() != null ? exam.getStatus() : ExamStatus.ACTIVE)
                             .build())
                     .toList();
         }
@@ -102,7 +103,9 @@
 
         @Transactional
         public Exam createExam(Exam exam) {
-
+            if (exam.getStatus() == null) {
+                exam.setStatus(ExamStatus.ACTIVE);
+            }
             if (exam.getCompetencyBands() == null || exam.getCompetencyBands().isEmpty()) {
                 List<CompetencyBand> defaultBands = List.of(
                         CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L1).title("Expert").minScore(90).maxScore(100).build(),
