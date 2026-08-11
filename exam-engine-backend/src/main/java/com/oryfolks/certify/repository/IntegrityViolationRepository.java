@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface IntegrityViolationRepository extends JpaRepository<IntegrityViolation, UUID> {
     List<IntegrityViolation> findByAttemptIdOrderByCreatedAtAsc(UUID attemptId);
+    void deleteByAttemptId(UUID attemptId);
 }

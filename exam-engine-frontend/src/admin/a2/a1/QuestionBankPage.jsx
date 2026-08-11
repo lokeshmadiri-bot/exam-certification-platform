@@ -44,7 +44,7 @@ const emptyQuestion = {
 export default function QuestionBankPage() {
     const [rows, setRows] = useState(null);
     const [exams, setExams] = useState([]);
-    const [filters, setFilters] = useState({ q: "", stack: "", type: "", level: "", status: "" });
+    const [filters, setFilters] = useState({ q: "", examId: "", stack: "", type: "", level: "", status: "" });
     const [page, setPage] = useState(1);
     const [selected, setSelected] = useState(new Set());
     const [editing, setEditing] = useState(null); // question object or {} for new
@@ -64,14 +64,43 @@ export default function QuestionBankPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters]);
 
-    const pageRows = useMemo(() => {
+    const filteredRows = useMemo(() => {
         if (!rows) return [];
-        const start = (page - 1) * PAGE_SIZE;
-        return rows.slice(start, start + PAGE_SIZE);
-    }, [rows, page]);
+        let result = rows;
+        if (filters.q) {
+            const query = filters.q.toLowerCase();
+            result = result.filter((q) =>
+                (q.questionText || q.title || "").toLowerCase().includes(query) ||
+                (q.topic || "").toLowerCase().includes(query)
+            );
+        }
+        if (filters.examId) {
+            const selectedExam = exams.find((e) => String(e.id || e.examId) === String(filters.examId));
+            result = result.filter((q) => {
+                const qExamId = q.examId || q.exam?.id || q.exam_id;
+                if (qExamId) return String(qExamId) === String(filters.examId);
+                if (selectedExam) {
+                    const title = q.examTitle || q.examName || (typeof q.exam === "string" ? q.exam : q.exam?.title);
+                    if (title) return title === selectedExam.title;
+                    return q.stack === selectedExam.stack;
+                }
+                return false;
+            });
+        }
+        if (filters.stack) result = result.filter((q) => q.stack === filters.stack);
+        if (filters.type) result = result.filter((q) => q.type === filters.type);
+        if (filters.level) result = result.filter((q) => q.level === filters.level);
+        if (filters.status) result = result.filter((q) => q.status === filters.status);
+        return result;
+    }, [rows, filters, exams]);
 
-    const totalPages = rows ? Math.max(1, Math.ceil(rows.length / PAGE_SIZE)) : 1;
-    const activeCount = rows ? rows.filter((q) => q.status === "ACTIVE").length : 0;
+    const pageRows = useMemo(() => {
+        const start = (page - 1) * PAGE_SIZE;
+        return filteredRows.slice(start, start + PAGE_SIZE);
+    }, [filteredRows, page]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+    const activeCount = filteredRows.filter((q) => q.status === "ACTIVE").length;
 
     const toggleSelect = (id) =>
         setSelected((prev) => {
@@ -114,7 +143,7 @@ export default function QuestionBankPage() {
     };
 
     const exportSelectedQuestions = () => {
-        const items = (rows || []).filter((q) => selected.size === 0 || selected.has(q.id));
+        const items = filteredRows.filter((q) => selected.size === 0 || selected.has(q.id));
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(items, null, 2));
         const downloadAnchor = document.createElement("a");
         downloadAnchor.setAttribute("href", dataStr);
@@ -158,7 +187,7 @@ export default function QuestionBankPage() {
 
             <div className="a1-pool-note">
                 Example: Question Pool = 120 · Per Attempt = 30 · Minimum Required Questions = 30.
-                {rows && ` Active questions matching current filters: ${activeCount} of ${rows.length}.`}
+                {rows && ` Active questions matching current filters: ${activeCount} of ${filteredRows.length}.`}
             </div>
 
             {/* Filter bar */}
@@ -170,6 +199,15 @@ export default function QuestionBankPage() {
                         value={filters.q}
                         onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, q: e.target.value })); }}
                     />
+                </div>
+                <div className="a1-field">
+                    <label>Assigned Exam</label>
+                    <select value={filters.examId} onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, examId: e.target.value })); }}>
+                        <option value="">All Exams</option>
+                        {exams.map((ex) => (
+                            <option key={ex.id} value={ex.id}>{ex.title}</option>
+                        ))}
+                    </select>
                 </div>
                 <div className="a1-field">
                     <label>Stack</label>
@@ -205,7 +243,7 @@ export default function QuestionBankPage() {
             {/* Questions Table */}
             {!rows ? (
                 <div className="a1-loading">Loading questions…</div>
-            ) : rows.length === 0 ? (
+            ) : filteredRows.length === 0 ? (
                 <div className="a1-empty">No questions match your filters.</div>
             ) : (
                 <table className="a1-table a1-table-hover">
@@ -215,7 +253,7 @@ export default function QuestionBankPage() {
                                 <input type="checkbox" checked={pageRows.length > 0 && pageRows.every((q) => selected.has(q.id))} onChange={toggleSelectAllPage} />
                             </th>
                             <th>Question</th>
-                            <th>Exam</th>
+                            <th>Assigned Exam</th>
                             <th>Stack</th>
                             <th>Type</th>
                             <th>Difficulty</th>
@@ -225,51 +263,61 @@ export default function QuestionBankPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {pageRows.map((q) => (
-                            <tr key={q.id}>
-                                <td className="a1-checkbox-col">
-                                    <input type="checkbox" checked={selected.has(q.id)} onChange={() => toggleSelect(q.id)} />
-                                </td>
-                                <td>
-                                    <div style={{ fontWeight: 600, color: "var(--a1-navy)", fontSize: 13.5 }}>
-                                        {q.questionText || q.title}
-                                    </div>
-                                    {q.topic && <span className="a1-sub" style={{ fontSize: 11, color: "var(--a1-mut)" }}>Topic: {q.topic} · Marks: {q.marks || 1}</span>}
-                                </td>
-                                <td>
-                                    <span className="a1-pill a1-pill-navy" style={{ fontWeight: 600 }}>
-                                        {q.exam?.title || (exams.find((e) => e.id === (q.examId || q.exam?.id))?.title) || "Assigned Exam"}
-                                    </span>
-                                </td>
-                                <td>{q.stack}</td>
-                                <td><span className="a1-pill a1-pill-navy">{TYPE_LABEL[q.type] || q.type}</span></td>
-                                <td>
-                                    <span className={`a1-pill a1-lvl-${q.level}`}>{q.level || "L1"}</span>
-                                    {q.difficulty && <span className="a1-pill a1-pill-amber" style={{ marginLeft: 4 }}>{q.difficulty}</span>}
-                                </td>
-                                <td>
-                                    <span className={`a1-pill ${q.source === "AI" ? "a1-pill-green" : "a1-pill"}`}>
-                                        {q.source || "MANUAL"}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span className={`a1-pill ${q.status === "ACTIVE" ? "a1-pill-green" : ""}`}>{q.status}</span>
-                                </td>
-                                <td>
-                                    <div style={{ display: "flex", gap: 6 }}>
-                                        <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => setViewing(q)}>View</button>
-                                        <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => setEditing(q)}>Edit</button>
-                                        <button className="a1-btn a1-btn-red a1-btn-sm" onClick={() => setConfirmDelete(q)}>Delete</button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
+                        {pageRows.map((q) => {
+                            const assignedExamTitle =
+                                q.exam?.title ||
+                                q.examTitle ||
+                                q.examName ||
+                                (typeof q.exam === "string" && q.exam.trim() ? q.exam : null) ||
+                                (exams.find((e) => String(e.id || e.examId) === String(q.examId || q.exam?.id || q.exam_id) || e.title === q.exam || e.title === q.examTitle)?.title) ||
+                                (exams.find((e) => e.stack === q.stack)?.title) ||
+                                (q.stack ? `${q.stack} Certification Exam` : "General Certification Pool");
+                            return (
+                                <tr key={q.id}>
+                                    <td className="a1-checkbox-col">
+                                        <input type="checkbox" checked={selected.has(q.id)} onChange={() => toggleSelect(q.id)} />
+                                    </td>
+                                    <td>
+                                        <div style={{ fontWeight: 600, color: "var(--a1-navy)", fontSize: 13.5 }}>
+                                            {q.questionText || q.title}
+                                        </div>
+                                        {q.topic && <span className="a1-sub" style={{ fontSize: 11, color: "var(--a1-mut)" }}>Topic: {q.topic} · Marks: {q.marks || 1}</span>}
+                                    </td>
+                                    <td>
+                                        <span className="a1-pill a1-pill-navy" style={{ fontWeight: 600 }}>
+                                            {assignedExamTitle}
+                                        </span>
+                                    </td>
+                                    <td>{q.stack}</td>
+                                    <td><span className="a1-pill a1-pill-navy">{TYPE_LABEL[q.type] || q.type}</span></td>
+                                    <td>
+                                        <span className={`a1-pill a1-lvl-${q.level}`}>{q.level || "L1"}</span>
+                                        {q.difficulty && <span className="a1-pill a1-pill-amber" style={{ marginLeft: 4 }}>{q.difficulty}</span>}
+                                    </td>
+                                    <td>
+                                        <span className={`a1-pill ${q.source === "AI" ? "a1-pill-green" : "a1-pill"}`}>
+                                            {q.source || "MANUAL"}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span className={`a1-pill ${q.status === "ACTIVE" ? "a1-pill-green" : ""}`}>{q.status}</span>
+                                    </td>
+                                    <td>
+                                        <div style={{ display: "flex", gap: 6 }}>
+                                            <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => setViewing(q)}>View</button>
+                                            <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => setEditing(q)}>Edit</button>
+                                            <button className="a1-btn a1-btn-red a1-btn-sm" onClick={() => setConfirmDelete(q)}>Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             )}
 
             {/* Pagination */}
-            {rows && rows.length > PAGE_SIZE && (
+            {filteredRows && filteredRows.length > PAGE_SIZE && (
                 <div style={{ display: "flex", justifyContent: "center", gap: 10, marginTop: 16 }}>
                     <button className="a1-btn a1-btn-ghost a1-btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← Prev</button>
                     <span className="a1-sub">Page {page} of {totalPages}</span>
@@ -380,9 +428,12 @@ function QuestionModal({ question, exams = [], onCancel, onSave }) {
         e.preventDefault();
         setBusy(true);
         try {
+            const selectedExam = exams.find((e) => String(e.id) === String(form.examId));
             await onSave({
                 ...form,
-                exam: form.examId ? { id: form.examId } : null,
+                examId: form.examId || null,
+                examTitle: selectedExam?.title || null,
+                exam: form.examId ? { id: form.examId, title: selectedExam?.title } : null,
             });
         } finally {
             setBusy(false);
@@ -641,11 +692,8 @@ function ViewQuestionModal({ question, onClose }) {
     return (
         <div className="a1-modal-overlay" onClick={onClose}>
             <div className="a1-modal" onClick={(e) => e.stopPropagation()} style={{ width: "min(680px, 95vw)", maxHeight: "90vh", overflowY: "auto" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                    <div>
-                        <h3 style={{ margin: 0 }}>Question Details</h3>
-                        <p className="a1-sub" style={{ marginTop: 2 }}>ID: {question.id}</p>
-                    </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                    <h3 style={{ margin: 0 }}>Question Details</h3>
                     <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={onClose}>✕</button>
                 </div>
 
