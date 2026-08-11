@@ -84,9 +84,11 @@ public class GovernanceController {
         aiParameters.put("alertWindowSec", gs.getAlertWindowSec());
         aiParameters.put("snapshotResolution", gs.getSnapshotResolution());
 
+        Optional<ApprovalRequest> pendingRet = approvalRepository.findFirstByTypeAndStatus("RETENTION_CHANGE", "PENDING");
+
         Map<String, Object> result = new HashMap<>();
         result.put("retentionDays", gs.getRetentionDays());
-        result.put("pendingRetentionChange", null);
+        result.put("pendingRetentionChange", pendingRet.map(ApprovalRequest::getId).orElse(null));
         result.put("security", security);
         result.put("aiSettings", aiSettings);
         result.put("aiParameters", aiParameters);
@@ -232,6 +234,11 @@ public class GovernanceController {
             @RequestBody(required = false) Map<String, Object> body,
             Principal principal) {
         try {
+            if (approvalRepository.findFirstByTypeAndStatus("RETENTION_CHANGE", "PENDING").isPresent()) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("A retention policy change request is already pending approval."));
+            }
+
             GovernanceSetting gs = getOrInitSettings();
             Object daysObj = body != null ? body.get("days") : null;
             int days = daysObj != null ? Integer.parseInt(daysObj.toString()) : 180;
