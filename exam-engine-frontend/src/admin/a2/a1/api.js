@@ -289,9 +289,19 @@ export const fetchAuditLog = (filters = {}) =>
 // ---------------- Four-eyes / approvals (shared, Task 6) ----------------
 
 export const fetchPendingApprovals = () =>
-    withFallback(() => get("/approvals/pending"), () =>
-        MOCK.approvals.filter((a) => a.status === "PENDING")
-    );
+    withFallback(() => get("/approvals/pending"), () => {
+        const pending = MOCK.approvals.filter((a) => a.status === "PENDING");
+        const seen = new Set();
+        const deduplicated = [];
+        for (const a of pending) {
+            const key = a.type === "RETENTION_CHANGE" ? "RETENTION_CHANGE" : `${a.type}_${a.targetId}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                deduplicated.push(a);
+            }
+        }
+        return deduplicated;
+    });
 
 export const approveRequest = (id, note) =>
     withFallback(() => post(`/approvals/${id}/approve`, { note }), () =>
@@ -429,6 +439,12 @@ function mockArchiveExam(id) {
 }
 
 function mockRequestExamStatus(examId, targetStatus, note) {
+    const existing = MOCK.approvals.find((a) => String(a.targetId) === String(examId) && a.status === "PENDING");
+    if (existing) {
+        const exam = MOCK.exams.find((e) => e.id === examId);
+        if (exam) exam.pendingApproval = existing.id;
+        return { ok: true, approval: existing };
+    }
     const exam = MOCK.exams.find((e) => e.id === examId);
     const title = exam ? exam.title : `Exam (${String(examId).slice(0, 8)}…)`;
     const approval = {
@@ -527,6 +543,11 @@ function mockListCandidates(filters) {
 function mockRequestLockOverride(id, note) {
     const candidate = MOCK.candidates.find((c) => c.id === id);
     if (!candidate) throw new Error("Candidate not found");
+    const existing = MOCK.approvals.find((a) => String(a.targetId) === String(id) && a.status === "PENDING");
+    if (existing) {
+        candidate.pendingApproval = existing.id;
+        return { ok: true, approval: existing };
+    }
     const approval = {
         id: uid("APR"),
         type: "CANDIDATE_UNLOCK",
@@ -562,6 +583,11 @@ function mockUpdateAIParameters(payload) {
 }
 
 function mockRequestRetentionChange(days, note) {
+    const existing = MOCK.approvals.find((a) => a.type === "RETENTION_CHANGE" && a.status === "PENDING");
+    if (existing) {
+        MOCK.governance.pendingRetentionChange = existing.id;
+        return { ok: true, approval: existing };
+    }
     const approval = {
         id: uid("APR"),
         type: "RETENTION_CHANGE",
