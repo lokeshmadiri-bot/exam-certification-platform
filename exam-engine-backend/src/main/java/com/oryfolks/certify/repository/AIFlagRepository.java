@@ -11,4 +11,5 @@ import java.util.UUID;
 public interface AIFlagRepository extends JpaRepository<AIFlag, UUID> {
     List<AIFlag> findByAttemptId(UUID attemptId);
     long countByAttemptId(UUID attemptId);
+    void deleteByAttemptId(UUID attemptId);
 }
