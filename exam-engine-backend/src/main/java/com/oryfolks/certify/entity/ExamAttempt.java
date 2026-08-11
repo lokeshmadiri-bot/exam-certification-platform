@@ -100,7 +100,7 @@ public class ExamAttempt {
     private LocalDateTime createdAt;
 
     @Column(name = "published_at")
-private LocalDateTime publishedAt;
+    private LocalDateTime publishedAt;
 
     @NotNull(message = "Result publish status is required.")
     @Enumerated(EnumType.STRING)
@@ -116,5 +116,9 @@ private LocalDateTime publishedAt;
 
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
+
+    @Builder.Default
+    @Column(name = "retry_override_approved", nullable = false)
+    private Boolean retryOverrideApproved = false;
 
 }

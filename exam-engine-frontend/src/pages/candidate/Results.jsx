@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Clock, Calendar } from 'lucide-react';
-import { attemptService } from '../../services/api';
+import { attemptService, candidateService } from '../../services/api';
 
 export default function CandidateResults() {
   const [attempts, setAttempts] = useState([]);
@@ -9,7 +9,7 @@ export default function CandidateResults() {
   useEffect(() => {
     async function loadData() {
       try {
-        const attemptsRes = await attemptService.getMyAttempts();
+        const attemptsRes = await candidateService.getMyAttempts();
         setAttempts(attemptsRes.data || []);
       } catch (err) {
         console.error(err);
@@ -60,7 +60,6 @@ export default function CandidateResults() {
             <tr>
               <th>Certification</th>
               <th>Date</th>
-              <th>Score</th>
               <th>Assigned Level</th>
               <th>Result Status</th>
             </tr>
@@ -68,23 +67,20 @@ export default function CandidateResults() {
           <tbody>
             {attempts.length > 0 ? (
               attempts.map((attempt) => (
-                <tr key={attempt.id}>
+                <tr key={attempt.attemptId}>
                   <td>
-                    <div className="font-semibold text-[#0E1B2E]">{attempt.exam.title}</div>
-                    <span className="text-[11.5px] text-[#5C6B82] capitalize">{attempt.exam.stack} Stack</span>
+                    <div className="font-semibold text-[#0E1B2E]">{attempt.examTitle}</div>
+                    <span className="text-[11.5px] text-[#5C6B82] capitalize">{attempt.stack} Stack</span>
                   </td>
                   <td className="mono text-[#5C6B82]">
-                    {new Date(attempt.createdAt).toLocaleDateString()}
+                    {new Date(attempt.submittedAt).toLocaleDateString()}
                   </td>
-                  <td className="mono font-semibold text-[#0E1B2E]">{attempt.score ?? 0}%</td>
+
                   <td>
                     <span className={`tier-badge flex items-center gap-2 font-bold font-display text-[12px] px-2.5 py-0.5 rounded-full text-white w-max ${getTierColor(attempt.assignedLevel)}`}>
                       <i>{attempt.assignedLevel}</i>
                       <span className="text-[11px] font-medium">
-                        {attempt.assignedLevel === 'L1' ? 'Expert' :
-                         attempt.assignedLevel === 'L2' ? 'Advanced' :
-                         attempt.assignedLevel === 'L3' ? 'Intermediate' :
-                         attempt.assignedLevel === 'L4' ? 'Beginner' : 'Needs Training'}
+                        {attempt.assignedLevelTitle}
                       </span>
                     </span>
                   </td>
