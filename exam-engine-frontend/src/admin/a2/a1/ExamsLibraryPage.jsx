@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import {
     fetchExams, deleteExam,
     requestExamActivation, requestExamDeactivation,
+    fetchPendingApprovals,
     META,
 } from "./api";
 import { PendingApprovalBadge, RequestApprovalModal } from "./FourEyes";
@@ -26,9 +27,17 @@ export default function ExamsLibraryPage() {
 
     // Four-eyes
     const [statusAction, setStatusAction] = useState(null); // { exam, target: "ACTIVE"|"INACTIVE" }
+    const [pendingApprovals, setPendingApprovals] = useState([]);
 
-    const load = () =>
+    const load = () => {
         fetchExams(filters).then((res) => setRows(res?.rows || (Array.isArray(res) ? res : [])));
+        fetchPendingApprovals().then((res) => setPendingApprovals(Array.isArray(res) ? res : (res?.rows || [])));
+    };
+
+    const isExamPending = (exam) => {
+        if (exam.pendingApproval) return true;
+        return pendingApprovals.some((a) => String(a.targetId) === String(exam.id) && a.status === "PENDING");
+    };
 
     useEffect(() => {
         load();
@@ -187,7 +196,7 @@ export default function ExamsLibraryPage() {
                             <div className="a1-exam-card-foot">
                                 <div className="a1-exam-card-status-col">
                                     <StatusPill status={exam.status} />
-                                    {exam.pendingApproval && <PendingApprovalBadge />}
+                                    {isExamPending(exam) && <PendingApprovalBadge />}
                                 </div>
                                 <div className="a1-exam-card-actions">
                                     <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => navigate(`/admin/authoring?examId=${exam.id}`)}>
@@ -196,12 +205,15 @@ export default function ExamsLibraryPage() {
                                     <button className="a1-btn a1-btn-ghost a1-btn-sm a1-btn-danger" onClick={() => handleDelete(exam)}>
                                         🗑 Delete
                                     </button>
-                                    {exam.status !== "ACTIVE" && !exam.pendingApproval && (
+                                    {isExamPending(exam) ? (
+                                        <button className="a1-btn a1-btn-ghost a1-btn-sm" disabled style={{ opacity: 0.7, cursor: "not-allowed" }}>
+                                            Approval Pending…
+                                        </button>
+                                    ) : exam.status !== "ACTIVE" ? (
                                         <button className="a1-btn a1-btn-primary a1-btn-sm" onClick={() => openStatusAction(exam, "ACTIVE")}>
                                             ▶ Activate
                                         </button>
-                                    )}
-                                    {exam.status === "ACTIVE" && !exam.pendingApproval && (
+                                    ) : (
                                         <button className="a1-btn a1-btn-red a1-btn-sm" onClick={() => openStatusAction(exam, "INACTIVE")}>
                                             ⏸ Deactivate
                                         </button>
@@ -230,7 +242,7 @@ export default function ExamsLibraryPage() {
                                 <td className="a1-mono">{exam.passMark}%</td>
                                 <td>
                                     <StatusPill status={exam.status} />
-                                    {exam.pendingApproval && <PendingApprovalBadge />}
+                                    {isExamPending(exam) && <PendingApprovalBadge />}
                                 </td>
                                 <td>{new Date(exam.updatedAt).toLocaleDateString()}</td>
                                 <td>
@@ -241,12 +253,15 @@ export default function ExamsLibraryPage() {
                                         <button className="a1-btn a1-btn-ghost a1-btn-sm" style={{ color: "#d9383a" }} onClick={() => handleDelete(exam)}>
                                             Delete
                                         </button>
-                                        {exam.status !== "ACTIVE" && !exam.pendingApproval && (
+                                        {isExamPending(exam) ? (
+                                            <button className="a1-btn a1-btn-ghost a1-btn-sm" disabled style={{ opacity: 0.7, cursor: "not-allowed" }}>
+                                                Approval Pending…
+                                            </button>
+                                        ) : exam.status !== "ACTIVE" ? (
                                             <button className="a1-btn a1-btn-primary a1-btn-sm" onClick={() => openStatusAction(exam, "ACTIVE")}>
                                                 Activate
                                             </button>
-                                        )}
-                                        {exam.status === "ACTIVE" && !exam.pendingApproval && (
+                                        ) : (
                                             <button className="a1-btn a1-btn-red a1-btn-sm" onClick={() => openStatusAction(exam, "INACTIVE")}>
                                                 Deactivate
                                             </button>
