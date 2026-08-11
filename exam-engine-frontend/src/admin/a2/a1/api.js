@@ -467,6 +467,19 @@ function mockListQuestions(filters) {
         const query = filters.q.toLowerCase();
         rows = rows.filter((q) => (q.questionText || q.title || "").toLowerCase().includes(query) || (q.topic || "").toLowerCase().includes(query));
     }
+    if (filters.examId) {
+        const selectedExam = MOCK.exams.find((e) => String(e.id || e.examId) === String(filters.examId));
+        rows = rows.filter((q) => {
+            const qExamId = q.examId || q.exam?.id || q.exam_id;
+            if (qExamId) return String(qExamId) === String(filters.examId);
+            if (selectedExam) {
+                const title = q.examTitle || q.examName || (typeof q.exam === "string" ? q.exam : q.exam?.title);
+                if (title) return title === selectedExam.title;
+                return q.stack === selectedExam.stack;
+            }
+            return false;
+        });
+    }
     if (filters.stack) rows = rows.filter((q) => q.stack === filters.stack);
     if (filters.type) rows = rows.filter((q) => q.type === filters.type);
     if (filters.level) rows = rows.filter((q) => q.level === filters.level);

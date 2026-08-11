@@ -1,15 +1,9 @@
 package com.oryfolks.certify.controller;
 
-import com.oryfolks.certify.entity.CompetencyBand;
-import com.oryfolks.certify.entity.Exam;
+import com.oryfolks.certify.entity.*;
 import com.oryfolks.certify.enums.CompetencyLevel;
 import com.oryfolks.certify.enums.ExamStatus;
-import com.oryfolks.certify.entity.AccessAuditLog;
-import com.oryfolks.certify.entity.ApprovalRequest;
-import com.oryfolks.certify.repository.AccessAuditLogRepository;
-import com.oryfolks.certify.repository.ApprovalRequestRepository;
-import com.oryfolks.certify.repository.CompetencyBandRepository;
-import com.oryfolks.certify.repository.ExamRepository;
+import com.oryfolks.certify.repository.*;
 import com.oryfolks.certify.response.ApiResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +30,36 @@ public class AdminExamController {
 
     @Autowired
     private ApprovalRequestRepository approvalRepository;
+
+    @Autowired
+    private QuestionRepository questionRepository;
+
+    @Autowired
+    private SectionRepository sectionRepository;
+
+    @Autowired
+    private ExamAttemptRepository examAttemptRepository;
+
+    @Autowired
+    private ExamAttemptQuestionRepository examAttemptQuestionRepository;
+
+    @Autowired
+    private AttemptAnswerRepository attemptAnswerRepository;
+
+    @Autowired
+    private AnswerRepository answerRepository;
+
+    @Autowired
+    private IntegrityViolationRepository integrityViolationRepository;
+
+    @Autowired
+    private ExamViolationRepository examViolationRepository;
+
+    @Autowired
+    private AIFlagRepository aiFlagRepository;
+
+    @Autowired
+    private RecordingSessionRepository recordingSessionRepository;
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -212,7 +236,6 @@ public class AdminExamController {
                 case L5 -> "Needs Training";
             };
 
-
             bandList.add(CompetencyBand.builder()
                     .exam(exam)
                     .levelName(lvl)
@@ -380,7 +403,42 @@ public class AdminExamController {
     }
 
     @DeleteMapping("/{id}")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> deleteExam(@PathVariable UUID id, Principal principal) {
+        // 1. Delete all attempt related data for this exam
+        List<ExamAttempt> attempts = examAttemptRepository.findByExamId(id);
+        for (ExamAttempt attempt : attempts) {
+            examAttemptQuestionRepository.deleteByAttemptId(attempt.getId());
+            attemptAnswerRepository.deleteByAttemptId(attempt.getId());
+            answerRepository.deleteByAttemptId(attempt.getId());
+            integrityViolationRepository.deleteByAttemptId(attempt.getId());
+            examViolationRepository.deleteByAttemptId(attempt.getId());
+            aiFlagRepository.deleteByAttemptId(attempt.getId());
+            recordingSessionRepository.deleteByAttemptId(attempt.getId());
+        }
+        if (!attempts.isEmpty()) {
+            examAttemptRepository.deleteAll(attempts);
+        }
+
+        // 2. Delete questions
+        List<Question> questions = questionRepository.findByExamId(id);
+        if (!questions.isEmpty()) {
+            questionRepository.deleteAll(questions);
+        }
+
+        // 3. Delete sections
+        List<Section> sections = sectionRepository.findByExamId(id);
+        if (!sections.isEmpty()) {
+            sectionRepository.deleteAll(sections);
+        }
+
+        // 4. Delete competency bands
+        bandRepository.deleteByExamId(id);
+
+        // 5. Delete approval requests
+        approvalRepository.deleteByTargetId(id.toString());
+
+        // 6. Delete exam entity
         examRepository.deleteById(id);
 
         auditLogRepository.save(AccessAuditLog.builder()
