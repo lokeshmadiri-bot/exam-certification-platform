@@ -116,7 +116,7 @@ export const attemptService = {
     return response.data;
   },
   getMyAttempts: async () => {
-    const response = await api.get('/attempts/my-attempts');
+    const response = await api.get('/candidate/attempts/my-attempts');
     return response.data;
   },
   startAttempt: async (examId) => {
@@ -155,8 +155,14 @@ export const adminService = {
     const response = await api.get('/admin/candidates');
     return response.data;
   },
-  approveOverride: async (candidateId) => {
-    const response = await api.post(`/admin/candidates/${candidateId}/override`);
+  approveOverride: async (candidateId, examId) => {
+    const response = await api.post(
+      `/admin/candidates/${candidateId}/override`,
+      {
+        examId
+      }
+    );
+
     return response.data;
   },
   getAuditLogs: async () => {
