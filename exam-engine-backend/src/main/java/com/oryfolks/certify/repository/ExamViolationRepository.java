@@ -11,4 +11,5 @@ import java.util.UUID;
 public interface ExamViolationRepository extends JpaRepository<ExamViolation, UUID> {
     List<ExamViolation> findByAttemptIdOrderByCreatedAtAsc(UUID attemptId);
     long countByAttemptId(UUID attemptId);
+    void deleteByAttemptId(UUID attemptId);
 }
