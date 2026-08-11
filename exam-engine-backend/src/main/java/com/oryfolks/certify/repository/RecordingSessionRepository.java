@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface RecordingSessionRepository extends JpaRepository<RecordingSession, UUID> {
     List<RecordingSession> findByAttemptId(UUID attemptId);
+    void deleteByAttemptId(UUID attemptId);
 }

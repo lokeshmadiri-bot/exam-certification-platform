@@ -14,6 +14,8 @@ import java.util.UUID;
 public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> {
     List<ExamAttempt> findByCandidateIdOrderByCreatedAtDesc(UUID candidateId);
 
+    List<ExamAttempt> findByExamId(UUID examId);
+
     Optional<ExamAttempt> findFirstByCandidateIdAndExamIdOrderByCreatedAtDesc(UUID candidateId, UUID examId);
 
     List<ExamAttempt> findAllByOrderByCreatedAtDesc();

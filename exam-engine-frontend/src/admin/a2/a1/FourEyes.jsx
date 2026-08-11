@@ -72,8 +72,6 @@ export function RequestApprovalModal({
             <div className="a1-modal" onClick={(e) => e.stopPropagation()}>
                 <h3>{title}</h3>
 
-                <TwoPersonRuleBanner />
-
                 {description && <p className="a1-sub" style={{ margin: "8px 0 0" }}>{description}</p>}
 
                 <textarea

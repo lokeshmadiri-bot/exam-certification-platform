@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest, String> {
     List<ApprovalRequest> findByStatusOrderByRequestedAtDesc(String status);
+    void deleteByTargetId(String targetId);
 }
