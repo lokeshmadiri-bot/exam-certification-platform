@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Award, CheckCircle, Clock, BookOpen, Compass, Shield, Zap } from 'lucide-react';
+import { Play, Award, CheckCircle, Clock, BookOpen, Compass, Shield } from 'lucide-react';
 import { examService, candidateService } from '../services/api';
 
 export default function CandidateDashboard() {
@@ -67,39 +67,70 @@ export default function CandidateDashboard() {
   }
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
+    <div className="space-y-8 max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
       {/* Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#0a192f] via-[#0f2a4a] to-[#1a3d6c] rounded-[24px] p-8 text-white border border-white/10 shadow-[0_12px_40px_rgba(11,31,56,0.15)]">
+      <div 
+        className="relative overflow-hidden rounded-[24px] p-8 border"
+        style={{
+          background: 'linear-gradient(135deg, #0a192f 0%, #0f2a4a 50%, #1a3d6c 100%)',
+          color: '#ffffff',
+          borderColor: 'rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 12px 40px rgba(11, 31, 56, 0.15)'
+        }}
+      >
         {/* Glow ambient effects */}
-        <div className="absolute right-[-100px] bottom-[-100px] w-[350px] h-[350px] rounded-full bg-[#2F6BFF]/20 blur-[120px] pointer-events-none"></div>
-        <div className="absolute left-[20%] top-[-80px] w-[200px] h-[200px] rounded-full bg-[#00e5ff]/10 blur-[80px] pointer-events-none"></div>
+        <div className="absolute right-[-100px] bottom-[-100px] w-[350px] h-[350px] rounded-full blur-[120px] pointer-events-none" style={{ backgroundColor: 'rgba(47, 107, 255, 0.2)' }}></div>
+        <div className="absolute left-[20%] top-[-80px] w-[200px] h-[200px] rounded-full blur-[80px] pointer-events-none" style={{ backgroundColor: 'rgba(0, 229, 255, 0.1)' }}></div>
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="max-w-xl">
-            <span className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[2px] uppercase text-[#7fa6e6] bg-[#2F6BFF]/15 px-3 py-1 rounded-full border border-[#2F6BFF]/30 font-semibold mb-4">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6" style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'between', gap: '24px' }}>
+          <div className="max-w-xl" style={{ flex: '1', minWidth: '280px' }}>
+            <span 
+              className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[2px] uppercase px-3 py-1 rounded-full font-semibold mb-4"
+              style={{
+                backgroundColor: 'rgba(47, 107, 255, 0.25)',
+                color: '#7fa6e6',
+                border: '1px solid rgba(47, 107, 255, 0.4)'
+              }}
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-[#2F6BFF] animate-pulse"></span>
               Candidate Workspace
             </span>
-            <h1 className="font-display font-extrabold text-3xl md:text-4xl text-white tracking-tight mt-1.5 mb-2 leading-tight">
-              Welcome back, <span className="bg-gradient-to-r from-white via-[#e2edff] to-[#a5c7fc] bg-clip-text text-transparent">{candidate?.fullName || "Candidate"}</span>
+            <h1 className="font-display font-extrabold text-3xl md:text-4xl tracking-tight mt-1.5 mb-2 leading-tight" style={{ color: '#ffffff', margin: '6px 0 12px' }}>
+              Welcome back, <span style={{ color: '#ffffff', fontWeight: '800' }}>{candidate?.fullName || "Candidate"}</span>
             </h1>
-            <p className="text-[#a5b9d7] text-[14.5px] leading-relaxed font-medium">
+            <p className="text-[14.5px] leading-relaxed font-medium" style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '14.5px', lineHeight: '1.6' }}>
               Your professional skill pathway is fully active. Choose an available stack below to begin your timed proctored exam, or review your historical result transcripts and earned level badges.
             </p>
           </div>
 
-          <div className="flex gap-4 shrink-0 mt-2 md:mt-0">
-            <div className="bg-white/5 backdrop-blur-md border border-white/10 p-[18px_24px] rounded-2xl flex flex-col min-w-[130px] shadow-sm">
-              <span className="n font-display font-extrabold text-3xl text-white leading-tight">
+          <div className="flex gap-4 shrink-0" style={{ display: 'flex', gap: '16px', flexShrink: '0' }}>
+            <div 
+              className="p-[18px_24px] rounded-2xl flex flex-col min-w-[130px] shadow-sm"
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                padding: '18px 24px',
+                borderRadius: '16px'
+              }}
+            >
+              <span className="font-display font-extrabold text-3xl leading-tight" style={{ color: '#ffffff', fontSize: '30px', fontWeight: '800' }}>
                 {attempts.filter(a => a.resultStatus === 'PASSED').length}
               </span>
-              <span className="k text-[11px] text-[#8fa9d0] mt-1 uppercase tracking-wider font-semibold font-mono">Badges Earned</span>
+              <span className="text-[11px] mt-1 uppercase tracking-wider font-semibold font-mono" style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '11px' }}>Badges Earned</span>
             </div>
-            <div className="bg-white/5 backdrop-blur-md border border-white/10 p-[18px_24px] rounded-2xl flex flex-col min-w-[130px] shadow-sm">
-              <span className="n font-display font-extrabold text-3xl text-white leading-tight">
+            <div 
+              className="p-[18px_24px] rounded-2xl flex flex-col min-w-[130px] shadow-sm"
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                padding: '18px 24px',
+                borderRadius: '16px'
+              }}
+            >
+              <span className="font-display font-extrabold text-3xl leading-tight" style={{ color: '#ffffff', fontSize: '30px', fontWeight: '800' }}>
                 {attempts.length}
               </span>
-              <span className="k text-[11px] text-[#8fa9d0] mt-1 uppercase tracking-wider font-semibold font-mono">Total Attempts</span>
+              <span className="text-[11px] mt-1 uppercase tracking-wider font-semibold font-mono" style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '11px' }}>Total Attempts</span>
             </div>
           </div>
         </div>
@@ -107,74 +138,88 @@ export default function CandidateDashboard() {
 
       {/* Available Exams */}
       <div>
-        <div className="sec-title flex items-center justify-between mb-4 mx-0.5">
+        <div className="sec-title flex items-center justify-between mb-4 mx-0.5" style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
-            <h2 className="font-display font-bold text-lg md:text-xl text-[#0E1B2E] tracking-tight">Available Certifications</h2>
+            <h2 className="font-display font-bold text-lg md:text-xl text-[#0E1B2E] tracking-tight" style={{ fontSize: '18px', fontWeight: '700' }}>Available Certifications</h2>
             <p className="text-[12.5px] text-[#6b7c96] font-medium mt-0.5">Choose your technology stack to unlock credential levels.</p>
           </div>
           <button 
             onClick={() => navigate('/candidate/catalog')}
             className="inline-flex items-center gap-1 text-[12.5px] font-bold text-[#2F6BFF] hover:text-[#1a56e8] bg-[#2F6BFF]/5 hover:bg-[#2F6BFF]/10 px-3.5 py-2 rounded-xl transition-all duration-150"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '12px' }}
           >
             <Compass className="w-3.5 h-3.5" />
             <span>View Catalog</span>
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
           {exams.filter(e => !e.status || e.status === 'ACTIVE' || e.status === 'DRAFT').slice(0, 6).map((exam) => {
-            const style = getStackIcon(exam.stack);
+            const styleIcon = getStackIcon(exam.stack);
             const lastAttempt = attempts.find(a => a.examId === exam.examId);
             const canAttempt = lastAttempt?.canAttempt ?? true;
             const daysLeft = lastAttempt?.retryDaysLeft ?? 0;
 
             return (
-              <div key={exam.examId} className="group relative bg-white border border-[#E4EAF2] hover:border-[#2F6BFF]/40 rounded-2xl p-6 shadow-sm hover:shadow-[0_12px_28px_rgba(47,107,255,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col">
-                <div className="top flex items-start justify-between gap-4 mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="ic w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105" style={{ backgroundColor: style.bg, color: style.fg }}>
+              <div 
+                key={exam.examId} 
+                className="group relative bg-white border border-[#E4EAF2] hover:border-[#2F6BFF]/40 rounded-2xl p-6 shadow-sm hover:shadow-[0_12px_28px_rgba(47,107,255,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: '24px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #E4EAF2',
+                  borderRadius: '16px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)'
+                }}
+              >
+                <div className="top flex items-start justify-between gap-4 mb-4" style={{ display: 'flex', alignItems: 'start', justifyContent: 'between', gap: '16px', marginBottom: '16px' }}>
+                  <div className="flex items-center gap-3" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div className="ic w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105" style={{ width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', backgroundColor: styleIcon.bg, color: styleIcon.fg }}>
                       <Award className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="font-display font-bold text-[16px] text-[#0E1B2E] tracking-tight line-clamp-1">{exam.title}</h3>
-                      <div className="sub text-[11.5px] text-[#6b7c96] font-bold uppercase tracking-wider mt-0.5">{exam.stack} Certification</div>
+                      <h3 className="font-display font-bold text-[16px] text-[#0E1B2E] tracking-tight line-clamp-1" style={{ fontSize: '16px', fontWeight: '700', color: '#0E1B2E', margin: '0' }}>{exam.title}</h3>
+                      <div className="sub text-[11.5px] text-[#6b7c96] font-bold uppercase tracking-wider mt-0.5" style={{ fontSize: '11.5px', color: '#6b7c96', fontWeight: '700' }}>{exam.stack} Certification</div>
                     </div>
                   </div>
                 </div>
 
-                <div className="h-[1px] bg-[#EEF2F8] my-3"></div>
+                <div className="h-[1px] bg-[#EEF2F8] my-3" style={{ height: '1px', backgroundColor: '#EEF2F8', margin: '12px 0' }}></div>
 
-                <div className="facts flex gap-6 my-3 text-[12.5px] text-[#5C6B82] font-semibold">
-                  <div className="flex items-center gap-1.5">
+                <div className="facts flex gap-6 my-3 text-[12.5px] text-[#5C6B82] font-semibold" style={{ display: 'flex', gap: '24px', margin: '12px 0', fontSize: '12.5px', color: '#5C6B82' }}>
+                  <div className="flex items-center gap-1.5" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Clock className="w-4 h-4 text-[#5C6B82]/70" />
-                    <span>Duration: <b className="text-[#0E1B2E] font-semibold">{exam.durationMinutes}m</b></span>
+                    <span>Duration: <b className="text-[#0E1B2E] font-semibold" style={{ color: '#0E1B2E' }}>{exam.durationMinutes}m</b></span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <BookOpen className="w-4 h-4 text-[#5C6B82]/70" />
-                    <span>Questions: <b className="text-[#0E1B2E] font-semibold">{exam.perAttempt}</b></span>
+                    <span>Questions: <b className="text-[#0E1B2E] font-semibold" style={{ color: '#0E1B2E' }}>{exam.perAttempt}</b></span>
                   </div>
                 </div>
 
-                <div className="foot mt-6 pt-3 border-t border-[#EEF2F8] flex items-center justify-between">
+                <div className="foot mt-6 pt-3 border-t border-[#EEF2F8] flex items-center justify-between" style={{ display: 'flex', alignItems: 'center', justifyContent: 'between', marginTop: '24px', paddingTop: '12px', borderTop: '1px solid #EEF2F8' }}>
                   {!canAttempt ? (
                     <>
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider bg-[#fff3df] text-[#c9831a] px-2.5 py-1 rounded-lg border border-[#f5e2b3]">
-                        <Clock className="w-3.5 h-3.5" />
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider bg-[#fff3df] text-[#c9831a] px-2.5 py-1 rounded-lg border border-[#f5e2b3]" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', padding: '4px 10px', borderRadius: '8px', border: '1px solid #f5e2b3', backgroundColor: '#fff3df', color: '#c9831a' }}>
+                        <Clock className="w-3.5 h-3.5 text-[#c9831a]" />
                         Locked · {daysLeft}d left
                       </span>
-                      <button className="btn cursor-not-allowed opacity-50 bg-[#eef2f8] text-[#8fa3c4] border border-[#d2dfef] shadow-none hover:transform-none px-4 py-2.5 text-[12.5px] font-bold rounded-xl" disabled>
+                      <button className="btn cursor-not-allowed opacity-50 bg-[#eef2f8] text-[#8fa3c4] border border-[#d2dfef] shadow-none hover:transform-none px-4 py-2.5 text-[12.5px] font-bold rounded-xl" style={{ padding: '8px 16px', borderRadius: '12px' }} disabled>
                         Locked
                       </button>
                     </>
                   ) : (
                     <>
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider bg-[#e7f7f0] text-[#0a7a52] px-2.5 py-1 rounded-lg border border-[#c3ebd7]">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider bg-[#e7f7f0] text-[#0a7a52] px-2.5 py-1 rounded-lg border border-[#c3ebd7]" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', padding: '4px 10px', borderRadius: '8px', border: '1px solid #c3ebd7', backgroundColor: '#e7f7f0', color: '#0a7a52' }}>
                         <Shield className="w-3.5 h-3.5 text-[#0a7a52]" />
                         Ready
                       </span>
                       <button
                         onClick={() => navigate(`/candidate/instructions/${exam.examId}`)}
                         className="inline-flex items-center gap-1.5 bg-[#2F6BFF] hover:bg-[#1a56e8] text-white px-4.5 py-2.5 text-[12.5px] font-bold rounded-xl shadow-[0_4px_12px_rgba(47,107,255,0.15)] hover:shadow-[0_6px_20px_rgba(47,107,255,0.25)] transition-all duration-200"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#2F6BFF', color: '#ffffff', padding: '10px 18px', borderRadius: '12px', fontWeight: '700' }}
                       >
                         <span>Start Exam</span>
                         <Play className="w-3 h-3 fill-current" />
@@ -188,37 +233,52 @@ export default function CandidateDashboard() {
         </div>
       </div>
 
-      {/* Recent Results */}
+      {/* Recent Badges */}
       <div>
-        <div className="sec-title flex items-center justify-between mb-4 mx-0.5">
+        <div className="sec-title flex items-center justify-between mb-4 mx-0.5" style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
-            <h2 className="font-display font-bold text-lg md:text-xl text-[#0E1B2E] tracking-tight">Recent Badges</h2>
+            <h2 className="font-display font-bold text-lg md:text-xl text-[#0E1B2E] tracking-tight" style={{ fontSize: '18px', fontWeight: '700' }}>Recent Badges</h2>
             <p className="text-[12.5px] text-[#6b7c96] font-medium mt-0.5">Credentials earned from your successfully completed proctored assessments.</p>
           </div>
           <button 
             onClick={() => navigate('/candidate/results')}
             className="inline-flex items-center gap-1 text-[12.5px] font-bold text-[#2F6BFF] hover:text-[#1a56e8] bg-[#2F6BFF]/5 hover:bg-[#2F6BFF]/10 px-3.5 py-2 rounded-xl transition-all duration-150"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '12px' }}
           >
             <span>View History</span>
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-3.5">
+        <div style={{ display: 'grid', gap: '16px' }}>
           {attempts.filter(a => a.resultPublishStatus === 'PUBLISHED').length > 0 ? (
             attempts.filter(a => a.resultPublishStatus === 'PUBLISHED').slice(0, 3).map((attempt) => {
               return (
-                <div key={attempt.attemptId} className="group flex flex-col sm:flex-row sm:items-center gap-4 p-5 bg-white border border-[#E4EAF2] hover:border-[#2F6BFF]/30 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200">
-                  <div className="ic w-11 h-11 rounded-xl bg-[#F4F7FC] text-[#2F6BFF] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200">
+                <div 
+                  key={attempt.attemptId} 
+                  className="group flex flex-col sm:flex-row sm:items-center gap-4 p-5 bg-white border border-[#E4EAF2] hover:border-[#2F6BFF]/30 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: '20px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #E4EAF2',
+                    borderRadius: '16px',
+                    gap: '16px',
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)'
+                  }}
+                >
+                  <div className="ic w-11 h-11 rounded-xl bg-[#F4F7FC] text-[#2F6BFF] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200" style={{ width: '44px', height: '44px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', backgroundColor: '#F4F7FC' }}>
                     <CheckCircle className="w-5.5 h-5.5 text-[#2F6BFF]" />
                   </div>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-[15px] text-[#0E1B2E] tracking-tight">{attempt.examTitle} Certification</h4>
-                    <div className="d text-[12px] text-[#5C6B82] flex items-center gap-1.5 mt-1 font-medium">
+                  <div className="flex-1" style={{ flex: '1' }}>
+                    <h4 className="font-bold text-[15px] text-[#0E1B2E] tracking-tight" style={{ fontSize: '15px', fontWeight: '700', color: '#0E1B2E', margin: '0' }}>{attempt.examTitle} Certification</h4>
+                    <div className="d text-[12px] text-[#5C6B82] flex items-center gap-1.5 mt-1 font-medium" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#5C6B82', marginTop: '4px' }}>
                       <Clock className="w-4 h-4 text-[#5C6B82]/70" />
                       <span>Completed on {new Date(attempt.submittedAt).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 mt-3 sm:mt-0">
+                  <div className="flex items-center gap-3 mt-3 sm:mt-0" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <span className={`tier-badge flex items-center gap-2 font-bold font-display text-[12px] px-3.5 py-1 rounded-full text-white shadow-sm ${getTierColor(attempt.assignedLevel)}`}>
                       <i>{attempt.assignedLevel}</i>
                       <span className="text-[11px] font-semibold">
@@ -228,6 +288,7 @@ export default function CandidateDashboard() {
                     <button
                       onClick={() => navigate(`/candidate/result-view/${attempt.attemptId}`)}
                       className="ml-auto inline-flex items-center gap-1 text-[12px] font-bold text-[#2F6BFF] hover:text-[#1a56e8] bg-[#2F6BFF]/5 hover:bg-[#2F6BFF]/10 px-3.5 py-2 rounded-lg transition-all duration-150"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#2F6BFF', backgroundColor: 'rgba(47, 107, 255, 0.05)', padding: '6px 12px', borderRadius: '8px', fontWeight: '750' }}
                     >
                       <span>View Transcript</span>
                     </button>
@@ -236,7 +297,7 @@ export default function CandidateDashboard() {
               );
             })
           ) : (
-            <div className="bg-white border border-[#E4EAF2] rounded-2xl text-center text-[#5C6B82] text-sm py-10 font-medium shadow-sm">
+            <div className="bg-white border border-[#E4EAF2] rounded-2xl text-center text-[#5C6B82] text-sm py-10 font-medium shadow-sm" style={{ padding: '40px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px' }}>
               You haven't completed any certification attempts yet.
             </div>
           )}

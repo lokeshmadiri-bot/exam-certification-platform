@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Award, Clock, Eye, Calendar, ShieldAlert, CheckCircle, FileText } from 'lucide-react';
+import { Award, Clock, Eye, Calendar, ShieldAlert, FileText } from 'lucide-react';
 import { candidateService } from '../services/api';
 
 export default function CandidateResults() {
@@ -55,60 +55,69 @@ export default function CandidateResults() {
   const underReviewCount = attempts.filter(a => a.resultPublishStatus !== 'PUBLISHED').length;
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Page Header */}
       <div className="page-head">
         <span className="eyebrow font-mono text-[10px] tracking-[2px] uppercase text-[#2F6BFF] bg-[#2F6BFF]/10 px-3 py-1 rounded-full border border-[#2F6BFF]/20 font-bold">
           Credentials & history
         </span>
-        <h1 className="font-display font-extrabold text-3xl text-[#0E1B2E] tracking-tight mt-3 mb-1">My Results</h1>
+        <h1 className="font-display font-extrabold text-3xl text-[#0E1B2E] tracking-tight mt-3 mb-1" style={{ fontSize: '28px', fontWeight: '800', color: '#0E1B2E' }}>My Results</h1>
         <p className="text-[#5C6B82] text-sm font-medium">
           Review your historically earned levels, score breakdowns, and attempt outcomes.
         </p>
       </div>
 
       {/* Overview Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white border border-[#E4EAF2] p-5 rounded-2xl flex items-center gap-4 shadow-sm">
-          <div className="w-10 h-10 rounded-xl bg-[#2F6BFF]/5 text-[#2F6BFF] flex items-center justify-center shrink-0">
+      <div className="grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
+        <div 
+          className="bg-white border border-[#E4EAF2] p-5 rounded-2xl flex items-center gap-4 shadow-sm"
+          style={{ display: 'flex', alignItems: 'center', padding: '20px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px', gap: '16px' }}
+        >
+          <div className="w-10 h-10 rounded-xl bg-[#2F6BFF]/5 text-[#2F6BFF] flex items-center justify-center shrink-0" style={{ width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(47, 107, 255, 0.05)', color: '#2F6BFF' }}>
             <FileText className="w-5 h-5" />
           </div>
           <div>
-            <span className="block font-display font-bold text-2xl text-[#0E1B2E] leading-tight">{attempts.length}</span>
-            <span className="text-[11.5px] text-[#5C6B82] font-bold uppercase tracking-wide">Total Attempts</span>
+            <span className="block font-display font-bold text-2xl text-[#0E1B2E] leading-tight" style={{ display: 'block', fontSize: '24px', fontWeight: '700', color: '#0E1B2E' }}>{attempts.length}</span>
+            <span className="text-[11.5px] text-[#5C6B82] font-bold uppercase tracking-wide" style={{ fontSize: '11.5px', color: '#5C6B82', fontWeight: '700' }}>Total Attempts</span>
           </div>
         </div>
-        <div className="bg-white border border-[#E4EAF2] p-5 rounded-2xl flex items-center gap-4 shadow-sm">
-          <div className="w-10 h-10 rounded-xl bg-[#0E9F6E]/5 text-[#0E9F6E] flex items-center justify-center shrink-0">
+        <div 
+          className="bg-white border border-[#E4EAF2] p-5 rounded-2xl flex items-center gap-4 shadow-sm"
+          style={{ display: 'flex', alignItems: 'center', padding: '20px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px', gap: '16px' }}
+        >
+          <div className="w-10 h-10 rounded-xl bg-[#0E9F6E]/5 text-[#0E9F6E] flex items-center justify-center shrink-0" style={{ width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(14, 159, 110, 0.05)', color: '#0E9F6E' }}>
             <Award className="w-5 h-5" />
           </div>
           <div>
-            <span className="block font-display font-bold text-2xl text-[#0E1B2E] leading-tight">{passedCount}</span>
-            <span className="text-[11.5px] text-[#5C6B82] font-bold uppercase tracking-wide">Badges Earned</span>
+            <span className="block font-display font-bold text-2xl text-[#0E1B2E] leading-tight" style={{ display: 'block', fontSize: '24px', fontWeight: '700', color: '#0E1B2E' }}>{passedCount}</span>
+            <span className="text-[11.5px] text-[#5C6B82] font-bold uppercase tracking-wide" style={{ fontSize: '11.5px', color: '#5C6B82', fontWeight: '700' }}>Badges Earned</span>
           </div>
         </div>
-        <div className="bg-white border border-[#E4EAF2] p-5 rounded-2xl flex items-center gap-4 shadow-sm">
-          <div className="w-10 h-10 rounded-xl bg-[#E0A500]/5 text-[#E0A500] flex items-center justify-center shrink-0">
+        <div 
+          className="bg-white border border-[#E4EAF2] p-5 rounded-2xl flex items-center gap-4 shadow-sm"
+          style={{ display: 'flex', alignItems: 'center', padding: '20px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px', gap: '16px' }}
+        >
+          <div className="w-10 h-10 rounded-xl bg-[#E0A500]/5 text-[#E0A500] flex items-center justify-center shrink-0" style={{ width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(224, 165, 0, 0.05)', color: '#E0A500' }}>
             <Clock className="w-5 h-5" />
           </div>
           <div>
-            <span className="block font-display font-bold text-2xl text-[#0E1B2E] leading-tight">{underReviewCount}</span>
-            <span className="text-[11.5px] text-[#5C6B82] font-bold uppercase tracking-wide">Pending Review</span>
+            <span className="block font-display font-bold text-2xl text-[#0E1B2E] leading-tight" style={{ display: 'block', fontSize: '24px', fontWeight: '700', color: '#0E1B2E' }}>{underReviewCount}</span>
+            <span className="text-[11.5px] text-[#5C6B82] font-bold uppercase tracking-wide" style={{ fontSize: '11.5px', color: '#5C6B82', fontWeight: '700' }}>Pending Review</span>
           </div>
         </div>
       </div>
 
       {/* Results Table Card */}
-      <div className="bg-white border border-[#E4EAF2] rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-[#E4EAF2] rounded-2xl shadow-sm overflow-hidden" style={{ backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px' }}>
         <div className="overflow-x-auto">
           <table className="tbl w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#F8FAFC] border-b border-[#E4EAF2] text-[#5C6B82] text-[11px] font-bold font-mono uppercase">
-                <th className="py-4 px-5">Certification</th>
-                <th className="py-4 px-5">Date</th>
-                <th className="py-4 px-5">Assigned Level</th>
-                <th className="py-4 px-5">Admin Approval State</th>
-                <th className="py-4 px-5 text-right">Action</th>
+                <th className="py-4 px-5" style={{ padding: '16px 20px' }}>Certification</th>
+                <th className="py-4 px-5" style={{ padding: '16px 20px' }}>Date</th>
+                <th className="py-4 px-5" style={{ padding: '16px 20px' }}>Assigned Level</th>
+                <th className="py-4 px-5" style={{ padding: '16px 20px' }}>Admin Approval State</th>
+                <th className="py-4 px-5 text-right" style={{ padding: '16px 20px' }}>Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#EEF2F8]">
@@ -117,24 +126,24 @@ export default function CandidateResults() {
                   const isPublished = attempt.resultPublishStatus === 'PUBLISHED';
                   return (
                     <tr key={attempt.attemptId} className="hover:bg-[#F8FAFC]/50 transition-colors">
-                      <td className="py-4.5 px-5">
-                        <div className="font-bold text-[#0E1B2E] text-sm">{attempt.examTitle}</div>
+                      <td className="py-4.5 px-5" style={{ padding: '18px 20px' }}>
+                        <div className="font-bold text-[#0E1B2E] text-sm" style={{ fontWeight: '700' }}>{attempt.examTitle}</div>
                         <span className="inline-block text-[11px] font-bold text-[#5c6b82] bg-[#eef2f8] px-2 py-0.5 rounded mt-1 uppercase tracking-wider">{attempt.stack} Stack</span>
                       </td>
-                      <td className="py-4.5 px-5 font-mono text-[#5C6B82] text-xs">
-                        <div className="flex items-center gap-1.5">
+                      <td className="py-4.5 px-5 font-mono text-[#5C6B82] text-xs" style={{ padding: '18px 20px' }}>
+                        <div className="flex items-center gap-1.5" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Calendar className="w-3.5 h-3.5 text-[#5C6B82]/70" />
                           <span>{attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleDateString() : 'In Progress'}</span>
                         </div>
                       </td>
-                      <td className="py-4.5 px-5">
+                      <td className="py-4.5 px-5" style={{ padding: '18px 20px' }}>
                         {attempt.resultStatus === 'TERMINATED' ? (
-                          <span className="inline-flex items-center gap-1 text-[11.5px] text-[#bb2e2e] font-bold bg-[#fde8e8] px-2.5 py-1 rounded-lg border border-[#f8b4b4] uppercase tracking-wide">
+                          <span className="inline-flex items-center gap-1 text-[11.5px] text-[#bb2e2e] font-bold bg-[#fde8e8] px-2.5 py-1 rounded-lg border border-[#f8b4b4] uppercase tracking-wide" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid #f8b4b4', backgroundColor: '#fde8e8', color: '#bb2e2e', padding: '4px 10px', borderRadius: '8px' }}>
                             <ShieldAlert className="w-3.5 h-3.5 text-[#bb2e2e]" />
                             Terminated
                           </span>
                         ) : !isPublished ? (
-                          <span className="text-[11.5px] text-[#9c7400] font-bold bg-[#fdf3da] px-2.5 py-1 rounded-lg border border-[#f5e2b3] inline-flex items-center gap-1.5 uppercase tracking-wide">
+                          <span className="text-[11.5px] text-[#9c7400] font-bold bg-[#fdf3da] px-2.5 py-1 rounded-lg border border-[#f5e2b3] inline-flex items-center gap-1.5 uppercase tracking-wide" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid #f5e2b3', backgroundColor: '#fdf3da', color: '#9c7400', padding: '4px 10px', borderRadius: '8px' }}>
                             <Clock className="w-3.5 h-3.5 text-[#9c7400]" />
                             Pending Approval
                           </span>
@@ -147,21 +156,22 @@ export default function CandidateResults() {
                           </span>
                         )}
                       </td>
-                      <td className="py-4.5 px-5">
+                      <td className="py-4.5 px-5" style={{ padding: '18px 20px' }}>
                         {!isPublished ? (
-                          <span className="inline-block chip font-bold bg-[#fdf3da] text-[#9c7400] border border-[#f5e2b3] px-2.5 py-1 rounded-lg text-[10.5px] uppercase tracking-wide">
+                          <span className="inline-block chip font-bold bg-[#fdf3da] text-[#9c7400] border border-[#f5e2b3] px-2.5 py-1 rounded-lg text-[10.5px] uppercase tracking-wide" style={{ border: '1px solid #f5e2b3', backgroundColor: '#fdf3da', color: '#9c7400', padding: '4px 10px', borderRadius: '8px' }}>
                             UNDER REVIEW
                           </span>
                         ) : (
-                          <span className={`inline-block chip font-bold px-2.5 py-1 rounded-lg text-[10.5px] uppercase border tracking-wide ${getResultBadgeClass(attempt.resultStatus)}`}>
+                          <span className={`inline-block chip font-bold px-2.5 py-1 rounded-lg text-[10.5px] uppercase border tracking-wide ${getResultBadgeClass(attempt.resultStatus)}`} style={{ padding: '4px 10px', borderRadius: '8px' }}>
                             {attempt.resultStatus}
                           </span>
                         )}
                       </td>
-                      <td className="py-4.5 px-5 text-right">
+                      <td className="py-4.5 px-5 text-right" style={{ padding: '18px 20px' }}>
                         <button
                           onClick={() => navigate(`/candidate/result-view/${attempt.attemptId}`)}
                           className="inline-flex items-center gap-1.5 bg-[#2F6BFF]/10 hover:bg-[#2F6BFF] text-[#2F6BFF] hover:text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all duration-200"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '12px', fontWeight: '700' }}
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>View Result</span>
@@ -172,7 +182,7 @@ export default function CandidateResults() {
                 })
               ) : (
                 <tr>
-                  <td colSpan="5" className="text-center py-12 text-[#5C6B82] font-medium">
+                  <td colSpan="5" className="text-center py-12 text-[#5C6B82] font-medium" style={{ textAlign: 'center', padding: '48px 0' }}>
                     No historical certification attempts recorded.
                   </td>
                 </tr>
