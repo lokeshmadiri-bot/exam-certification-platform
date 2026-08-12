@@ -1,6 +1,22 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0B1F38;
+  --color-ink2: #123257;
+  --color-paper: #F4F7FC;
+  --color-brand: #2F6BFF;
+  --color-brand-dark: #2256d6;
+  --color-live: #F2A93B;
+  --color-t1: #0E9F6E;
+  --color-t2: #57B85A;
+  --color-t3: #E0A500;
+  --color-t4: #EA7A3B;
+  --color-t5: #E04F4F;
+
+  --font-display: "Sora", "system-ui", "sans-serif";
+  --font-body: "Inter", "system-ui", "sans-serif";
+  --font-mono: "IBM Plex Mono", "monospace";
+}
 
 :root {
   --ink:#0B1F38; --ink2:#123257; --paper:#F4F7FC; --card:#FFFFFF;
