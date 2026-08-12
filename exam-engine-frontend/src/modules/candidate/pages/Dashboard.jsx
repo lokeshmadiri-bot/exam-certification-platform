@@ -70,12 +70,13 @@ export default function CandidateDashboard() {
     <div className="space-y-8 max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
       {/* Banner */}
       <div 
-        className="relative overflow-hidden rounded-[24px] p-8 border"
+        className="relative overflow-hidden rounded-[24px] border"
         style={{
           background: 'linear-gradient(135deg, #0a192f 0%, #0f2a4a 50%, #1a3d6c 100%)',
           color: '#ffffff',
           borderColor: 'rgba(255, 255, 255, 0.1)',
-          boxShadow: '0 12px 40px rgba(11, 31, 56, 0.15)'
+          boxShadow: '0 12px 40px rgba(11, 31, 56, 0.15)',
+          padding: '32px 36px'
         }}
       >
         {/* Glow ambient effects */}

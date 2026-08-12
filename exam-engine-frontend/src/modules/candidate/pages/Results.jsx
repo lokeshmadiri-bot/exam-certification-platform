@@ -73,7 +73,7 @@ export default function CandidateResults() {
           className="bg-white border border-[#E4EAF2] p-5 rounded-2xl flex items-center gap-4 shadow-sm"
           style={{ display: 'flex', alignItems: 'center', padding: '20px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px', gap: '16px' }}
         >
-          <div className="w-10 h-10 rounded-xl bg-[#2F6BFF]/5 text-[#2F6BFF] flex items-center justify-center shrink-0" style={{ width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(47, 107, 255, 0.05)', color: '#2F6BFF' }}>
+          <div className="w-10 h-10 rounded-xl bg-[#2F6BFF]/5 text-[#2F6BFF] flex items-center justify-center shrink-0" style={{ width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(47, 107, 255, 0.05)', color: '#2F6BFF' }}>
             <FileText className="w-5 h-5" />
           </div>
           <div>
@@ -85,7 +85,7 @@ export default function CandidateResults() {
           className="bg-white border border-[#E4EAF2] p-5 rounded-2xl flex items-center gap-4 shadow-sm"
           style={{ display: 'flex', alignItems: 'center', padding: '20px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px', gap: '16px' }}
         >
-          <div className="w-10 h-10 rounded-xl bg-[#0E9F6E]/5 text-[#0E9F6E] flex items-center justify-center shrink-0" style={{ width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(14, 159, 110, 0.05)', color: '#0E9F6E' }}>
+          <div className="w-10 h-10 rounded-xl bg-[#0E9F6E]/5 text-[#0E9F6E] flex items-center justify-center shrink-0" style={{ width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(14, 159, 110, 0.05)', color: '#0E9F6E' }}>
             <Award className="w-5 h-5" />
           </div>
           <div>
@@ -97,7 +97,7 @@ export default function CandidateResults() {
           className="bg-white border border-[#E4EAF2] p-5 rounded-2xl flex items-center gap-4 shadow-sm"
           style={{ display: 'flex', alignItems: 'center', padding: '20px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px', gap: '16px' }}
         >
-          <div className="w-10 h-10 rounded-xl bg-[#E0A500]/5 text-[#E0A500] flex items-center justify-center shrink-0" style={{ width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(224, 165, 0, 0.05)', color: '#E0A500' }}>
+          <div className="w-10 h-10 rounded-xl bg-[#E0A500]/5 text-[#E0A500] flex items-center justify-center shrink-0" style={{ width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(224, 165, 0, 0.05)', color: '#E0A500' }}>
             <Clock className="w-5 h-5" />
           </div>
           <div>
@@ -124,6 +124,8 @@ export default function CandidateResults() {
               {attempts.length > 0 ? (
                 attempts.map((attempt) => {
                   const isPublished = attempt.resultPublishStatus === 'PUBLISHED';
+                  const isInProgress = attempt.resultStatus === 'IN_PROGRESS' || !attempt.submittedAt;
+
                   return (
                     <tr key={attempt.attemptId} className="hover:bg-[#F8FAFC]/50 transition-colors">
                       <td className="py-4.5 px-5" style={{ padding: '18px 20px' }}>
@@ -131,21 +133,29 @@ export default function CandidateResults() {
                         <span className="inline-block text-[11px] font-bold text-[#5c6b82] bg-[#eef2f8] px-2 py-0.5 rounded mt-1 uppercase tracking-wider">{attempt.stack} Stack</span>
                       </td>
                       <td className="py-4.5 px-5 font-mono text-[#5C6B82] text-xs" style={{ padding: '18px 20px' }}>
-                        <div className="flex items-center gap-1.5" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Calendar className="w-3.5 h-3.5 text-[#5C6B82]/70" />
-                          <span>{attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleDateString() : 'In Progress'}</span>
-                        </div>
+                        {isInProgress ? (
+                          <span className="inline-flex items-center text-[10px] font-bold text-[#2F6BFF] bg-[#2F6BFF]/10 px-2 py-0.5 rounded border border-[#2F6BFF]/20 uppercase tracking-wider">
+                            In Progress
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-1.5" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Calendar className="w-3.5 h-3.5 text-[#5C6B82]/70" />
+                            <span>{new Date(attempt.submittedAt).toLocaleDateString()}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="py-4.5 px-5" style={{ padding: '18px 20px' }}>
                         {attempt.resultStatus === 'TERMINATED' ? (
-                          <span className="inline-flex items-center gap-1 text-[11.5px] text-[#bb2e2e] font-bold bg-[#fde8e8] px-2.5 py-1 rounded-lg border border-[#f8b4b4] uppercase tracking-wide" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid #f8b4b4', backgroundColor: '#fde8e8', color: '#bb2e2e', padding: '4px 10px', borderRadius: '8px' }}>
-                            <ShieldAlert className="w-3.5 h-3.5 text-[#bb2e2e]" />
+                          <span className="inline-flex items-center gap-1 text-[10.5px] text-[#bb2e2e] font-bold bg-[#fde8e8] px-2 py-0.5 rounded border border-[#f8b4b4] uppercase tracking-wide" style={{ border: '1px solid #f8b4b4', backgroundColor: '#fde8e8', color: '#bb2e2e', padding: '2px 8px', borderRadius: '6px' }}>
+                            <ShieldAlert className="w-3 h-3 text-[#bb2e2e]" />
                             Terminated
                           </span>
+                        ) : isInProgress ? (
+                          <span className="text-xs text-[#8A99AE] font-semibold">—</span>
                         ) : !isPublished ? (
-                          <span className="text-[11.5px] text-[#9c7400] font-bold bg-[#fdf3da] px-2.5 py-1 rounded-lg border border-[#f5e2b3] inline-flex items-center gap-1.5 uppercase tracking-wide" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid #f5e2b3', backgroundColor: '#fdf3da', color: '#9c7400', padding: '4px 10px', borderRadius: '8px' }}>
-                            <Clock className="w-3.5 h-3.5 text-[#9c7400]" />
-                            Pending Approval
+                          <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-[#9c7400] bg-[#fdf3da] px-2 py-0.5 rounded border border-[#f5e2b3] uppercase tracking-wider" style={{ border: '1px solid #f5e2b3', backgroundColor: '#fdf3da', color: '#9c7400', padding: '2px 8px', borderRadius: '6px' }}>
+                            <Clock className="w-3 h-3 text-[#9c7400]" />
+                            Pending
                           </span>
                         ) : (
                           <span className={`tier-badge flex items-center gap-2 font-bold font-display text-[12px] px-3.5 py-0.5 rounded-full text-white shadow-sm ${getTierColor(attempt.assignedLevel)}`}>
@@ -157,9 +167,13 @@ export default function CandidateResults() {
                         )}
                       </td>
                       <td className="py-4.5 px-5" style={{ padding: '18px 20px' }}>
-                        {!isPublished ? (
-                          <span className="inline-block chip font-bold bg-[#fdf3da] text-[#9c7400] border border-[#f5e2b3] px-2.5 py-1 rounded-lg text-[10.5px] uppercase tracking-wide" style={{ border: '1px solid #f5e2b3', backgroundColor: '#fdf3da', color: '#9c7400', padding: '4px 10px', borderRadius: '8px' }}>
-                            UNDER REVIEW
+                        {isInProgress ? (
+                          <span className="inline-flex items-center text-[10px] font-bold text-[#2F6BFF] bg-[#2F6BFF]/10 px-2 py-0.5 rounded border border-[#2F6BFF]/20 uppercase tracking-wider">
+                            Active
+                          </span>
+                        ) : !isPublished ? (
+                          <span className="inline-block chip font-bold bg-[#fdf3da] text-[#9c7400] border border-[#f5e2b3] px-2 py-0.5 rounded text-[10.5px] uppercase tracking-wider" style={{ border: '1px solid #f5e2b3', backgroundColor: '#fdf3da', color: '#9c7400', padding: '2px 8px', borderRadius: '6px' }}>
+                            Under Review
                           </span>
                         ) : (
                           <span className={`inline-block chip font-bold px-2.5 py-1 rounded-lg text-[10.5px] uppercase border tracking-wide ${getResultBadgeClass(attempt.resultStatus)}`} style={{ padding: '4px 10px', borderRadius: '8px' }}>
