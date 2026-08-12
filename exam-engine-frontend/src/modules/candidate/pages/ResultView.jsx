@@ -64,7 +64,7 @@ export default function CandidateResultView() {
   const isTerminated = attempt.resultStatus === 'TERMINATED';
 
   return (
-    <div className="max-w-[760px] mx-auto pb-12" style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+    <div className="max-w-7xl mx-auto pb-12" style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
       {/* Result Hero Header */}
       <div 
         className="result-hero rounded-[28px] overflow-hidden text-center relative shadow-xl border"
