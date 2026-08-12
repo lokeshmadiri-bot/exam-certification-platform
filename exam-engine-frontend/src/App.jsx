@@ -54,7 +54,7 @@ export default function App() {
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="attempts" element={<AdminAttempts />} />
           <Route path="attempts/:attemptId/review" element={<AdminReview />} />
-          <Route path="review" element={<Navigate to="/admin/attempts?result=NEEDS_REVIEW" replace />} />
+          <Route path="review" element={<AdminAttempts />} />
           <Route path="candidates" element={<CandidatesPage />} />
           <Route path="exams" element={<ExamsLibraryPage />} />
           <Route path="authoring" element={<AuthoringPage />} />

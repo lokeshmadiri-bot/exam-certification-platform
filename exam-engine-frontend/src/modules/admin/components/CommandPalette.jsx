@@ -36,7 +36,7 @@ export default function CommandPalette() {
     const base = [
       { label: "Go to dashboard", hint: "Navigation", run: () => navigate("/admin/dashboard") },
       { label: "Go to attempts", hint: "Navigation", run: () => navigate("/admin/attempts") },
-      { label: "Show needs-review queue", hint: "Filter", run: () => navigate("/admin/attempts?result=NEEDS_REVIEW") },
+      { label: "Show needs-review queue", hint: "Filter", run: () => navigate("/admin/review") },
       { label: "Show failed attempts", hint: "Filter", run: () => navigate("/admin/attempts?result=FAIL") },
       ...META.STACKS.map((s) => ({
         label: `Filter attempts: ${s}`,

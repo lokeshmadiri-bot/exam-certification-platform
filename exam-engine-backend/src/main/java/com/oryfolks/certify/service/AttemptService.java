@@ -302,18 +302,27 @@ public class AttemptService {
 
                 // Calculate score & level
                 Exam exam = attempt.getExam();
-                List<Question> questions = questionRepository.findByExamIdAndIsActiveTrue(exam.getId());
-                if (questions.isEmpty()) {
-                        questions = questionRepository.findByExamId(exam.getId());
-                }
-                if (questions.isEmpty() && exam.getStack() != null && !exam.getStack().isBlank()) {
-                        questions = questionRepository.findByStackIgnoreCaseAndIsActiveTrue(exam.getStack());
-                        if (questions.isEmpty()) {
-                                questions = questionRepository.findByStackIgnoreCase(exam.getStack());
+                List<ExamAttemptQuestion> attemptQuestions = examAttemptQuestionRepository
+                                .findByAttemptIdOrderByQuestionOrderAsc(attempt.getId());
+                List<Question> questions = new ArrayList<>();
+                if (attemptQuestions != null && !attemptQuestions.isEmpty()) {
+                        for (ExamAttemptQuestion eq : attemptQuestions) {
+                                questions.add(eq.getQuestion());
                         }
-                }
-                if (questions.isEmpty()) {
-                        questions = questionRepository.findByIsActiveTrue();
+                } else {
+                        questions = questionRepository.findByExamIdAndIsActiveTrue(exam.getId());
+                        if (questions.isEmpty()) {
+                                questions = questionRepository.findByExamId(exam.getId());
+                        }
+                        if (questions.isEmpty() && exam.getStack() != null && !exam.getStack().isBlank()) {
+                                questions = questionRepository.findByStackIgnoreCaseAndIsActiveTrue(exam.getStack());
+                                if (questions.isEmpty()) {
+                                        questions = questionRepository.findByStackIgnoreCase(exam.getStack());
+                                }
+                        }
+                        if (questions.isEmpty()) {
+                                questions = questionRepository.findByIsActiveTrue();
+                        }
                 }
 
                 int totalMarks = 0;
@@ -324,21 +333,31 @@ public class AttemptService {
                         totalMarks += qMarks;
 
                         String correct = q.getCorrectOption() != null ? q.getCorrectOption().trim() : "";
+                        String userSelected = null;
+                        
                         Optional<AttemptAnswer> ansOpt = savedAttemptAnswers.stream()
                                         .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
                                         .findFirst();
 
-                        if (ansOpt.isPresent() && !correct.isEmpty() && ansOpt.get().getSelectedOption() != null) {
-                                String userSelected = ansOpt.get().getSelectedOption().trim();
-                                if (correct.equalsIgnoreCase(userSelected)) {
-                                        earnedMarks += qMarks;
+                        if (ansOpt.isPresent() && ansOpt.get().getSelectedOption() != null) {
+                                userSelected = ansOpt.get().getSelectedOption().trim();
+                        } else {
+                                Optional<Answer> aOpt = answerRepository.findByAttemptIdAndQuestionId(attempt.getId(), q.getId());
+                                if (aOpt.isPresent() && aOpt.get().getSelectedOption() != null) {
+                                        userSelected = aOpt.get().getSelectedOption().trim();
                                 }
+                        }
+
+                        if (userSelected != null && !correct.isEmpty() && correct.equalsIgnoreCase(userSelected)) {
+                                earnedMarks += qMarks;
                         }
                 }
 
                 int finalScore = totalMarks > 0 ? (int) Math.round(((double) earnedMarks / totalMarks) * 100) : 0;
                 attempt.setScore(finalScore);
-                attempt.setEndTime(LocalDateTime.now());
+                LocalDateTime now = LocalDateTime.now();
+                attempt.setEndTime(now);
+                attempt.setSubmittedAt(now);
 
                 CompetencyLevel level = CompetencyLevel.L5;
                 List<CompetencyBand> bands = exam.getCompetencyBands();
@@ -367,6 +386,7 @@ public class AttemptService {
                                 .message("Exam submitted successfully.")
                                 .submittedAt(attempt.getEndTime())
                                 .build();
+
         }
 
         public Answer saveAnswer(

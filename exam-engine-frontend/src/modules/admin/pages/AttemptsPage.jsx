@@ -9,11 +9,12 @@ import "../components/a2.css";
 export default function AttemptsPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
+  const isReviewPage = window.location.pathname.includes("/admin/review");
 
   const filters = {
     stack: params.get("stack") || "",
     level: params.get("level") || "",
-    result: params.get("result") || "",
+    result: params.get("result") || (isReviewPage ? "NEEDS_REVIEW" : ""),
     from: params.get("from") || "",
     to: params.get("to") || "",
   };
@@ -37,13 +38,22 @@ export default function AttemptsPage() {
     setParams(next, { replace: true });
   };
 
-  const clearAll = () => setParams({}, { replace: true });
-  const hasFilters = Object.values(filters).some(Boolean);
+  const clearAll = () => {
+    if (isReviewPage) {
+      setParams({ result: "NEEDS_REVIEW" }, { replace: true });
+    } else {
+      setParams({}, { replace: true });
+    }
+  };
+  
+  const hasFilters = isReviewPage 
+    ? Object.entries(filters).some(([k, v]) => k !== "result" ? Boolean(v) : v !== "NEEDS_REVIEW")
+    : Object.values(filters).some(Boolean);
 
   return (
     <div className="a2-page">
       <header className="a2-page-head">
-        <h1>Attempts</h1>
+        <h1>{isReviewPage ? "Reviews & Flags" : "Attempts"}</h1>
         <p className="a2-sub">{data.total} attempt{data.total === 1 ? "" : "s"} matching current filters</p>
       </header>
 

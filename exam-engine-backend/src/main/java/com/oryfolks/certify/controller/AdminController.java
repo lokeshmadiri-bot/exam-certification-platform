@@ -18,6 +18,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import com.oryfolks.certify.exception.BadRequestException;
+import com.oryfolks.certify.entity.ExamAttemptQuestion;
+import com.oryfolks.certify.repository.ExamAttemptQuestionRepository;
 import com.oryfolks.certify.repository.QuestionRepository;
 import com.oryfolks.certify.repository.AttemptAnswerRepository;
 import com.oryfolks.certify.repository.AnswerRepository;
@@ -76,6 +78,9 @@ public class AdminController {
 
     @Autowired
     private AIFlagRepository aiFlagRepository;
+
+    @Autowired
+    private ExamAttemptQuestionRepository examAttemptQuestionRepository;
 
     @GetMapping("/candidates")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getCandidates(
@@ -646,10 +651,27 @@ public class AdminController {
         int totalScore = 0;
         int maxTotal = 0;
 
+        List<Question> questions = new ArrayList<>();
+        List<ExamAttemptQuestion> attemptQuestions = examAttemptQuestionRepository != null
+                ? examAttemptQuestionRepository.findByAttemptIdOrderByQuestionOrderAsc(id)
+                : List.of();
+        if (attemptQuestions != null && !attemptQuestions.isEmpty()) {
+            for (ExamAttemptQuestion eq : attemptQuestions) {
+                questions.add(eq.getQuestion());
+            }
+        } else {
+            questions = questionRepository.findByExamId(attempt.getExam().getId());
+            if (questions.isEmpty() && attempt.getExam().getStack() != null) {
+                questions = questionRepository.findByStackIgnoreCase(attempt.getExam().getStack());
+            }
+            if (questions.isEmpty()) {
+                questions = questionRepository.findByIsActiveTrue();
+            }
+        }
+
         if (examSections == null || examSections.isEmpty()) {
             int sectionScore = 0;
             int sectionMax = 0;
-            List<Question> questions = questionRepository.findByExamId(attempt.getExam().getId());
             for (Question q : questions) {
                 sectionMax += q.getMarks();
                 Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
@@ -671,13 +693,15 @@ public class AdminController {
             for (Section section : examSections) {
                 int sectionScore = 0;
                 int sectionMax = 0;
-                for (Question q : section.getQuestions()) {
-                    sectionMax += q.getMarks();
-                    Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
-                            .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
-                            .findFirst();
-                    if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
-                        sectionScore += q.getMarks();
+                for (Question q : questions) {
+                    if (q.getSection() != null && q.getSection().getId().equals(section.getId())) {
+                        sectionMax += q.getMarks();
+                        Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
+                                .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
+                                .findFirst();
+                        if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
+                            sectionScore += q.getMarks();
+                        }
                     }
                 }
                 Map<String, Object> secMap = new HashMap<>();
@@ -719,8 +743,25 @@ public class AdminController {
                 int totalScore = 0;
                 int maxTotal = 0;
 
+                List<Question> questions = new ArrayList<>();
+                List<ExamAttemptQuestion> attemptQuestions = examAttemptQuestionRepository != null
+                        ? examAttemptQuestionRepository.findByAttemptIdOrderByQuestionOrderAsc(id)
+                        : List.of();
+                if (attemptQuestions != null && !attemptQuestions.isEmpty()) {
+                    for (ExamAttemptQuestion eq : attemptQuestions) {
+                        questions.add(eq.getQuestion());
+                    }
+                } else {
+                    questions = questionRepository.findByExamId(attempt.getExam().getId());
+                    if (questions.isEmpty() && attempt.getExam().getStack() != null) {
+                        questions = questionRepository.findByStackIgnoreCase(attempt.getExam().getStack());
+                    }
+                    if (questions.isEmpty()) {
+                        questions = questionRepository.findByIsActiveTrue();
+                    }
+                }
+
                 if (examSections == null || examSections.isEmpty()) {
-                    List<Question> questions = questionRepository.findByExamId(attempt.getExam().getId());
                     for (Question q : questions) {
                         maxTotal += q.getMarks();
                         Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
@@ -732,13 +773,15 @@ public class AdminController {
                     }
                 } else {
                     for (Section section : examSections) {
-                        for (Question q : section.getQuestions()) {
-                            maxTotal += q.getMarks();
-                            Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
-                                    .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
-                                    .findFirst();
-                            if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
-                                totalScore += q.getMarks();
+                        for (Question q : questions) {
+                            if (q.getSection() != null && q.getSection().getId().equals(section.getId())) {
+                                maxTotal += q.getMarks();
+                                Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
+                                        .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
+                                        .findFirst();
+                                if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
+                                    totalScore += q.getMarks();
+                                }
                             }
                         }
                     }
@@ -868,16 +911,31 @@ public class AdminController {
         }
 
         map.put("score", score);
-        map.put("result", a.getResultStatus() != null ? a.getResultStatus().name() : "NEEDS_REVIEW");
+
+        String resultStr = "NEEDS_REVIEW";
+        if (a.getResultPublishStatus() == ResultPublishStatus.PUBLISHED) {
+            if (a.getResultStatus() == ResultStatus.PASSED) {
+                resultStr = "PASS";
+            } else if (a.getResultStatus() == ResultStatus.FAILED || a.getResultStatus() == ResultStatus.TERMINATED) {
+                resultStr = "FAIL";
+            }
+        } else if (a.getResultStatus() == ResultStatus.IN_PROGRESS) {
+            resultStr = "IN_PROGRESS";
+        }
+        map.put("result", resultStr);
+
         map.put("submittedAt", a.getSubmittedAt() != null ? a.getSubmittedAt().toString()
-                : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : new Date().toString()));
+                : (a.getEndTime() != null ? a.getEndTime().toString()
+                : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : new Date().toString())));
 
         long violationCount = integrityViolationRepository.findByAttemptIdOrderByCreatedAtAsc(a.getId()).size();
         long aiFlagCount = aiFlagRepository.findByAttemptId(a.getId()).size();
         long totalFlags = Math.max(1, violationCount + aiFlagCount);
 
         map.put("flagCount", totalFlags);
-        map.put("flaggedAt", a.getSubmittedAt() != null ? a.getSubmittedAt().toString() : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : new Date().toString()));
+        map.put("flaggedAt", a.getSubmittedAt() != null ? a.getSubmittedAt().toString()
+                : (a.getEndTime() != null ? a.getEndTime().toString()
+                : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : new Date().toString())));
         return map;
     }
 
@@ -885,12 +943,23 @@ public class AdminController {
         if (attempt == null || attempt.getExam() == null) return 0;
         List<AttemptAnswer> aaList = attemptAnswerRepository.findByAttemptId(attempt.getId());
         List<Answer> aList = answerRepository.findByAttemptId(attempt.getId());
-        List<Question> questions = questionRepository.findByExamId(attempt.getExam().getId());
-        if (questions.isEmpty() && attempt.getExam().getStack() != null) {
-            questions = questionRepository.findByStackIgnoreCase(attempt.getExam().getStack());
-        }
-        if (questions.isEmpty()) {
-            questions = questionRepository.findByIsActiveTrue();
+
+        List<Question> questions = new ArrayList<>();
+        List<ExamAttemptQuestion> attemptQuestions = examAttemptQuestionRepository != null
+                ? examAttemptQuestionRepository.findByAttemptIdOrderByQuestionOrderAsc(attempt.getId())
+                : List.of();
+        if (attemptQuestions != null && !attemptQuestions.isEmpty()) {
+            for (ExamAttemptQuestion eq : attemptQuestions) {
+                questions.add(eq.getQuestion());
+            }
+        } else {
+            questions = questionRepository.findByExamId(attempt.getExam().getId());
+            if (questions.isEmpty() && attempt.getExam().getStack() != null) {
+                questions = questionRepository.findByStackIgnoreCase(attempt.getExam().getStack());
+            }
+            if (questions.isEmpty()) {
+                questions = questionRepository.findByIsActiveTrue();
+            }
         }
         if (questions.isEmpty()) return 0;
 

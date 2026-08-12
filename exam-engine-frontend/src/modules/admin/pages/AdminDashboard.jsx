@@ -41,7 +41,7 @@ export default function AdminDashboard() {
           label="Needs review"
           value={kpis.needsReview}
           accent="amber"
-          onClick={() => navigate("/admin/attempts?result=NEEDS_REVIEW")}
+          onClick={() => navigate("/admin/review")}
         />
         <Kpi label="Avg. duration" value={`${kpis.avgDurationMin} min`} />
       </div>
@@ -112,7 +112,7 @@ export default function AdminDashboard() {
           <h2>Needs-review queue</h2>
           <button
             className="a2-btn a2-btn-ghost"
-            onClick={() => navigate("/admin/attempts?result=NEEDS_REVIEW")}
+            onClick={() => navigate("/admin/review")}
           >
             View all
           </button>

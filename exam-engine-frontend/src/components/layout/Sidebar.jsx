@@ -93,14 +93,14 @@ export default function Sidebar({ user, onNavClose }) {
             </button>
             <button
               onClick={() => handleNav('/admin/attempts')}
-              className={`nav-item ${isActive('/admin/attempts') && !location.search.includes('result=NEEDS_REVIEW') ? 'active' : ''}`}
+              className={`nav-item ${isActive('/admin/attempts') ? 'active' : ''}`}
             >
               <ClipboardList />
               <span>Attempts</span>
             </button>
             <button
-              onClick={() => handleNav('/admin/attempts?result=NEEDS_REVIEW')}
-              className={`nav-item ${location.pathname === '/admin/attempts' && location.search.includes('result=NEEDS_REVIEW') ? 'active' : ''}`}
+              onClick={() => handleNav('/admin/review')}
+              className={`nav-item ${isActive('/admin/review') ? 'active' : ''}`}
             >
               <AlertTriangle />
               <span>Review &amp; flags</span>
