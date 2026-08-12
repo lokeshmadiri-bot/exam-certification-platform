@@ -15,7 +15,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  *   - stopDetection  : fn()     — call to stop the detection loop
  */
 
-const MODELS_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
+const MODELS_URL = '/models/tiny_face_detector';
 const DETECTION_INTERVAL_MS = 1500; // run detection every 1.5 s
 
 export function useFaceDetection() {
@@ -40,7 +40,7 @@ export function useFaceDetection() {
           throw new Error('face-api.js is not loaded. Check the CDN script in index.html.');
         }
 
-        console.log('[FaceDetection] Loading face detection models from CDN…');
+        console.log('[FaceDetection] Loading face detection models from local /models/…');
         setDetectionStatus('loading');
 
         // TinyFaceDetector is very fast and lightweight (< 190 KB weights)
