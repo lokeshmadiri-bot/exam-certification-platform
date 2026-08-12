@@ -63,7 +63,7 @@ export default function CandidateCatalog() {
       </div>
 
       <div className="grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
-        {exams.filter(e => !e.status || e.status === 'ACTIVE' || e.status === 'DRAFT').map((exam) => {
+        {exams.filter(e => e.status === 'ACTIVE').map((exam) => {
           const styleIcon = getStackIcon(exam.stack);
           const lastAttempt = attempts.find(a => a.examId === exam.examId);
           const canAttempt = lastAttempt?.canAttempt ?? true;

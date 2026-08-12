@@ -37,7 +37,7 @@
             List<Exam> exams = examRepository.findAll();
 
             return exams.stream()
-                    .filter(exam -> exam.getStatus() == null || exam.getStatus() == ExamStatus.ACTIVE || exam.getStatus() == ExamStatus.DRAFT)
+                    .filter(exam -> exam.getStatus() == ExamStatus.ACTIVE)
                     .map(exam -> ExamCardResponseDTO.builder()
                             .examId(exam.getId())
                             .title(exam.getTitle())

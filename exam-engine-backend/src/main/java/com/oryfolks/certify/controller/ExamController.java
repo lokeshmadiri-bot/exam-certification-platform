@@ -401,6 +401,14 @@ public class ExamController {
 
         CompetencyLevel level = CompetencyLevel.L5;
         List<CompetencyBand> bands = exam.getCompetencyBands();
+        if (bands == null || bands.isEmpty()) {
+            bands = new ArrayList<>();
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L2).minScore(75).maxScore(89).title("Advanced").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L3).minScore(60).maxScore(74).title("Intermediate").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L4).minScore(40).maxScore(59).title("Beginner").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
+        }
         for (CompetencyBand band : bands) {
             if (finalScore >= band.getMinScore() && finalScore <= band.getMaxScore()) {
                 level = band.getLevelName();
@@ -527,6 +535,14 @@ public class ExamController {
 
         CompetencyLevel level = CompetencyLevel.L5;
         List<CompetencyBand> bands = exam.getCompetencyBands();
+        if (bands == null || bands.isEmpty()) {
+            bands = new ArrayList<>();
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L2).minScore(75).maxScore(89).title("Advanced").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L3).minScore(60).maxScore(74).title("Intermediate").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L4).minScore(40).maxScore(59).title("Beginner").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
+        }
         for (CompetencyBand band : bands) {
             if (finalScore >= band.getMinScore() && finalScore <= band.getMaxScore()) {
                 level = band.getLevelName();
