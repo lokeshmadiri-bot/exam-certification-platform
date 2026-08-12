@@ -1,18 +1,37 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 export function useFullscreenMonitor(active, onViolation) {
+  const wasFullscreenRef = useRef(true);
+
+  useEffect(() => {
+    if (active) {
+      const initial = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
+      wasFullscreenRef.current = initial;
+    }
+  }, [active]);
+
   useEffect(() => {
     if (!active) return;
 
     const handleFullscreenChange = () => {
-      const isFullscreen = document.fullscreenElement ||
-                           document.webkitFullscreenElement ||
-                           document.mozFullScreenElement ||
-                           document.msFullscreenElement;
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
       
-      if (!isFullscreen) {
+      // Only report violation if the candidate was previously in fullscreen and has exited
+      if (wasFullscreenRef.current && !isCurrentlyFullscreen) {
         onViolation('FULLSCREEN_EXIT');
       }
+      
+      wasFullscreenRef.current = isCurrentlyFullscreen;
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);

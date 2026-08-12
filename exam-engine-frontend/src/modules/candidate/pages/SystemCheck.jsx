@@ -12,6 +12,7 @@ export default function CandidateSystemCheck() {
   const [networkAccess, setNetworkAccess] = useState("pending");
   const [checking, setChecking] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [proctorCheckStatus, setProctorCheckStatus] = useState("normal"); // "normal", "multiple_faces", "mobile_phone", "suspicious_activity"
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
@@ -148,6 +149,7 @@ export default function CandidateSystemCheck() {
   }, []);
 
   const handleStartExam = async () => {
+    if (proctorCheckStatus !== 'normal') return;
     setErrorMessage('');
     try {
       // Create exam attempt record on the backend
@@ -172,7 +174,6 @@ export default function CandidateSystemCheck() {
         err?.message ||
         'Failed to start the exam. The exam may be locked or unavailable.';
       setErrorMessage(msg);
-      // Do NOT navigate to a mock runner — that causes the "Submission Failed" ghost screen
     }
   };
 
@@ -224,6 +225,17 @@ export default function CandidateSystemCheck() {
 
     // Only show Start Exam when all checks are ready
     if (cameraAccess === 'ready' && micAccess === 'ready' && networkAccess === 'ready') {
+      if (proctorCheckStatus !== 'normal') {
+        return (
+          <button
+            disabled
+            className="btn bg-[#E02424]/60 text-white flex items-center justify-center gap-1.5 w-full font-semibold text-[13.5px] py-3.5 rounded-xl shadow-none cursor-not-allowed"
+          >
+            <ShieldAlert className="w-4 h-4" />
+            <span>Webcam Verification Blocked</span>
+          </button>
+        );
+      }
       return (
         <button
           onClick={handleStartExam}
@@ -264,13 +276,25 @@ export default function CandidateSystemCheck() {
         {/* Left Side: Live Webcam View */}
         <div className="selfview aspect-[4/3] rounded-2xl overflow-hidden relative bg-gradient-to-t from-[#0b2038] to-[#1c3c66] flex items-center justify-center shadow-lg">
           {cameraAccess === 'ready' ? (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover transform -scale-x-100"
-            />
+            <>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover transform -scale-x-100"
+              />
+              {proctorCheckStatus !== 'normal' && (
+                <div className="absolute inset-0 bg-[#E02424]/20 backdrop-blur-[1px] flex flex-col items-center justify-center text-center p-6 z-20">
+                  <ShieldAlert className="w-12 h-12 text-[#FF4B4B] mb-2 animate-bounce" />
+                  <div className="text-white font-bold text-xs uppercase tracking-wider bg-black/75 px-3.5 py-1.5 rounded-md border border-[#FF4B4B]/30">
+                    {proctorCheckStatus === 'multiple_faces' && 'MULTIPLE FACES DETECTED'}
+                    {proctorCheckStatus === 'mobile_phone' && 'MOBILE PHONE DETECTED'}
+                    {proctorCheckStatus === 'suspicious_activity' && 'SUSPICIOUS ACTIVITY'}
+                  </div>
+                </div>
+              )}
+            </>
           ) : cameraAccess === 'denied' ? (
             <div className="text-center text-[#ff9b9b] px-6">
               <ShieldAlert className="w-16 h-16 mx-auto mb-3" />
@@ -285,15 +309,15 @@ export default function CandidateSystemCheck() {
             </div>
           )}
 
-          <div className="rec absolute top-3.5 left-3.5 flex items-center gap-1.5 bg-black/60 text-white font-mono text-[11px] px-2.5 py-1 rounded-full">
+          <div className="rec absolute top-3.5 left-3.5 flex items-center gap-1.5 bg-black/60 text-white font-mono text-[11px] px-2.5 py-1 rounded-full z-10">
             <i className="w-2 h-2 rounded-full bg-[#F2A93B] animate-[blink_1.4s_infinite]" />
             <span>LIVE FEED</span>
           </div>
 
-          <div className="frameguide absolute inset-3.5 border-2 border-dashed border-white/20 rounded-xl pointer-events-none" />
+          <div className="frameguide absolute inset-3.5 border-2 border-dashed border-white/20 rounded-xl pointer-events-none z-10" />
         </div>
 
-        {/* Right Side: Check status list */}
+        {/* Right Side: Check status list & simulation */}
         <div className="space-y-4">
           <div className="check-list flex flex-col gap-3">
             {/* Camera Check */}
@@ -369,22 +393,61 @@ export default function CandidateSystemCheck() {
             </div>
           </div>
 
-          <div className="card pad bg-white">
+          {/* Webcam Environment Simulation Control Card */}
+          {cameraAccess === 'ready' && (
+            <div className="card pad bg-white border border-[#E4EAF2] rounded-xl p-5 shadow-sm" style={{ padding: '20px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '12px' }}>
+              <h3 className="font-display font-bold text-xs text-[#0E1B2E] uppercase tracking-wider mb-2" style={{ fontSize: '11px' }}>Webcam Detection Simulation</h3>
+              <p className="text-[12px] text-[#5C6B82] leading-relaxed mb-4">
+                Select an environment state to simulate AI webcam checks. Suspicious conditions block exam startup.
+              </p>
+              <div className="grid grid-cols-2 gap-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                <button
+                  onClick={() => setProctorCheckStatus("normal")}
+                  className={`py-2 px-3 rounded-lg text-xs font-semibold border transition-all ${proctorCheckStatus === 'normal' ? 'bg-[#e7f7f0] border-[#0E9F6E] text-[#0a7a52]' : 'bg-[#F8FAFC] border-[#E4EAF2] text-[#5C6B82] hover:bg-[#EEF2F8]'}`}
+                >
+                  Normal (1 Face)
+                </button>
+                <button
+                  onClick={() => setProctorCheckStatus("multiple_faces")}
+                  className={`py-2 px-3 rounded-lg text-xs font-semibold border transition-all ${proctorCheckStatus === 'multiple_faces' ? 'bg-[#FDF3F3] border-[#E02424] text-[#9B1C1C]' : 'bg-[#F8FAFC] border-[#E4EAF2] text-[#5C6B82] hover:bg-[#EEF2F8]'}`}
+                >
+                  Multiple Faces
+                </button>
+                <button
+                  onClick={() => setProctorCheckStatus("mobile_phone")}
+                  className={`py-2 px-3 rounded-lg text-xs font-semibold border transition-all ${proctorCheckStatus === 'mobile_phone' ? 'bg-[#FDF3F3] border-[#E02424] text-[#9B1C1C]' : 'bg-[#F8FAFC] border-[#E4EAF2] text-[#5C6B82] hover:bg-[#EEF2F8]'}`}
+                >
+                  Mobile Phone
+                </button>
+                <button
+                  onClick={() => setProctorCheckStatus("suspicious_activity")}
+                  className={`py-2 px-3 rounded-lg text-xs font-semibold border transition-all ${proctorCheckStatus === 'suspicious_activity' ? 'bg-[#FDF3F3] border-[#E02424] text-[#9B1C1C]' : 'bg-[#F8FAFC] border-[#E4EAF2] text-[#5C6B82] hover:bg-[#EEF2F8]'}`}
+                >
+                  Suspicious Activity
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="card pad bg-white border border-[#E4EAF2] rounded-xl p-5 shadow-sm" style={{ padding: '20px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '12px' }}>
             <h3 className="font-display font-semibold text-sm text-[#0E1B2E] mb-1">Confirm System Readiness</h3>
             <p className="text-[12px] text-[#5C6B82] leading-relaxed mb-4">
               Upon clicking "Start Exam", fullscreen mode will be enabled and online proctoring begins. Camera, microphone and network access are required throughout the examination.
             </p>
 
-            {((cameraAccess === 'denied' || micAccess === 'denied' || networkAccess === 'denied') || (errorMessage && cameraAccess === 'ready' && micAccess === 'ready' && networkAccess === 'ready')) && (
+            {((cameraAccess === 'denied' || micAccess === 'denied' || networkAccess === 'denied') || proctorCheckStatus !== 'normal') && (
               <div className="p-3.5 mb-4 rounded-xl bg-[#FDF3F3] border border-[#FCD9D9] text-[#9B1C1C] text-xs leading-relaxed flex gap-2.5 items-start">
                 <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
                 <div>
                   <b className="font-semibold block mb-0.5">
-                    {(cameraAccess === 'denied' || micAccess === 'denied' || networkAccess === 'denied')
-                      ? 'Permission/Connection Error'
-                      : 'Cannot Start Exam'}
+                    {proctorCheckStatus !== 'normal'
+                      ? 'AI Proctoring Violation'
+                      : 'Permission/Connection Error'}
                   </b>
-                  {errorMessage || "Permissions or network stability validation failed. Please check your system settings."}
+                  {proctorCheckStatus === 'multiple_faces' && 'Multiple faces detected in the camera feed. Please ensure you are alone in the room.'}
+                  {proctorCheckStatus === 'mobile_phone' && 'Mobile phone detected in the camera feed. Please remove all mobile devices from your workspace.'}
+                  {proctorCheckStatus === 'suspicious_activity' && 'Suspicious background/unauthorized activity detected in your camera feed. Please clear your workspace.'}
+                  {proctorCheckStatus === 'normal' && (errorMessage || "Permissions or network stability validation failed. Please check your system settings.")}
                 </div>
               </div>
             )}

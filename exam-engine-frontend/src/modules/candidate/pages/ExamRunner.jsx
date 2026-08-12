@@ -282,9 +282,11 @@ function ExamRunnerContent() {
 
   const {
     strikeCount,
+    violations,
     warningVisible,
     terminated,
-    dismissWarning
+    dismissWarning,
+    handleViolation
   } = useStrikeEngine({
     attemptId,
     initialStrikeCount,
@@ -298,6 +300,20 @@ function ExamRunnerContent() {
   }, [strikeCount, setStrikes]);
 
   const { enterFullscreenMode } = useFullscreen();
+
+  // Expose simulated violation handler globally for the camera feed simulation controls
+  useEffect(() => {
+    window.simulateProctorViolation = (type) => {
+      console.log(`[Simulated Proctor Violation] ${type}`);
+      // Record a silent AI flag
+      recordSilentFlag(type);
+      // Trigger the warning via strike engine
+      handleViolation(type);
+    };
+    return () => {
+      delete window.simulateProctorViolation;
+    };
+  }, [recordSilentFlag, handleViolation]);
 
   // Request Fullscreen on launch
   useEffect(() => {
@@ -339,7 +355,7 @@ function ExamRunnerContent() {
       <WatermarkOverlay />
 
       {/* Warnings & Modals */}
-      <WarningModal isOpen={warningVisible} strikeCount={strikeCount} onClose={dismissWarning} />
+      <WarningModal isOpen={warningVisible} strikeCount={strikeCount} lastViolation={violations[violations.length - 1]} onClose={dismissWarning} />
       <TerminateModal isOpen={terminated} />
       <OfflineOverlay isOpen={!online || offline} />
       <ReconnectLoader isOpen={syncing || reconnecting} />

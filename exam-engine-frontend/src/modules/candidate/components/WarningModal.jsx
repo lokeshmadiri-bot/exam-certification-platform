@@ -1,14 +1,32 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 
-export default function WarningModal({ isOpen, strikeCount, onClose }) {
+export default function WarningModal({ isOpen, strikeCount, lastViolation, onClose }) {
   if (!isOpen) return null;
 
   const isFinal = strikeCount === 3;
-  const title = isFinal ? 'Final Warning' : 'Warning';
-  const description = isFinal
-    ? 'One more violation will terminate your exam.'
-    : 'You left the exam window.';
+  const title = isFinal ? 'Final Warning' : 'Proctoring Warning';
+  
+  let description = 'You left the exam window.';
+  if (isFinal) {
+    description = 'One more violation will terminate your exam immediately.';
+  } else if (lastViolation) {
+    const type = lastViolation.type;
+    if (type === 'FULLSCREEN_EXIT') {
+      description = 'You exited fullscreen mode. Fullscreen is strictly required during the proctored exam.';
+    } else if (type === 'MULTIPLE_FACES') {
+      description = 'Multiple faces detected in the camera feed. Please ensure you are alone in front of the webcam.';
+    } else if (type === 'MOBILE_PHONE') {
+      description = 'Mobile phone detected in the camera feed. Mobile devices are not allowed during the exam.';
+    } else if (type === 'TAB_SWITCH' || type === 'VISIBILITY_CHANGE') {
+      description = 'You switched tabs or left the active exam window.';
+    } else if (type === 'WINDOW_BLUR') {
+      description = 'The exam window lost focus. Please remain focused on the exam screen.';
+    } else if (type === 'WINDOW_RESIZE') {
+      description = 'The exam window was resized. Resizing is flagged as suspicious activity.';
+    }
+  }
+
   const buttonText = isFinal ? 'Continue' : 'Continue Exam';
 
   return (

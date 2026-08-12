@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { proctorService } from '../services/proctorService';
 import { useVisibility } from './useVisibility';
 import { useWindowBlur } from './useWindowBlur';
@@ -21,6 +21,9 @@ export function useStrikeEngine({ attemptId, initialStrikeCount, active, onTermi
 
   // Track the grace period when active becomes true
   const [isGracePeriod, setIsGracePeriod] = useState(true);
+
+  // Cooldown tracker per violation type: Mapping of type -> timestamp (ms)
+  const lastViolationTimeRef = useRef({});
 
   useEffect(() => {
     if (active) {
@@ -50,6 +53,15 @@ export function useStrikeEngine({ attemptId, initialStrikeCount, active, onTermi
     if (isGracePeriod && (type === 'WINDOW_RESIZE' || type === 'WINDOW_BLUR')) {
       return;
     }
+
+    // Cooldown/Debounce check: 10 seconds (10000ms) cooldown per violation type
+    const nowMs = Date.now();
+    const lastTime = lastViolationTimeRef.current[type] || 0;
+    if (nowMs - lastTime < 10000) {
+      console.log(`Violation ${type} suppressed due to 10s cooldown`);
+      return;
+    }
+    lastViolationTimeRef.current[type] = nowMs;
 
     const timestamp = getLocalISOString();
     
@@ -97,6 +109,7 @@ export function useStrikeEngine({ attemptId, initialStrikeCount, active, onTermi
     violations: state.violations,
     warningVisible: state.warningVisible,
     terminated: state.terminated,
-    dismissWarning
+    dismissWarning,
+    handleViolation
   };
 }
