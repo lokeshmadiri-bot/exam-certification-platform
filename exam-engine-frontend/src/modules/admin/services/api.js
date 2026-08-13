@@ -105,8 +105,6 @@ async function withFallback(fn, mock) {
     }
 }
 
-const uid = (p) => `${p}-${Math.random().toString(36).slice(2, 9)}`;
-const nowIso = () => new Date().toISOString();
 
 // ---------------- Auth (Task 1 — Admin Shell) ----------------
 // Auth calls go to /api/auth (not /api/admin/auth) to match the backend AuthController.
