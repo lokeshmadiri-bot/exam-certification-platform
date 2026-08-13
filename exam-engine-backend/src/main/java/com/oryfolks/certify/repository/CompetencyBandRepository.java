@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface CompetencyBandRepository extends JpaRepository<CompetencyBand, UUID> {
     List<CompetencyBand> findByExamId(UUID examId);
+    void deleteByExamId(UUID examId);
 }

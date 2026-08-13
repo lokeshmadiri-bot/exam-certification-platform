@@ -11,4 +11,5 @@ import java.util.UUID;
 public interface QuestionRepository extends JpaRepository<Question, UUID> {
     List<Question> findByExamIdAndIsActiveTrue(UUID examId);
     List<Question> findByExamId(UUID examId);
+    List<Question> findByIsActiveTrue();
 }

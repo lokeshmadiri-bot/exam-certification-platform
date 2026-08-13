@@ -14,7 +14,7 @@ export default function CandidateTerminatedView() {
         </div>
         <span className="eyebrow font-mono text-xs text-[#ffb3b3] tracking-[2px] uppercase">Attempt ended</span>
         <h1 className="font-display font-extrabold text-[38px] mt-2 mb-1">Exam terminated</h1>
-        <div className="exam text-[#e9c9c9] text-[15px]">Left the exam tab 3 times</div>
+        <div className="exam text-[#e9c9c9] text-[15px]">Attempt terminated due to an integrity policy violation.</div>
         <p className="text-[#e9c9c9] text-[13.5px] max-w-[520px] mx-auto mt-3.5 leading-relaxed">
           Your attempt was scored from the answers submitted so far and counts as your attempt for this 30-day window.
         </p>

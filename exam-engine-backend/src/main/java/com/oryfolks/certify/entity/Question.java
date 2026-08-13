@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
-import com.oryfolks.certify.entity.AttemptAnswer;
+
 import java.util.UUID;
 
 @Entity
@@ -15,7 +15,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = ("exam"))
+@ToString(exclude = "exam")
 public class Question {
 
     @Id
@@ -24,7 +24,7 @@ public class Question {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "exam_id", nullable = false)
+    @JoinColumn(name = "exam_id", nullable = true)
     @JsonIgnore
     private Exam exam;
 
@@ -33,12 +33,28 @@ public class Question {
     @JsonIgnore
     private Section section;
 
+    @Column(name = "stack", length = 50)
+    private String stack;
+
     @NotBlank(message = "Question text is required.")
     @Column(name = "question_text", nullable = false, columnDefinition = "TEXT")
     private String questionText;
 
     @Column(name = "code_snippet", columnDefinition = "TEXT")
     private String codeSnippet;
+
+    @Column(name = "topic", length = 100)
+    private String topic;
+
+    @Column(name = "type", length = 20)
+    private String type;
+
+    @Column(name = "level", length = 10)
+    private String level;
+
+    @Column(name = "status", length = 20)
+    @Builder.Default
+    private String status = "ACTIVE";
 
     @NotBlank(message = "Difficulty is required.")
     @Column(nullable = false, length = 20)
@@ -67,6 +83,30 @@ public class Question {
     @NotBlank(message = "Option D is required.")
     @Column(name = "option_d", nullable = false, columnDefinition = "TEXT")
     private String optionD;
+
+    @Column(name = "language", length = 30)
+    private String language;
+
+    @Column(name = "sample_input", columnDefinition = "TEXT")
+    private String sampleInput;
+
+    @Column(name = "sample_output", columnDefinition = "TEXT")
+    private String sampleOutput;
+
+    @Column(name = "expected_output", columnDefinition = "TEXT")
+    private String expectedOutput;
+
+    @Column(name = "model_answer", columnDefinition = "TEXT")
+    private String modelAnswer;
+
+    @Column(name = "explanation", columnDefinition = "TEXT")
+    private String explanation;
+
+    @Column(name = "source", length = 20)
+    private String source;
+
+    @Column(name = "ai_model", length = 50)
+    private String aiModel;
 
     @Builder.Default
     @Column(name = "is_active")

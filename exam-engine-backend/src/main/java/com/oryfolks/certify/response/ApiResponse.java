@@ -47,4 +47,25 @@ public class ApiResponse<T> {
                 .timestamp(LocalDateTime.now())
                 .build();
     }
+
+    /**
+     * Helper method to return a successful response with just a message (no data)
+     */
+    public static <T> ApiResponse<T> success(String message) {
+        return success(message, null);
+    }
+
+    /**
+     * Helper method to return an error response with a message and some data
+     */
+    public static <T> ApiResponse<T> error(String message, T data) {
+        return ApiResponse.<T>builder()
+                .success(false)
+                .message(message)
+                .data(data)
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
+
 }

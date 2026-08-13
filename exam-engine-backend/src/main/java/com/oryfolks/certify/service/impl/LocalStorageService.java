@@ -1,4 +1,4 @@
-package com.oryfolks.certify.service.impl;
+ package com.oryfolks.certify.service.impl;
 
 import com.oryfolks.certify.service.StorageService;
 import org.springframework.beans.factory.annotation.Value;

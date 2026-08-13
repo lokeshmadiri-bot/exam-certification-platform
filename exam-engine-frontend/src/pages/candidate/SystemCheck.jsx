@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Camera, Check, Play, ShieldAlert, Wifi, Cpu, Loader } from 'lucide-react';
+import { Camera, Mic, Play, ShieldAlert, Wifi, Loader } from 'lucide-react';
 import { examService, attemptService } from '../../services/api';
 
 export default function CandidateSystemCheck() {
   const { examId } = useParams();
   const navigate = useNavigate();
   const [exam, setExam] = useState(null);
-  const [cameraAccess, setCameraAccess] = useState('checking'); // checking, ready, denied
-  const [networkAccess, setNetworkAccess] = useState('checking'); // checking, ready
+  const [cameraAccess, setCameraAccess] = useState("checking");
+  const [micAccess, setMicAccess] = useState("checking");
+  const [networkAccess, setNetworkAccess] = useState(
+    navigator.onLine ? "ready" : "denied"
+  );
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
@@ -26,39 +29,98 @@ export default function CandidateSystemCheck() {
 
   // Request camera access
   useEffect(() => {
-    async function requestCamera() {
+    console.log("System Check useEffect executed");
+    async function initializeSystemCheck() {
+      console.log("initializeSystemCheck started");
+      // Camera Check
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        setCameraAccess('ready');
-      } catch (err) {
-        console.error('Camera access denied:', err);
-        setCameraAccess('denied');
-      }
-    }
-    requestCamera();
+        console.log("Requesting camera permission");
+        const cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: 320,
+            height: 240
+          }
+        });
+        console.log("Camera permission granted");
 
-    // Simulate network stability check
-    const netTimer = setTimeout(() => {
-      setNetworkAccess('ready');
-    }, 2200);
+        setCameraAccess("ready");
+
+        streamRef.current = cameraStream;
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = cameraStream;
+        }
+
+      } catch (err) {
+
+
+        console.error("Camera Error:", err);
+
+        setCameraAccess("denied");
+
+      }
+
+      // Microphone Check
+      try {
+        console.log("Requesting microphone permission");
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: true
+        });
+        console.log("Microphone permission granted");
+        setMicAccess("ready");
+
+        // Stop microphone stream immediately since
+        // we only wanted to check permission
+        micStream.getTracks().forEach(track => track.stop());
+
+      } catch (err) {
+
+        console.error("Microphone Error:", err);
+
+        setMicAccess("denied");
+
+      }
+
+    }
+
+    initializeSystemCheck();
+
+    const handleOnline = () => {
+
+      setNetworkAccess("ready");
+
+    };
+
+    const handleOffline = () => {
+
+      setNetworkAccess("denied");
+
+    };
+
+    window.addEventListener("online", handleOnline);
+
+    window.addEventListener("offline", handleOffline);
 
     return () => {
-      clearTimeout(netTimer);
-      // Stop webcam stream when component unmounts
+
+      window.removeEventListener("online", handleOnline);
+
+      window.removeEventListener("offline", handleOffline);
+
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
+
+        streamRef.current.getTracks().forEach(track => track.stop());
+
       }
+
     };
+
   }, []);
 
   const handleStartExam = async () => {
     try {
       // Create exam attempt record on the backend
-      const res = await examService.startExamAttempt(examId);
+      const res = await attemptService.startAttempt(examId);
       if (res.success) {
         // Clean stream tracks so that the runner can re-capture or preserve it
         if (streamRef.current) {
@@ -73,7 +135,10 @@ export default function CandidateSystemCheck() {
 
   if (!exam) {
     return <div className="text-center py-10 font-mono text-sm text-[#8A99AE]">Loading system check...</div>;
+
   }
+  console.log("cameraAccess =", cameraAccess);
+  console.log("micAccess =", micAccess);
 
   return (
     <div>
@@ -81,7 +146,7 @@ export default function CandidateSystemCheck() {
         <span className="eyebrow font-mono text-xs font-semibold text-[#2F6BFF] uppercase tracking-[1.4px]">Step 2 of 3</span>
         <h1 className="font-display font-bold text-[27px] text-[#0E1B2E] mt-1 mb-1">System Check</h1>
         <p className="text-[#5C6B82] text-sm">
-          Please verify your camera feed and stability requirements before starting.
+          Please verify your camera, microphone and network connection before starting the exam.
         </p>
       </div>
 
@@ -141,6 +206,44 @@ export default function CandidateSystemCheck() {
               </div>
             </div>
 
+            {/* Microphone Check */}
+            <div
+              className={`check-item flex items-center gap-3.5 p-[15px_16px] bg-white border border-[#E4EAF2] rounded-xl shadow-sm ${micAccess === "ready" ? "done" : ""
+                }`}
+            >
+              <div
+                className={`ci w-[38px] h-[38px] rounded-lg flex items-center justify-center shrink-0 ${micAccess === "ready"
+                  ? "bg-[#e7f7f0] text-[#0E9F6E]"
+                  : "bg-[#F4F7FC] text-[#5C6B82]"
+                  }`}
+              >
+                <Mic className="w-[19px] h-[19px]" />
+              </div>
+
+              <div>
+                <b className="text-[13.5px] font-semibold text-[#0E1B2E]">
+                  Microphone Access
+                </b>
+
+                <span className="text-[12px] text-[#5C6B82] block mt-0.5">
+                  Required for online proctoring
+                </span>
+              </div>
+
+              <div className="state ml-auto font-mono text-xs">
+                {micAccess === "ready" ? (
+                  <span className="chip ok bg-[#e7f7f0] text-[#0a7a52] font-semibold rounded-full px-2.5 py-0.5">
+                    Ready
+                  </span>
+                ) : micAccess === "denied" ? (
+                  <span className="chip bad bg-[#fde8e8] text-[#bb2e2e] font-semibold rounded-full px-2.5 py-0.5">
+                    Failed
+                  </span>
+                ) : (
+                  <Loader className="w-4 h-4 animate-spin text-[#2F6BFF]" />
+                )}
+              </div>
+            </div>
             {/* Network Stability Check */}
             <div className={`check-item flex items-center gap-3.5 p-[15px_16px] bg-white border border-[#E4EAF2] rounded-xl shadow-sm ${networkAccess === 'ready' ? 'done' : ''}`}>
               <div className={`ci w-[38px] h-[38px] rounded-lg flex items-center justify-center shrink-0 ${networkAccess === 'ready' ? 'bg-[#e7f7f0] text-[#0E9F6E]' : 'bg-[#F4F7FC] text-[#5C6B82]'}`}>
@@ -148,13 +251,21 @@ export default function CandidateSystemCheck() {
               </div>
               <div>
                 <b className="text-[13.5px] font-semibold text-[#0E1B2E]">Network Connection</b>
-                <span className="text-[12px] text-[#5C6B82] block mt-0.5">{networkAccess === 'ready' ? 'Stable · 48 Mbps' : 'Testing stability…'}</span>
+                <span className="text-[12px] text-[#5C6B82] block mt-0.5">
+                  {networkAccess === "ready"
+                    ? "Internet connection available"
+                    : "No internet connection"}
+                </span>
               </div>
               <div className="state ml-auto font-mono text-xs">
-                {networkAccess === 'ready' ? (
-                  <span className="chip ok bg-[#e7f7f0] text-[#0a7a52] font-semibold rounded-full px-2.5 py-0.5">Ready</span>
+                {networkAccess === "ready" ? (
+                  <span className="chip ok bg-[#e7f7f0] text-[#0a7a52] font-semibold rounded-full px-2.5 py-0.5">
+                    Ready
+                  </span>
                 ) : (
-                  <Loader className="w-4 h-4 animate-spin text-[#2F6BFF]" />
+                  <span className="chip bad bg-[#fde8e8] text-[#bb2e2e] font-semibold rounded-full px-2.5 py-0.5">
+                    Offline
+                  </span>
                 )}
               </div>
             </div>
@@ -163,10 +274,14 @@ export default function CandidateSystemCheck() {
           <div className="card pad bg-white">
             <h3 className="font-display font-semibold text-sm text-[#0E1B2E] mb-1">Confirm System Readiness</h3>
             <p className="text-[12px] text-[#5C6B82] leading-relaxed mb-4">
-              Upon clicking "Start Exam", the interface enters fullscreen mode. Any attempt to minimize the window or exit fullscreen triggers warnings.
+              Upon clicking "Start Exam", fullscreen mode will be enabled and online proctoring begins. Camera, microphone and network access are required throughout the examination.
             </p>
             <button
-              disabled={cameraAccess !== 'ready' || networkAccess !== 'ready'}
+              disabled={
+                cameraAccess !== "ready" ||
+                micAccess !== "ready" ||
+                networkAccess !== "ready"
+              }
               onClick={handleStartExam}
               className="btn bg-[#F2A93B] hover:bg-[#e69f2c] text-[#3a2700] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 w-full font-semibold text-[13.5px] py-3.5 rounded-xl shadow-md transition-all"
             >

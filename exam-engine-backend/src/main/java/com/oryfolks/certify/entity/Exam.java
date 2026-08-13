@@ -59,16 +59,22 @@ public class Exam {
     @Column(name = "pass_mark", nullable = false)
     private Integer passMark;
 
+    @Column(name = "instructions", columnDefinition = "TEXT")
+    private String instructions;
+
     @NotBlank(message = "Version is required.")
     @Column(name = "version", nullable = false, length = 10)
-    private String version;
+    @Builder.Default
+    private String version = "1";
 
     @NotNull(message = "Exam status is required.")
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    private ExamStatus status;
+    @Builder.Default
+    private ExamStatus status = ExamStatus.DRAFT;
 
     @OneToMany(mappedBy = "exam", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties("exam")
     @Builder.Default
     private List<CompetencyBand> competencyBands = new ArrayList<>();
 
@@ -79,4 +85,29 @@ public class Exam {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // Frontend compatibility alias methods
+    public Integer getDurationMin() {
+        return durationMinutes;
+    }
+
+    public void setDurationMin(Integer durationMin) {
+        this.durationMinutes = durationMin;
+    }
+
+    public Integer getQuestionPoolSize() {
+        return questionPool;
+    }
+
+    public void setQuestionPoolSize(Integer questionPoolSize) {
+        this.questionPool = questionPoolSize;
+    }
+
+    public Integer getQuestionsPerAttempt() {
+        return perAttempt;
+    }
+
+    public void setQuestionsPerAttempt(Integer questionsPerAttempt) {
+        this.perAttempt = questionsPerAttempt;
+    }
 }

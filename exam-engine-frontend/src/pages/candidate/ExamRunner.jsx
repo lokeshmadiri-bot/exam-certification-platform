@@ -7,12 +7,12 @@ import Toast from '../../components/common/Toast';
 export default function ExamRunner() {
   const { attemptId } = useParams();
   const navigate = useNavigate();
-  
+
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState({}); // questionId -> chosenOption
-  
+
   // Timer & Status
   const [timeRemaining, setTimeRemaining] = useState(41 * 60 + 12); // seconds
   const [strikes, setStrikes] = useState(0);
@@ -30,7 +30,7 @@ export default function ExamRunner() {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const runnerRef = useRef(null);
-  
+
   // Initialize and load attempt data
   useEffect(() => {
     async function loadAttempt() {
@@ -43,7 +43,7 @@ export default function ExamRunner() {
         // Let's fallback to standard template if API fails, but make it fit the API return
         const attemptObj = res.data.attempt;
         const examObj = attemptObj.exam;
-        
+
         // Since getAttemptDetail returns attempt summary, let's load active questions
         // We will fetch questions using attempt details
         const questionsRes = await attemptService.startAttempt(examObj.id);
@@ -83,7 +83,7 @@ export default function ExamRunner() {
   useEffect(() => {
     if (!loading && runnerRef.current) {
       if (runnerRef.current.requestFullscreen) {
-        runnerRef.current.requestFullscreen().catch(() => {});
+        runnerRef.current.requestFullscreen().catch(() => { });
       }
     }
   }, [loading]);
@@ -161,21 +161,21 @@ export default function ExamRunner() {
   const handleStrikeTrigger = async (code, meta) => {
     if (handRaised || offline) return;
     const formatTime = formatTimeRemaining(timeRemaining);
-    
+
     // Capture snapshot from webcam
     const blob = await captureSnapshotBlob();
     const imageFile = blob ? new File([blob], 'snapshot.jpg', { type: 'image/jpeg' }) : null;
 
     try {
       const res = await attemptService.recordTabSwitch(attemptId, formatTime);
-      
+
       // Upload webcam snapshot associated with violation
       await attemptService.recordViolation(attemptId, code, meta, formatTime, imageFile);
 
       if (res.data.terminated) {
         // Stop camera tracks and exit fullscreen
         if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-        try { if (document.exitFullscreen) document.exitFullscreen(); } catch (_) {}
+        try { if (document.exitFullscreen) document.exitFullscreen(); } catch (_) { }
         navigate('/candidate/terminated');
       } else {
         setStrikes(res.data.strikes);
@@ -220,7 +220,7 @@ export default function ExamRunner() {
   const handleGradingSubmit = async () => {
     setShowConfirmSubmit(false);
     setShowThanks(true);
-    
+
     // Assemble submissions array
     const submissions = Object.keys(selectedAnswers).map(qId => ({
       questionId: qId,
@@ -232,7 +232,7 @@ export default function ExamRunner() {
       if (res.success) {
         // Stop stream and fullscreen
         if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-        try { if (document.exitFullscreen) document.exitFullscreen(); } catch (_) {}
+        try { if (document.exitFullscreen) document.exitFullscreen(); } catch (_) { }
         setTimeout(() => {
           navigate(`/candidate/result-view/${attemptId}`);
         }, 1700);
@@ -367,7 +367,7 @@ export default function ExamRunner() {
               </div>
 
               <h2 className="font-display font-semibold text-[23px] text-white leading-snug mb-2">{currentQuestion.questionText}</h2>
-              
+
               {currentQuestion.codeSnippet && (
                 <div className="code font-mono text-[13px] bg-[#0c2138] border border-white/10 rounded-lg p-[13px_15px] text-[#bcd0ee] my-[14px] whitespace-pre">
                   {currentQuestion.codeSnippet}
@@ -384,13 +384,11 @@ export default function ExamRunner() {
                   <div
                     key={opt.key}
                     onClick={() => selectOption(opt.key)}
-                    className={`opt flex items-center gap-3.5 p-[16px_18px] border-[1.5px] rounded-xl bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer ${
-                      selectedAnswers[currentQuestion.id] === opt.key ? 'sel border-[#2F6BFF] bg-[#2f6bff]/10 shadow-[0_0_0_3px_rgba(47,107,255,0.13)]' : 'border-white/10'
-                    }`}
+                    className={`opt flex items-center gap-3.5 p-[16px_18px] border-[1.5px] rounded-xl bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer ${selectedAnswers[currentQuestion.id] === opt.key ? 'sel border-[#2F6BFF] bg-[#2f6bff]/10 shadow-[0_0_0_3px_rgba(47,107,255,0.13)]' : 'border-white/10'
+                      }`}
                   >
-                    <span className={`k w-[30px] h-[30px] rounded-lg font-mono text-[13px] flex items-center justify-center shrink-0 ${
-                      selectedAnswers[currentQuestion.id] === opt.key ? 'bg-[#2F6BFF] text-white' : 'bg-white/10 text-[#cdddf6]'
-                    }`}>{opt.key}</span>
+                    <span className={`k w-[30px] h-[30px] rounded-lg font-mono text-[13px] flex items-center justify-center shrink-0 ${selectedAnswers[currentQuestion.id] === opt.key ? 'bg-[#2F6BFF] text-white' : 'bg-white/10 text-[#cdddf6]'
+                      }`}>{opt.key}</span>
                     <p className="text-[14.5px] text-[#e3ebf8]">{opt.text}</p>
                   </div>
                 ))}
@@ -466,13 +464,12 @@ export default function ExamRunner() {
                   <button
                     key={q.id}
                     onClick={() => setCurrentIdx(i)}
-                    className={`aspect-square rounded-lg font-mono text-xs flex items-center justify-center border ${
-                      i === currentIdx
-                        ? 'bg-[#2F6BFF] text-white border-[#2F6BFF]'
-                        : isSelected
+                    className={`aspect-square rounded-lg font-mono text-xs flex items-center justify-center border ${i === currentIdx
+                      ? 'bg-[#2F6BFF] text-white border-[#2F6BFF]'
+                      : isSelected
                         ? 'bg-[#2f6bff]/20 text-[#cdddf6] border-[#2f6bff]/40'
                         : 'bg-white/5 text-[#9fb6d6] border-white/10'
-                    }`}
+                      }`}
                   >
                     {i + 1}
                   </button>
@@ -484,13 +481,13 @@ export default function ExamRunner() {
           {/* Action Row */}
           <div className="flex flex-col gap-2.5 mt-auto">
             <button
-              onClick={handleRaiseHand}
+              onClick={() => handleGradingSubmit(false)}
               className="btn ghost flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-[#cdddf6] hover:bg-white/10 py-3 rounded-xl font-semibold text-[13.5px]"
             >
               <span>Raise hand</span>
               <span className="font-mono text-xs text-[#8A99AE]">{raiseCount}/5</span>
             </button>
-            
+
             <button
               onClick={() => setShowConfirmSubmit(true)}
               className="btn bg-[#F2A93B] hover:bg-[#e69f2c] text-[#3a2700] flex items-center justify-center py-3 rounded-xl font-semibold text-[13.5px] shadow-md"
@@ -518,7 +515,7 @@ export default function ExamRunner() {
               </button>
               <button
                 className="px-[18px] py-[11px] rounded-xl bg-[#2F6BFF] hover:bg-[#2256d6] text-white font-semibold text-[13.5px] shadow-[0_6px_16px_rgba(47,107,255,0.2)] transition-all"
-                onClick={handleGradingSubmit}
+                onClick={() => handleGradingSubmit(true)}
               >
                 Submit anyway
               </button>

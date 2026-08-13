@@ -1,10 +1,11 @@
-package com.examportal.exam_engine_backend;
+package com.oryfolks.certify;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class ExamEngineBackendApplicationTests {
+
+@SpringBootTest(classes = CertifyApplication.class)
+class CertifyApplicationTests {
 
 	@Test
 	void contextLoads() {

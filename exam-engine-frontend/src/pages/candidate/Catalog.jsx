@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Award, Play } from 'lucide-react';
-import { examService, attemptService } from '../../services/api';
+import { examService, attemptService, candidateService } from '../../services/api';
 
 export default function CandidateCatalog() {
   const navigate = useNavigate();
@@ -13,7 +13,7 @@ export default function CandidateCatalog() {
     async function loadData() {
       try {
         const examsRes = await examService.getAllExams();
-        const attemptsRes = await attemptService.getMyAttempts();
+        const attemptsRes = await candidateService.getMyAttempts();
         setExams(examsRes.data || []);
         setAttempts(attemptsRes.data || []);
       } catch (err) {
@@ -35,21 +35,7 @@ export default function CandidateCatalog() {
     return configs[stack] || { bg: '#eef2f8', fg: '#5C6B82' };
   };
 
-  const isLocked = (examId) => {
-    const lastAttempt = attempts.find(a => a.exam.id === examId);
-    if (!lastAttempt) return false;
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    return new Date(lastAttempt.createdAt) > thirtyDaysAgo;
-  };
 
-  const getLockDaysLeft = (examId) => {
-    const lastAttempt = attempts.find(a => a.exam.id === examId);
-    if (!lastAttempt) return 0;
-    const diffTime = Math.abs(new Date() - new Date(lastAttempt.createdAt));
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, 30 - diffDays);
-  };
 
   if (loading) {
     return <div className="text-center py-10 font-mono text-sm text-[#8A99AE]">Loading catalog...</div>;
@@ -68,11 +54,16 @@ export default function CandidateCatalog() {
       <div className="exam-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {exams.filter(e => e.status === 'ACTIVE').map((exam) => {
           const style = getStackIcon(exam.stack);
-          const locked = isLocked(exam.id);
-          const daysLeft = getLockDaysLeft(exam.id);
+          const lastAttempt = attempts.find(
+            a => a.examId === exam.examId
+          );
+
+          const canAttempt = lastAttempt?.canAttempt ?? true;
+
+          const daysLeft = lastAttempt?.retryDaysLeft ?? 0;
 
           return (
-            <div key={exam.id} className="exam-card bg-white border border-[#E4EAF2] rounded-2xl p-[18px] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex flex-col">
+            <div key={exam.examId} className="exam-card bg-white border border-[#E4EAF2] rounded-2xl p-[18px] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex flex-col">
               <div className="top flex items-center gap-3 mb-3.5">
                 <div className="ic w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: style.bg, color: style.fg }}>
                   <Award className="w-5.5 h-5.5" />
@@ -82,14 +73,14 @@ export default function CandidateCatalog() {
                   <div className="sub text-[11.5px] text-[#5C6B82] capitalize">{exam.stack} Certification</div>
                 </div>
               </div>
-              
+
               <div className="facts flex gap-4 my-4 text-xs text-[#5C6B82]">
                 <span>Duration <b className="text-[#0E1B2E] font-mono font-semibold">{exam.durationMinutes}m</b></span>
                 <span>Questions <b className="text-[#0E1B2E] font-mono font-semibold">{exam.perAttempt}</b></span>
               </div>
 
               <div className="foot mt-auto flex items-center justify-between">
-                {locked ? (
+                {!canAttempt ? (
                   <>
                     <span className="chip warn bg-[#fdf3da] text-[#9c7400]">Locked · {daysLeft}d left</span>
                     <button className="btn ghost cursor-not-allowed opacity-50 px-3.5 py-2 text-[12.5px] font-semibold rounded-lg" disabled>
@@ -99,8 +90,8 @@ export default function CandidateCatalog() {
                 ) : (
                   <>
                     <span className="chip ok bg-[#e7f7f0] text-[#0a7a52]">Available</span>
-                    <button 
-                      onClick={() => navigate(`/candidate/instructions/${exam.id}`)}
+                    <button
+                      onClick={() => navigate(`/candidate/instructions/${exam.examId}`)}
                       className="btn bg-[#2F6BFF] hover:bg-[#2256d6] text-white flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-semibold rounded-lg shadow-sm"
                     >
                       <span>Start</span>

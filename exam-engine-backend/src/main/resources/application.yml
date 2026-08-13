@@ -20,6 +20,11 @@ spring:
       max-file-size: 10MB
       max-request-size: 10MB
 
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+
 app:
   jwt:
     secret: ${JWT_SECRET:SecretKeyToGenerateJWTsSecretKeyToGenerateJWTsSecretKeyToGenerateJWTs}
@@ -33,3 +38,22 @@ app:
       region: ${AWS_REGION:us-east-1}
       access-key: ${AWS_ACCESS_KEY_ID:}
       secret-key: ${AWS_SECRET_ACCESS_KEY:}
+
+# ---- AI Question Generation (Groq / Grok / Gemini) ----
+groq:
+  api:
+    key: ${GROQ_API_KEY:${GROK_API_KEY:}}
+    url: ${GROQ_API_URL:https://api.groq.com/openai/v1/chat/completions}
+    model: ${GROQ_MODEL:llama-3.3-70b-versatile}
+ 
+grok:
+  api:
+    key: ${GROK_API_KEY:}
+    url: ${GROK_API_URL:https://api.x.ai/v1/chat/completions}
+    model: ${GROK_MODEL:grok-2-latest}
+ 
+gemini:
+  api:
+    key: ${GEMINI_API_KEY:}
+    url: ${GEMINI_API_URL:https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent}
+ 

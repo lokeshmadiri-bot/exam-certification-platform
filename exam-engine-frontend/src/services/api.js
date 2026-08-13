@@ -35,10 +35,39 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+async function encryptPassword(password) {
+  try {
+    if (!window.crypto || !window.crypto.subtle) {
+      return btoa(password);
+    }
+    const keyText = "OryFolksCertifyK";
+    const ivText = "OryFolksCertifyI";
+    const enc = new TextEncoder();
+    const rawKey = enc.encode(keyText);
+    const iv = enc.encode(ivText);
+    const key = await window.crypto.subtle.importKey(
+      "raw",
+      rawKey,
+      { name: "AES-CBC" },
+      false,
+      ["encrypt"]
+    );
+    const encrypted = await window.crypto.subtle.encrypt(
+      { name: "AES-CBC", iv: iv },
+      key,
+      enc.encode(password)
+    );
+    return btoa(String.fromCharCode(...new Uint8Array(encrypted)));
+  } catch (err) {
+    console.error("Encryption failed, falling back to base64", err);
+    return btoa(password);
+  }
+}
 
 export const authService = {
   login: async (username, password) => {
-    const response = await api.post('/auth/login', { username, password });
+    const encryptedPassword = await encryptPassword(password);
+    const response = await api.post('/auth/login', { username, password: encryptedPassword });
     if (response.data.success && response.data.data.token) {
       localStorage.setItem('token', response.data.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.data));
@@ -88,12 +117,20 @@ export const examService = {
     const response = await api.get(`/exams/attempts/${attemptId}`);
     return response.data;
   },
-  saveAnswer: async (attemptId, questionId, selectedOption) => {
-    const response = await api.post(`/exams/attempts/${attemptId}/answers`, { questionId, selectedOption });
+  saveAnswer: async (attemptId, questionId, selectedOption, optionId) => {
+    const response = await api.post(`/exams/attempts/${attemptId}/answers`, { questionId, selectedOption, optionId });
     return response.data;
   },
   submitAttemptNew: async (attemptId) => {
     const response = await api.post(`/exams/attempts/${attemptId}/submit`);
+    return response.data;
+  },
+  getRemainingTime: async (attemptId) => {
+    const response = await api.get(`/exams/attempts/${attemptId}/timer`);
+    return response.data;
+  },
+  getIntegritySettings: async (attemptId) => {
+    const response = await api.get(`/exams/attempts/${attemptId}/integrity`);
     return response.data;
   }
 };
@@ -108,11 +145,13 @@ export const attemptService = {
     return response.data;
   },
   getMyAttempts: async () => {
-    const response = await api.get('/attempts/my-attempts');
+    const response = await api.get('/candidate/attempts/my-attempts');
     return response.data;
   },
   startAttempt: async (examId) => {
-    const response = await api.post(`/attempts/start?examId=${examId}`);
+    const response = await api.post("/candidate/attempts/start", {
+      examId
+    });
     return response.data;
   },
   recordTabSwitch: async (attemptId, offset) => {
@@ -145,8 +184,14 @@ export const adminService = {
     const response = await api.get('/admin/candidates');
     return response.data;
   },
-  approveOverride: async (candidateId) => {
-    const response = await api.post(`/admin/candidates/${candidateId}/override`);
+  approveOverride: async (candidateId, examId) => {
+    const response = await api.post(
+      `/admin/candidates/${candidateId}/override`,
+      {
+        examId
+      }
+    );
+
     return response.data;
   },
   getAuditLogs: async () => {
@@ -155,4 +200,37 @@ export const adminService = {
   }
 };
 
+export const candidateService = {
+  // Candidate Dashboard
+  getDashboard: async () => {
+    const response = await api.get('/candidate/dashboard');
+    return response.data;
+  },
+
+  getProfile: async () => {
+    const response = await api.get("/candidate/profile");
+    return response.data;
+  },
+
+  // Candidate Attempt History
+  getMyAttempts: async () => {
+    const response = await api.get('/candidate/attempts');
+    return response.data;
+  },
+
+  // Candidate Attempt Details
+  getAttemptDetails: async (attemptId) => {
+    const response = await api.get(`/candidate/attempts/${attemptId}`);
+    return response.data;
+  },
+
+  // Candidate Results
+  getMyResults: async () => {
+    const response = await api.get('/candidate/results');
+    return response.data;
+  }
+};
+
+
 export default api;
+

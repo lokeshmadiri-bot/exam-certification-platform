@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ShieldCheck, Monitor, HelpCircle, RefreshCw, ChevronRight } from 'lucide-react';
+import { ShieldCheck, Monitor, RefreshCw, ChevronRight } from 'lucide-react';
 import { examService } from '../../services/api';
 
 export default function CandidateInstructions() {
   const { examId } = useParams();
   const navigate = useNavigate();
   const [exam, setExam] = useState(null);
-  const [lang, setLang] = useState('en');
   const [agreed, setAgreed] = useState(false);
 
   useEffect(() => {
@@ -30,69 +29,42 @@ export default function CandidateInstructions() {
       r1: "Switching tabs, minimising or resizing the window each count as a strike. After 3 strikes the exam ends automatically.",
       r2t: "Camera & lighting",
       r2: "Sit facing a light source and avoid backlight. Keep your face fully in frame for the whole exam.",
-      r3t: "Raise hand if you need help",
-      r3: "Use Raise Hand to signal the invigilator. It pauses proctoring and answering. You may raise it up to 5 times.",
       r4t: "Refresh, back or closing = ended",
       r4: "Refreshing the page, pressing back or closing the tab submits your answers and ends the attempt. You cannot re-enter.",
       fmt: "Format at a glance",
-      sec: "Sections",
       q: "Questions",
       dur: "Duration",
-      autos: "You answer one section at a time and can revisit earlier sections before submitting. Answers save automatically as you go.",
+      autos: "Your answers are saved automatically while you progress through the exam. You may review and modify your answers before submitting the exam.",
       agt: "I have read and agree to the rules",
-      ag: "Including proctoring, recording and termination conditions.",
+      ag: "Including online proctoring, webcam recording, exam integrity monitoring and automatic termination conditions.",
       proceed: "Proceed to system check"
-    },
-    ja: {
-      title: "試験の注意事項",
-      lede: "ルールをよくお読みください。先へ進むには同意が必要です。",
-      r1t: "試験タブから離れない",
-      r1: "タブの切り替え・最小化・ウィンドウのサイズ変更はそれぞれ違反1回。3回で試験は自動終了します。",
-      r2t: "カメラと照明",
-      r2: "光の方を向いて座り、逆光を避けてください。試験中は顔が枠内に収まるようにしてください。",
-      r3t: "困ったら挙手",
-      r3: "挙手で監督者に合図できます。挙手中は監督と解答が一時停止します。最大5回まで可能です。",
-      r4t: "更新・戻る・閉じる＝終了",
-      r4: "ページの更新、戻る操作、タブを閉じると解答が送信され試験は終了します。再入室はできません。",
-      fmt: "試験の概要",
-      sec: "セクション",
-      q: "問題数",
-      dur: "制限時間",
-      autos: "1セクションずつ解答し、提出前に前のセクションへ戻れます。解答は自動保存されます。",
-      agt: "ルールを読み、同意します",
-      ag: "監督・録画・終了条件を含みます。",
-      proceed: "システムチェックへ進む"
     }
   };
 
-  const t = I18N[lang];
+  const t = I18N.en;
 
   if (!exam) {
-    return <div className="text-center py-10 font-mono text-sm text-[#8A99AE]">Loading instructions...</div>;
+    return <div className="flex items-center justify-center py-12">
+      <div className="animate-spin rounded-full h-6 w-6 border-2 border-[#2F6BFF] border-t-transparent"></div>
+
+      <span className="ml-3 text-[#5C6B82] text-sm">
+        Loading exam instructions...
+      </span>
+    </div>;
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center mb-6">
         <div className="page-head mb-0">
           <span className="eyebrow font-mono text-xs font-semibold text-[#2F6BFF] uppercase tracking-[1.4px]">Step 1 of 3</span>
-          <h1 className="font-display font-bold text-[27px] text-[#0E1B2E] mt-1">{exam.title}</h1>
-        </div>
+          <h1 className="font-display font-bold text-[27px] text-[#0E1B2E] mt-1">
+            {exam.title}
+          </h1>
 
-        {/* Language Switcher */}
-        <div className="lang-toggle flex bg-[#F4F7FC] border border-[#E4EAF2] rounded-xl p-[3px]">
-          <button
-            onClick={() => setLang('en')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold ${lang === 'en' ? 'bg-white text-[#2F6BFF] shadow-sm' : 'text-[#5C6B82]'}`}
-          >
-            English
-          </button>
-          <button
-            onClick={() => setLang('ja')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold ${lang === 'ja' ? 'bg-white text-[#2F6BFF] shadow-sm' : 'text-[#5C6B82]'}`}
-          >
-            日本語
-          </button>
+          <p className="text-[#5C6B82] text-sm mt-1">
+            {exam.stack} Certification
+          </p>
         </div>
       </div>
 
@@ -127,16 +99,6 @@ export default function CandidateInstructions() {
 
             <div className="instr flex gap-3.5">
               <div className="ic shrink-0 w-[38px] h-[38px] rounded-xl bg-[#eaf1ff] text-[#2F6BFF] flex items-center justify-center">
-                <HelpCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <b className="text-[13.5px] font-semibold text-[#0E1B2E]">{t.r3t}</b>
-                <p className="text-[12.5px] text-[#5C6B82] leading-relaxed mt-0.5">{t.r3}</p>
-              </div>
-            </div>
-
-            <div className="instr flex gap-3.5">
-              <div className="ic shrink-0 w-[38px] h-[38px] rounded-xl bg-[#eaf1ff] text-[#2F6BFF] flex items-center justify-center">
                 <RefreshCw className="w-5 h-5" />
               </div>
               <div>
@@ -148,15 +110,12 @@ export default function CandidateInstructions() {
         </div>
 
         {/* Right Side: Format & Consent */}
-        <div className="space-y-4">
+        <div className="flex flex-col" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           <div className="card pad bg-white">
             <h3 className="font-display font-semibold text-sm text-[#0E1B2E] mb-3.5">{t.fmt}</h3>
-            
+
             <div className="space-y-2.5 text-[13px] border-b border-[#EEF2F8] pb-3.5">
-              <div className="flex justify-between">
-                <span className="text-[#5C6B82]">{t.sec}</span>
-                <b className="font-mono text-[#0E1B2E] font-semibold">9 sections</b>
-              </div>
+              
               <div className="flex justify-between">
                 <span className="text-[#5C6B82]">{t.q}</span>
                 <b className="font-mono text-[#0E1B2E] font-semibold">{exam.perAttempt} MCQs</b>
@@ -164,6 +123,15 @@ export default function CandidateInstructions() {
               <div className="flex justify-between">
                 <span className="text-[#5C6B82]">{t.dur}</span>
                 <b className="font-mono text-[#0E1B2E] font-semibold">{exam.durationMinutes} minutes</b>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#5C6B82]">
+                  Passing Score
+                </span>
+
+                <b className="font-mono text-[#0E1B2E] font-semibold">
+                  {exam.passMark}%
+                </b>
               </div>
             </div>
 
@@ -173,16 +141,16 @@ export default function CandidateInstructions() {
           </div>
 
           <div className="card pad bg-white">
-            <div 
-              onClick={() => setAgreed(!agreed)}
-              className="switch flex items-center gap-3 border border-[#E4EAF2] hover:border-[#c3d2ea] rounded-xl p-[14px_16px] cursor-pointer bg-white mb-4 transition-all"
-            >
-              <div className="t flex-1">
-                <b className="text-[13.5px] font-semibold text-[#0E1B2E] block">{t.agt}</b>
-                <span className="text-[12px] text-[#5C6B82] block leading-snug mt-0.5">{t.ag}</span>
+            <div className="switch">
+              <div className="t">
+                <b className="block">{t.agt}</b>
+                <span className="block mt-0.5">{t.ag}</span>
               </div>
-              <span className={`toggle shrink-0 w-11 h-[25px] rounded-full relative cursor-pointer transition-all ${agreed ? 'bg-[#2F6BFF]' : 'bg-[#c8d3e3]'}`}>
-                <i className={`absolute top-0.5 w-[21px] h-[21px] rounded-full bg-white transition-all shadow-[0_1px_3px_rgba(0,0,0,0.2)] ${agreed ? 'left-[18px]' : 'left-0.5'}`} />
+              <span 
+                onClick={() => setAgreed(!agreed)}
+                className={`toggle ${agreed ? '' : 'off'}`}
+              >
+                <i />
               </span>
             </div>
 
