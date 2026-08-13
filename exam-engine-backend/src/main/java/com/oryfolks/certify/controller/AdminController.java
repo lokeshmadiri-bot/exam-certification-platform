@@ -97,7 +97,6 @@ public class AdminController {
         for (User c : candidates) {
 
             List<ExamAttempt> attempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(c.getId());
-
             if (activeExams.isEmpty() && attempts.isEmpty()) {
                 // Candidate with no exams at all — show one blank row
                 Map<String, Object> map = new HashMap<>();
@@ -123,7 +122,7 @@ public class AdminController {
                 for (Exam activeExam : activeExams) {
                     // Find most recent attempt for this candidate + this specific exam
                     Optional<ExamAttempt> latestAttempt = attempts.stream()
-                            .filter(a -> a.getExam().getId().equals(activeExam.getId()))
+                            .filter(a -> a.getExam() != null && a.getExam().getId().equals(activeExam.getId()))
                             .findFirst(); // already ordered DESC
 
                     if (latestAttempt.isPresent()) {
