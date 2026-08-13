@@ -32,14 +32,7 @@ export default function Topbar({ user, title, onMenuToggle, onOpenCmdPalette }) 
       </div>
 
       <div className="ml-auto flex items-center gap-[18px]">
-        {/* Quick Command Hint */}
-        <button 
-          onClick={onOpenCmdPalette}
-          className="kbd-hint hidden md:inline-flex items-center gap-1 text-[11px] font-mono text-[#8A99AE] border border-[#E4EAF2] rounded-[7px] px-2 py-1 hover:text-[#0E1B2E] hover:bg-[#F4F7FC] transition-all"
-        >
-          <Command className="w-3 h-3" />
-          <span>K</span>
-        </button>
+
 
         {/* Notification Icon */}
         {user?.role === 'ROLE_ADMIN' ? (
@@ -57,9 +50,9 @@ export default function Topbar({ user, title, onMenuToggle, onOpenCmdPalette }) 
             {/* Notifications Panel */}
             {showNotifications && (
               <>
-                <div 
-                  style={{ position: 'fixed', inset: 0, zIndex: 99, background: 'transparent' }} 
-                  onClick={() => setShowNotifications(false)} 
+                <div
+                  style={{ position: 'fixed', inset: 0, zIndex: 99, background: 'transparent' }}
+                  onClick={() => setShowNotifications(false)}
                 />
                 <div className="notif absolute right-0 top-[52px] w-[330px] bg-white border border-[#E4EAF2] rounded-xl shadow-2xl z-[100] overflow-hidden animate-[fade_0.2s_ease]">
                   <div className="nh flex items-center justify-between px-4 py-3 border-b border-[#EEF2F8]">

@@ -110,12 +110,41 @@ const nowIso = () => new Date().toISOString();
 
 // ---------------- Auth (Task 1 — Admin Shell) ----------------
 // Auth calls go to /api/auth (not /api/admin/auth) to match the backend AuthController.
+async function encryptPassword(password) {
+    try {
+        if (!window.crypto || !window.crypto.subtle) {
+            return btoa(password);
+        }
+        const keyText = "OryFolksCertifyK";
+        const ivText = "OryFolksCertifyI";
+        const enc = new TextEncoder();
+        const rawKey = enc.encode(keyText);
+        const iv = enc.encode(ivText);
+        const key = await window.crypto.subtle.importKey(
+            "raw",
+            rawKey,
+            { name: "AES-CBC" },
+            false,
+            ["encrypt"]
+        );
+        const encrypted = await window.crypto.subtle.encrypt(
+            { name: "AES-CBC", iv: iv },
+            key,
+            enc.encode(password)
+        );
+        return btoa(String.fromCharCode(...new Uint8Array(encrypted)));
+    } catch (err) {
+        console.error("Encryption failed, falling back to base64", err);
+        return btoa(password);
+    }
+}
 
 export const login = (username, password) =>
     withFallback(
         async () => {
+            const encryptedPassword = await encryptPassword(password);
             // Backend AuthController expects { username, password }
-            const data = await authPost("/login", { username, password });
+            const data = await authPost("/login", { username, password: encryptedPassword });
             // data = { token, username, role, fullName, userId, title }
             if (data && data.token) {
                 localStorage.setItem("admin_token", data.token);

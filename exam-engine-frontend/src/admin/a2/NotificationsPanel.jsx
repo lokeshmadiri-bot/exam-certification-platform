@@ -13,7 +13,7 @@ export default function NotificationsPanel() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 60_000); // light polling; swap for SSE later
+    const t = setInterval(load, 5_000); // 5s fast polling for immediate notifications
     return () => clearInterval(t);
   }, []);
 
