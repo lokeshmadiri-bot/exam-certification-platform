@@ -95,8 +95,8 @@ export default function AdminCandidates() {
           </thead>
           <tbody>
             {candidates.length > 0 ? (
-              candidates.map((cand) => (
-                <tr key={`${cand.candidateId}-${cand.examId}`}>
+              candidates.map((cand, idx) => (
+                <tr key={`${cand.candidateId}-${cand.examId}-${idx}`}>
                   <td>
                     <div className="who flex items-center gap-2.5">
                       <div className="av w-[34px] h-[34px] rounded-lg bg-[#eaf1ff] text-[#2F6BFF] flex items-center justify-center font-semibold text-xs shrink-0 uppercase">
