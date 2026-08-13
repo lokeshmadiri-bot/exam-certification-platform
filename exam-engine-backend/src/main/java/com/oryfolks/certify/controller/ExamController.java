@@ -59,6 +59,9 @@ public class ExamController {
     @Autowired
     private AnswerRepository answerRepository;
 
+    @Autowired
+    private AttemptAnswerRepository attemptAnswerRepository;
+
 
     @Autowired
     private ExamViolationRepository examViolationRepository;
@@ -153,23 +156,45 @@ public class ExamController {
 
         Exam exam = attempt.getExam();
         List<Section> sections = sectionRepository.findByExamId(exam.getId());
-
-        List<ExamAttemptQuestion> attemptQuestions = examAttemptQuestionRepository.findByAttemptIdOrderByQuestionOrderAsc(attemptId);
+        List<ExamAttemptQuestion> attemptQuestions = examAttemptQuestionRepository != null ? examAttemptQuestionRepository.findByAttemptIdOrderByQuestionOrderAsc(attemptId) : List.of();
         List<Question> questions;
-        if (!attemptQuestions.isEmpty()) {
+        if (attemptQuestions != null && !attemptQuestions.isEmpty()) {
             questions = new ArrayList<>();
             for (ExamAttemptQuestion eq : attemptQuestions) {
                 questions.add(eq.getQuestion());
             }
         } else {
-            questions = questionRepository.findByExamIdAndIsActiveTrue(exam.getId());
+            questions = fetchQuestionsForExam(exam);
         }
-
         List<Answer> savedAnswers = answerRepository.findByAttemptId(attemptId);
 
         Map<String, String> answersMap = new HashMap<>();
         for (Answer ans : savedAnswers) {
             answersMap.put(ans.getQuestion().getId().toString(), ans.getSelectedOption());
+        }
+
+        int perAttempt = exam.getPerAttempt();
+        if (perAttempt > 0 && questions.size() > perAttempt) {
+            Random rand = new Random(attemptId.getMostSignificantBits() ^ attemptId.getLeastSignificantBits());
+            List<Question> shuffled = new ArrayList<>(questions);
+            Collections.shuffle(shuffled, rand);
+            
+            List<Question> subset = new ArrayList<>();
+            for (Question q : shuffled) {
+                if (answersMap.containsKey(q.getId().toString())) {
+                    subset.add(q);
+                }
+            }
+            
+            for (Question q : shuffled) {
+                if (subset.size() >= perAttempt) {
+                    break;
+                }
+                if (!subset.contains(q)) {
+                    subset.add(q);
+                }
+            }
+            questions = subset;
         }
 
         List<Map<String, Object>> sectionsData = new ArrayList<>();
@@ -256,7 +281,11 @@ public class ExamController {
                 .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
 
         long remaining = 0;
-        if (attempt.getEndTime() != null) {
+        if (attempt.getResultStatus() == ResultStatus.IN_PROGRESS && attempt.getStartTime() != null) {
+            LocalDateTime expectedEndTime = attempt.getStartTime().plusMinutes(attempt.getExam().getDurationMinutes());
+            remaining = Duration.between(LocalDateTime.now(), expectedEndTime).getSeconds();
+            if (remaining < 0) remaining = 0;
+        } else if (attempt.getEndTime() != null) {
             remaining = Duration.between(LocalDateTime.now(), attempt.getEndTime()).getSeconds();
             if (remaining < 0) remaining = 0;
         }
@@ -314,33 +343,55 @@ public class ExamController {
                 .orElseThrow(() -> new RuntimeException("Attempt not found"));
 
         if (attempt.getResultStatus() != ResultStatus.IN_PROGRESS) {
-            return ResponseEntity.badRequest().body(ApiResponse.error("Exam is already submitted or terminated"));
+            return ResponseEntity.ok(ApiResponse.success("Exam was already submitted", attempt));
         }
 
         Exam exam = attempt.getExam();
-        List<ExamAttemptQuestion> attemptQuestions = examAttemptQuestionRepository.findByAttemptIdOrderByQuestionOrderAsc(attemptId);
+        List<ExamAttemptQuestion> attemptQuestions = examAttemptQuestionRepository != null ? examAttemptQuestionRepository.findByAttemptIdOrderByQuestionOrderAsc(attemptId) : List.of();
         List<Question> questions;
-        if (!attemptQuestions.isEmpty()) {
+        if (attemptQuestions != null && !attemptQuestions.isEmpty()) {
             questions = new ArrayList<>();
             for (ExamAttemptQuestion eq : attemptQuestions) {
                 questions.add(eq.getQuestion());
             }
         } else {
             questions = questionRepository.findByExamId(exam.getId());
+            if (questions.isEmpty() && exam.getStack() != null && !exam.getStack().isBlank()) {
+                questions = questionRepository.findByStackIgnoreCase(exam.getStack());
+            }
+            if (questions.isEmpty()) {
+                questions = questionRepository.findByIsActiveTrue();
+            }
         }
         List<Answer> savedAnswers = answerRepository.findByAttemptId(attemptId);
+        List<AttemptAnswer> savedAttemptAnswers = attemptAnswerRepository.findByAttemptId(attemptId);
 
         int totalMarks = 0;
         int earnedMarks = 0;
 
         for (Question q : questions) {
-            totalMarks += q.getMarks();
-            Optional<Answer> ansOpt = savedAnswers.stream()
-                    .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
-                    .findFirst();
+            int qMarks = (q.getMarks() != null && q.getMarks() > 0) ? q.getMarks() : 1;
+            totalMarks += qMarks;
 
-            if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
-                earnedMarks += q.getMarks();
+            String correct = q.getCorrectOption() != null ? q.getCorrectOption().trim() : "";
+            String selectedOption = null;
+
+            Optional<AttemptAnswer> aaOpt = savedAttemptAnswers.stream()
+                    .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
+                    .findFirst();
+            if (aaOpt.isPresent() && aaOpt.get().getSelectedOption() != null) {
+                selectedOption = aaOpt.get().getSelectedOption().trim();
+            } else {
+                Optional<Answer> aOpt = savedAnswers.stream()
+                        .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
+                        .findFirst();
+                if (aOpt.isPresent() && aOpt.get().getSelectedOption() != null) {
+                    selectedOption = aOpt.get().getSelectedOption().trim();
+                }
+            }
+
+            if (selectedOption != null && !correct.isEmpty() && correct.equalsIgnoreCase(selectedOption)) {
+                earnedMarks += qMarks;
             }
         }
 
@@ -350,6 +401,14 @@ public class ExamController {
 
         CompetencyLevel level = CompetencyLevel.L5;
         List<CompetencyBand> bands = exam.getCompetencyBands();
+        if (bands == null || bands.isEmpty()) {
+            bands = new ArrayList<>();
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L2).minScore(75).maxScore(89).title("Advanced").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L3).minScore(60).maxScore(74).title("Intermediate").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L4).minScore(40).maxScore(59).title("Beginner").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
+        }
         for (CompetencyBand band : bands) {
             if (finalScore >= band.getMinScore() && finalScore <= band.getMaxScore()) {
                 level = band.getLevelName();
@@ -363,6 +422,9 @@ public class ExamController {
         } else {
             attempt.setResultStatus(ResultStatus.FAILED);
         }
+
+        // Archive answers to attempt_answers table for permanent admin audit trail
+        archiveAnswers(attempt);
 
         ExamAttempt savedAttempt = examAttemptRepository.save(attempt);
         return ResponseEntity.ok(ApiResponse.success("Exam submitted successfully", savedAttempt));
@@ -393,8 +455,9 @@ public class ExamController {
 
         if (attempt.getResultStatus() != ResultStatus.IN_PROGRESS) {
             long count = examViolationRepository.countByAttemptId(attemptId);
+            boolean isTerminated = (attempt.getResultStatus() == ResultStatus.TERMINATED);
             return ResponseEntity.ok(ApiResponse.success("Attempt is already completed or terminated",
-                    new ViolationResponseDTO((int) count, true)));
+                    new ViolationResponseDTO((int) count, isTerminated)));
         }
 
         long currentCount = examViolationRepository.countByAttemptId(attemptId);
@@ -417,7 +480,7 @@ public class ExamController {
 
         examViolationRepository.save(violation);
 
-        boolean terminate = strikeNumber >= 3;
+        boolean terminate = strikeNumber >= 4;
         if (terminate) {
             terminateAttemptInternal(attempt);
         }
@@ -472,6 +535,14 @@ public class ExamController {
 
         CompetencyLevel level = CompetencyLevel.L5;
         List<CompetencyBand> bands = exam.getCompetencyBands();
+        if (bands == null || bands.isEmpty()) {
+            bands = new ArrayList<>();
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L2).minScore(75).maxScore(89).title("Advanced").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L3).minScore(60).maxScore(74).title("Intermediate").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L4).minScore(40).maxScore(59).title("Beginner").build());
+            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
+        }
         for (CompetencyBand band : bands) {
             if (finalScore >= band.getMinScore() && finalScore <= band.getMaxScore()) {
                 level = band.getLevelName();
@@ -482,6 +553,9 @@ public class ExamController {
         attempt.setResultStatus(ResultStatus.TERMINATED);
 
         examAttemptRepository.save(attempt);
+
+        // Archive all auto-saved answers into attempt_answers for permanent audit trail
+        archiveAnswers(attempt);
     }
 
     @GetMapping("/attempts/{attemptId}/status")
@@ -490,7 +564,11 @@ public class ExamController {
                 .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
 
         long remaining = 0;
-        if (attempt.getEndTime() != null) {
+        if (attempt.getResultStatus() == ResultStatus.IN_PROGRESS && attempt.getStartTime() != null) {
+            LocalDateTime expectedEndTime = attempt.getStartTime().plusMinutes(attempt.getExam().getDurationMinutes());
+            remaining = Duration.between(LocalDateTime.now(), expectedEndTime).getSeconds();
+            if (remaining < 0) remaining = 0;
+        } else if (attempt.getEndTime() != null) {
             remaining = Duration.between(LocalDateTime.now(), attempt.getEndTime()).getSeconds();
             if (remaining < 0) remaining = 0;
         }
@@ -550,7 +628,11 @@ public class ExamController {
         }
 
         long remaining = 0;
-        if (attempt.getEndTime() != null) {
+        if (attempt.getResultStatus() == ResultStatus.IN_PROGRESS && attempt.getStartTime() != null) {
+            LocalDateTime expectedEndTime = attempt.getStartTime().plusMinutes(attempt.getExam().getDurationMinutes());
+            remaining = Duration.between(LocalDateTime.now(), expectedEndTime).getSeconds();
+            if (remaining < 0) remaining = 0;
+        } else if (attempt.getEndTime() != null) {
             remaining = Duration.between(LocalDateTime.now(), attempt.getEndTime()).getSeconds();
             if (remaining < 0) remaining = 0;
         }
@@ -615,5 +697,181 @@ public class ExamController {
         examAttemptRepository.save(attempt);
 
         return ResponseEntity.ok(ApiResponse.success("Beacon recorded", "OK"));
+    }
+
+    private List<Question> fetchQuestionsForExam(Exam exam) {
+        List<Question> questions = questionRepository.findByExamIdAndIsActiveTrue(exam.getId());
+        if (questions.isEmpty()) {
+            questions = questionRepository.findByExamId(exam.getId());
+        }
+        if (questions.isEmpty() && exam.getStack() != null && !exam.getStack().isBlank()) {
+            questions = questionRepository.findByStackIgnoreCaseAndIsActiveTrue(exam.getStack());
+            if (questions.isEmpty()) {
+                questions = questionRepository.findByStackIgnoreCase(exam.getStack());
+            }
+        }
+        if (questions.isEmpty()) {
+            questions = questionRepository.findByIsActiveTrue();
+        }
+        if (questions.isEmpty()) {
+            questions = questionRepository.findAll();
+        }
+        if (questions.isEmpty()) {
+            questions = seedStarterQuestions(exam);
+        }
+        return questions;
+    }
+
+    private List<Question> seedStarterQuestions(Exam exam) {
+        String stackName = (exam.getStack() != null && !exam.getStack().isBlank()) ? exam.getStack() : "General";
+        List<Question> seeded = new ArrayList<>();
+
+        Question q1 = Question.builder()
+                .exam(exam)
+                .stack(stackName)
+                .questionText("What is the primary characteristic of immutable data structures in " + stackName + "?")
+                .optionA("Their state cannot be modified after creation")
+                .optionB("They consume double the memory of mutable structures")
+                .optionC("They can only store integer types")
+                .optionD("They automatically garbage-collect references")
+                .correctOption("A")
+                .difficulty("EASY")
+                .marks(1)
+                .type("MCQ")
+                .level("L1")
+                .status("ACTIVE")
+                .isActive(true)
+                .build();
+
+        Question q2 = Question.builder()
+                .exam(exam)
+                .stack(stackName)
+                .questionText("Which of the following best describes exception handling best practices in " + stackName + "?")
+                .optionA("Catch all exceptions silently with empty catch blocks")
+                .optionB("Catch specific exceptions and handle or rethrow with contextual detail")
+                .optionC("Avoid try-catch blocks entirely to maximize execution speed")
+                .optionD("Rethrow RuntimeExceptions as checked exceptions")
+                .correctOption("B")
+                .difficulty("MEDIUM")
+                .marks(2)
+                .type("MCQ")
+                .level("L3")
+                .status("ACTIVE")
+                .isActive(true)
+                .build();
+
+        Question q3 = Question.builder()
+                .exam(exam)
+                .stack(stackName)
+                .questionText("What is the primary benefit of dependency injection in modular " + stackName + " applications?")
+                .optionA("Decouples components and enhances unit testability")
+                .optionB("Increases execution speed by pre-compiling bytecodes")
+                .optionC("Eliminates the need for object-oriented programming")
+                .optionD("Automatically encrypts network communications")
+                .correctOption("A")
+                .difficulty("MEDIUM")
+                .marks(2)
+                .type("MCQ")
+                .level("L3")
+                .status("ACTIVE")
+                .isActive(true)
+                .build();
+
+        Question q4 = Question.builder()
+                .exam(exam)
+                .stack(stackName)
+                .questionText("In " + stackName + ", what is the purpose of asynchronous non-blocking I/O?")
+                .optionA("Allows threads to process other tasks while waiting for I/O operations")
+                .optionB("Forces all network packets to send synchronously")
+                .optionC("Disables multi-threading on the CPU core")
+                .optionD("Requires hard disk encryption for disk writes")
+                .correctOption("A")
+                .difficulty("HARD")
+                .marks(3)
+                .type("MCQ")
+                .level("L4")
+                .status("ACTIVE")
+                .isActive(true)
+                .build();
+
+        Question q5 = Question.builder()
+                .exam(exam)
+                .stack(stackName)
+                .questionText("Which data structure provides constant O(1) average time complexity for key lookup operations?")
+                .optionA("Hash Table / Map")
+                .optionB("Singly Linked List")
+                .optionC("Binary Search Tree")
+                .optionD("Sorted Array")
+                .correctOption("A")
+                .difficulty("EASY")
+                .marks(1)
+                .type("MCQ")
+                .level("L2")
+                .status("ACTIVE")
+                .isActive(true)
+                .build();
+
+        seeded.add(q1);
+        seeded.add(q2);
+        seeded.add(q3);
+        seeded.add(q4);
+        seeded.add(q5);
+
+        return questionRepository.saveAll(seeded);
+    }
+
+    private List<Question> getAttemptQuestions(ExamAttempt attempt, List<Answer> savedAnswers) {
+        Exam exam = attempt.getExam();
+        List<Question> questions = fetchQuestionsForExam(exam);
+        int perAttempt = exam.getPerAttempt();
+        if (perAttempt > 0 && questions.size() > perAttempt) {
+            Random rand = new Random(attempt.getId().getMostSignificantBits() ^ attempt.getId().getLeastSignificantBits());
+            List<Question> shuffled = new ArrayList<>(questions);
+            Collections.shuffle(shuffled, rand);
+            
+            List<Question> subset = new ArrayList<>();
+            Set<UUID> answeredIds = new HashSet<>();
+            for (Answer ans : savedAnswers) {
+                if (ans.getQuestion() != null) {
+                    answeredIds.add(ans.getQuestion().getId());
+                }
+            }
+            for (Question q : shuffled) {
+                if (answeredIds.contains(q.getId())) {
+                    subset.add(q);
+                }
+            }
+            for (Question q : shuffled) {
+                if (subset.size() >= perAttempt) {
+                    break;
+                }
+                if (!subset.contains(q)) {
+                    subset.add(q);
+                }
+            }
+            return subset;
+        }
+        return questions;
+    }
+
+    private void archiveAnswers(ExamAttempt attempt) {
+        try {
+            // Delete existing attempt answers if any
+            attemptAnswerRepository.deleteByAttemptId(attempt.getId());
+
+            // Load candidate's saved answers from the Answer table
+            List<Answer> savedAnswers = answerRepository.findByAttemptId(attempt.getId());
+            List<AttemptAnswer> attemptAnswers = new ArrayList<>();
+            for (Answer ans : savedAnswers) {
+                attemptAnswers.add(AttemptAnswer.builder()
+                        .attempt(attempt)
+                        .question(ans.getQuestion())
+                        .selectedOption(ans.getSelectedOption())
+                        .build());
+            }
+            attemptAnswerRepository.saveAll(attemptAnswers);
+        } catch (Exception e) {
+            System.err.println("Error archiving answers: " + e.getMessage());
+        }
     }
 }

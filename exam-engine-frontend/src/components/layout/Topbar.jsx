@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Bell, Menu, Command } from 'lucide-react';
-import NotificationsPanel from '../../admin/a2/NotificationsPanel';
+import NotificationsPanel from '../../modules/admin/components/NotificationsPanel';
 
 export default function Topbar({ user, title, onMenuToggle, onOpenCmdPalette }) {
   const navigate = useNavigate();

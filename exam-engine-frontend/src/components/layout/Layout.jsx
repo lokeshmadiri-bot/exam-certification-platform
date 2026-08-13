@@ -3,8 +3,8 @@ import { useNavigate, Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import CmdPalette from '../common/CmdPalette';
-import CommandPalette from '../../admin/a2/CommandPalette';
-import { authService } from '../../services/api';
+import CommandPalette from '../../modules/admin/components/CommandPalette';
+import { authService } from '../../modules/candidate/services/api';
 
 export default function Layout({ title }) {
   const navigate = useNavigate();

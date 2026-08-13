@@ -29,9 +29,15 @@ public class AttemptDetailsResponseDTO {
 
     private LocalDateTime submittedAt;
 
+    private Integer score;
+
     private ResultStatus resultStatus;
 
     private ResultPublishStatus resultPublishStatus;
+
+    private String assignedLevel;
+
+    private String assignedLevelTitle;
 
     private List<AttemptAnswerResponseDTO> answers;
 
