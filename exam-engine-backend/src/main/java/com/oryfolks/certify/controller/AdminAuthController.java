@@ -13,7 +13,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
+import com.oryfolks.certify.security.EncryptionUtils;
 import jakarta.validation.Valid;
 import java.security.Principal;
 import java.util.HashMap;
@@ -54,10 +54,12 @@ public class AdminAuthController {
      */
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody AuthRequest loginRequest) {
+        String decryptedPassword = EncryptionUtils.decrypt(loginRequest.getPassword());
+                
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         loginRequest.getUsername(),
-                        loginRequest.getPassword()));
+                        decryptedPassword));
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
 

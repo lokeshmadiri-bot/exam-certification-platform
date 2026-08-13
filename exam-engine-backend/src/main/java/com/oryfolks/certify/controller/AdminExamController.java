@@ -272,6 +272,11 @@ public class AdminExamController {
             Exam exam = examRepository.findById(id)
                     .orElseThrow(() -> new com.oryfolks.certify.exception.ResourceNotFoundException("Exam not found with id: " + id));
 
+            if (approvalRepository.findFirstByTargetIdAndStatus(id.toString(), "PENDING").isPresent()) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("An approval request is already pending for this exam."));
+            }
+
             String note = body != null ? body.getOrDefault("note", "") : "";
 
             ApprovalRequest req = ApprovalRequest.builder()
@@ -309,6 +314,11 @@ public class AdminExamController {
         try {
             Exam exam = examRepository.findById(id)
                     .orElseThrow(() -> new com.oryfolks.certify.exception.ResourceNotFoundException("Exam not found with id: " + id));
+
+            if (approvalRepository.findFirstByTargetIdAndStatus(id.toString(), "PENDING").isPresent()) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("An approval request is already pending for this exam."));
+            }
 
             String note = body != null ? body.getOrDefault("note", "") : "";
 

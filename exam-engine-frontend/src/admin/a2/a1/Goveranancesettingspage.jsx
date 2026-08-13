@@ -158,7 +158,7 @@ function RetentionTab({ gov, onSaved }) {
                     disabled={days === gov.retentionDays || !!gov.pendingRetentionChange}
                     onClick={() => setConfirmOpen(true)}
                 >
-                    Request retention change
+                    {gov.pendingRetentionChange ? "Approval Pending…" : "Request retention change"}
                 </button>
             </div>
 

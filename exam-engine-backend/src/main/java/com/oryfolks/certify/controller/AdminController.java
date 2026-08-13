@@ -50,8 +50,17 @@ public class AdminController {
                 for (User c : candidates) {
 
                         List<ExamAttempt> attempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(c.getId());
+                        Set<UUID> seenExams = new HashSet<>();
 
                         for (ExamAttempt attempt : attempts) {
+                                if (attempt.getExam() == null) {
+                                        continue;
+                                }
+                                UUID examId = attempt.getExam().getId();
+                                if (seenExams.contains(examId)) {
+                                        continue;
+                                }
+                                seenExams.add(examId);
 
                                 Map<String, Object> map = new HashMap<>();
 
@@ -64,7 +73,7 @@ public class AdminController {
                                                                 ? c.getUsername()
                                                                 : c.getUsername() + "@certify.com");
 
-                                map.put("examId", attempt.getExam().getId().toString());
+                                map.put("examId", examId.toString());
                                 map.put("examTitle", attempt.getExam().getTitle());
 
                                 map.put("status", attempt.getResultStatus().name());
@@ -122,6 +131,11 @@ public class AdminController {
 
                 User candidate = userRepository.findById(id)
                                 .orElseThrow(() -> new RuntimeException("Candidate not found: " + id));
+
+                if (approvalRepository.findFirstByTargetIdAndStatus(id.toString(), "PENDING").isPresent()) {
+                        return ResponseEntity.badRequest()
+                                        .body(ApiResponse.error("An unlock approval request is already pending for this candidate."));
+                }
 
                 String note = body != null ? body.getOrDefault("note", "") : "";
 
