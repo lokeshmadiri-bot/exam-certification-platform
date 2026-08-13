@@ -1,8 +1,7 @@
 package com.oryfolks.certify.controller;
 
 import com.oryfolks.certify.entity.*;
-import com.oryfolks.certify.enums.CompetencyLevel;
-import com.oryfolks.certify.enums.ExamStatus;
+import com.oryfolks.certify.enums.*;
 import com.oryfolks.certify.repository.*;
 import com.oryfolks.certify.response.ApiResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,7 +59,6 @@ public class AdminExamController {
 
     @Autowired
     private RecordingSessionRepository recordingSessionRepository;
-
     @GetMapping
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<Map<String, Object>>> getExams(
@@ -95,7 +93,7 @@ public class AdminExamController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<Exam>> createExam(@RequestBody Exam exam, Principal principal) {
-        if (exam.getStatus() == null) exam.setStatus(ExamStatus.DRAFT);
+        if (exam.getStatus() == null) exam.setStatus(ExamStatus.ACTIVE);
         if (exam.getVersion() == null) exam.setVersion("1");
 
         // Sync field aliases

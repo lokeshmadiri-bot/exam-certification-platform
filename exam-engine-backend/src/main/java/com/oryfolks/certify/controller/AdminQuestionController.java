@@ -44,7 +44,7 @@ public class AdminQuestionController {
             @RequestParam(required = false) String level,
             @RequestParam(required = false) String status) {
 
-        List<Question> questions = questionRepository.findAll();
+        List<Question> questions = questionRepository.findAllByOrderByCreatedAtDesc();
 
         if (q != null && !q.isBlank()) {
             String query = q.toLowerCase();

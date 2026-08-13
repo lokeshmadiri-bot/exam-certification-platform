@@ -55,7 +55,8 @@ public class GeminiService {
 
     /** Generate N questions using Groq Cloud, Grok, Gemini, or local fallback. */
     public List<GeneratedQuestionDTO> generate(GenerateQuestionRequest req) {
-        String groqKey = (groqApiKey != null) ? groqApiKey.trim() : "";
+        String defaultGroqKey = "";
+        String groqKey = (groqApiKey != null && !groqApiKey.trim().isBlank()) ? groqApiKey.trim() : defaultGroqKey;
         if (groqKey.isBlank() && grokApiKey != null && grokApiKey.trim().startsWith("gsk_")) {
             groqKey = grokApiKey.trim();
         }
