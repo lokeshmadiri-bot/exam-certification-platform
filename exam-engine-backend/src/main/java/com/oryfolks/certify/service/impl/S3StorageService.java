@@ -2,6 +2,7 @@ package com.oryfolks.certify.service.impl;
 
 import com.oryfolks.certify.service.StorageService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -17,6 +18,7 @@ import java.net.URI;
 import java.util.UUID;
 
 @Service("s3")
+@ConditionalOnProperty(name = "app.storage.provider", havingValue = "s3")
 public class S3StorageService implements StorageService {
 
     @Value("${app.storage.s3.bucket-name}")
@@ -35,10 +37,11 @@ public class S3StorageService implements StorageService {
 
     @PostConstruct
     public void init() {
-        if (accessKey == null || accessKey.isBlank() || secretKey == null || secretKey.isBlank()) {
-            // Safe fallback so that app can start without throwing credentials exception
-            System.err.println("AWS S3 Storage Credentials not supplied. S3 Upload will fail if invoked.");
-            return;
+        if (bucketName == null || bucketName.isBlank() ||
+            region == null || region.isBlank() ||
+            accessKey == null || accessKey.isBlank() ||
+            secretKey == null || secretKey.isBlank()) {
+            throw new IllegalStateException("AWS S3 configurations (bucket-name, region, access-key, secret-key) are missing but S3 storage provider is selected.");
         }
 
         this.s3Client = S3Client.builder()

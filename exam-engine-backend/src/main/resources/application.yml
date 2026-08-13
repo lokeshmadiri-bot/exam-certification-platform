@@ -1,11 +1,11 @@
 server:
-  port: ${PORT:8080}
+  port: ${PORT}
 
 spring:
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:certify}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:root}
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -27,15 +27,15 @@ logging:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:SecretKeyToGenerateJWTsSecretKeyToGenerateJWTsSecretKeyToGenerateJWTs}
+    secret: ${JWT_SECRET}
     expiration-ms: 86400000 # 24 hours
   storage:
-    provider: ${STORAGE_PROVIDER:local} # local or s3
+    provider: ${STORAGE_PROVIDER}
     local:
-      upload-dir: ${UPLOAD_DIR:uploads}
+      upload-dir: ${UPLOAD_DIR:}
     s3:
-      bucket-name: ${AWS_S3_BUCKET:oryfolks-certify-snapshots}
-      region: ${AWS_REGION:us-east-1}
+      bucket-name: ${AWS_S3_BUCKET:}
+      region: ${AWS_REGION:}
       access-key: ${AWS_ACCESS_KEY_ID:}
       secret-key: ${AWS_SECRET_ACCESS_KEY:}
 

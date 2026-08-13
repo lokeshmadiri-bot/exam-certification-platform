@@ -1,9 +1,11 @@
- package com.oryfolks.certify.service.impl;
+package com.oryfolks.certify.service.impl;
 
 import com.oryfolks.certify.service.StorageService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import jakarta.annotation.PostConstruct;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,10 +16,18 @@ import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 @Service("local")
+@ConditionalOnProperty(name = "app.storage.provider", havingValue = "local", matchIfMissing = true)
 public class LocalStorageService implements StorageService {
 
-    @Value("${app.storage.local.upload-dir:uploads}")
+    @Value("${app.storage.local.upload-dir}")
     private String uploadDir;
+
+    @PostConstruct
+    public void init() {
+        if (uploadDir == null || uploadDir.isBlank()) {
+            throw new IllegalStateException("Local upload directory (UPLOAD_DIR) configuration is missing but local storage provider is selected.");
+        }
+    }
 
     @Override
     public String uploadFile(MultipartFile file, String folderName) {
