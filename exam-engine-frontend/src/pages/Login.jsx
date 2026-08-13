@@ -56,7 +56,7 @@ export default function Login() {
       <div className="auth-art">
         <span className="ring" style={{ width: '520px', height: '520px', left: '-120px', top: '-120px' }}></span>
         <span className="ring" style={{ width: '360px', height: '360px', right: '-80px', bottom: '60px' }}></span>
-        
+
         <div className="auth-inner">
           {/* Brand Header */}
           <div className="brandmark">
@@ -73,7 +73,7 @@ export default function Login() {
           <div style={{ margin: 'auto 0' }}>
             <h1>Prove your skills.<br />Earn your level.</h1>
             <p>Timed, fairly proctored technical certifications — aligned to your stack, graded L1 to L5, with your privacy and your result handled with care.</p>
-            
+
             <div className="auth-feats">
               <span><ShieldCheck /> Live proctoring</span>
               <span><Award /> Timed &amp; fair</span>

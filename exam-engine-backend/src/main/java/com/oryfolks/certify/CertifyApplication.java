@@ -60,30 +60,37 @@ public class CertifyApplication {
                         }
 
                         // 2. Remove seeded dummy exams — only show admin-created exams in library.
-                        //    Uses native SQL for correct FK cascade ordering across all dependent tables.
+                        // Uses native SQL for correct FK cascade ordering across all dependent tables.
                         String[] dummyTitles = { "Selenium Certification", "API Testing", "DevOps" };
                         for (String title : dummyTitles) {
                                 String findExamSql = "SELECT id FROM exams WHERE title = ?";
                                 var ids = jdbc.queryForList(findExamSql, String.class, title);
                                 for (String examId : ids) {
                                         // Delete all child data in FK-safe order
-                                        String attemptsSql =
-                                                "SELECT id FROM exam_attempts WHERE exam_id = CAST(? AS uuid)";
+                                        String attemptsSql = "SELECT id FROM exam_attempts WHERE exam_id = CAST(? AS uuid)";
                                         var attemptIds = jdbc.queryForList(attemptsSql, String.class, examId);
                                         for (String attemptId : attemptIds) {
                                                 String uuid = attemptId;
-                                                jdbc.update("DELETE FROM ai_flag WHERE attempt_id = CAST(? AS uuid)", uuid);
-                                                jdbc.update("DELETE FROM exam_violation WHERE attempt_id = CAST(? AS uuid)", uuid);
-                                                jdbc.update("DELETE FROM integrity_violations WHERE attempt_id = CAST(? AS uuid)", uuid);
-                                                jdbc.update("DELETE FROM recording_session WHERE attempt_id = CAST(? AS uuid)", uuid);
-                                                jdbc.update("DELETE FROM attempt_answers WHERE attempt_id = CAST(? AS uuid)", uuid);
-                                                jdbc.update("DELETE FROM answers WHERE attempt_id = CAST(? AS uuid)", uuid);
+                                                jdbc.update("DELETE FROM ai_flag WHERE attempt_id = CAST(? AS uuid)",
+                                                                uuid);
+                                                jdbc.update("DELETE FROM exam_violation WHERE attempt_id = CAST(? AS uuid)",
+                                                                uuid);
+                                                jdbc.update("DELETE FROM integrity_violations WHERE attempt_id = CAST(? AS uuid)",
+                                                                uuid);
+                                                jdbc.update("DELETE FROM recording_session WHERE attempt_id = CAST(? AS uuid)",
+                                                                uuid);
+                                                jdbc.update("DELETE FROM attempt_answers WHERE attempt_id = CAST(? AS uuid)",
+                                                                uuid);
+                                                jdbc.update("DELETE FROM answers WHERE attempt_id = CAST(? AS uuid)",
+                                                                uuid);
                                         }
-                                        jdbc.update("DELETE FROM exam_attempts WHERE exam_id = CAST(? AS uuid)", examId);
+                                        jdbc.update("DELETE FROM exam_attempts WHERE exam_id = CAST(? AS uuid)",
+                                                        examId);
                                         jdbc.update("DELETE FROM sections WHERE exam_id = CAST(? AS uuid)", examId);
                                         jdbc.update("DELETE FROM questions WHERE exam_id = CAST(? AS uuid)", examId);
                                         jdbc.update("DELETE FROM approval_requests WHERE target_id = ?", examId);
-                                        jdbc.update("DELETE FROM competency_bands WHERE exam_id = CAST(? AS uuid)", examId);
+                                        jdbc.update("DELETE FROM competency_bands WHERE exam_id = CAST(? AS uuid)",
+                                                        examId);
                                         jdbc.update("DELETE FROM exams WHERE id = CAST(? AS uuid)", examId);
                                 }
                         }

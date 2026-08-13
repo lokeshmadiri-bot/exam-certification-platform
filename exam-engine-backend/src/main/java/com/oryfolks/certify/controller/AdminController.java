@@ -88,13 +88,12 @@ public class AdminController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String exam,
             @RequestParam(required = false) String locked) {
- 
+
         List<User> candidates = userRepository.findByRole(UserRole.ROLE_CANDIDATE);
         List<Exam> activeExams = examRepository.findByStatus(ExamStatus.ACTIVE);
 
         List<Map<String, Object>> rows = new ArrayList<>();
         for (User c : candidates) {
-
             List<ExamAttempt> attempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(c.getId());
             if (activeExams.isEmpty() && attempts.isEmpty()) {
                 Map<String, Object> map = new HashMap<>();
@@ -220,30 +219,30 @@ public class AdminController {
                 }
             }
         }
- 
+
         if (q != null && !q.isBlank()) {
             String query = q.toLowerCase();
-            rows = rows.stream().filter(r -> r.get("candidateName").toString().toLowerCase().contains(query)
-                    || r.get("email").toString().toLowerCase().contains(query)).toList();
+            rows = rows.stream().filter(r -> r.get("candidateName") != null && r.get("candidateName").toString().toLowerCase().contains(query)
+                    || (r.get("email") != null && r.get("email").toString().toLowerCase().contains(query))).toList();
         }
         if (status != null && !status.isBlank()) {
             if ("COMPLETED".equalsIgnoreCase(status)) {
                 rows = rows.stream().filter(r -> {
-                    String s = r.get("status").toString();
+                    String s = r.get("status") != null ? r.get("status").toString() : "";
                     return "PASSED".equalsIgnoreCase(s) || "FAILED".equalsIgnoreCase(s) || "TERMINATED".equalsIgnoreCase(s) || "SUBMITTED".equalsIgnoreCase(s);
                 }).toList();
             } else {
-                rows = rows.stream().filter(r -> r.get("status").toString().equalsIgnoreCase(status)).toList();
+                rows = rows.stream().filter(r -> r.get("status") != null && r.get("status").toString().equalsIgnoreCase(status)).toList();
             }
         }
         if (exam != null && !exam.isBlank()) {
-            rows = rows.stream().filter(r -> r.get("examTitle").toString().toLowerCase().contains(exam.toLowerCase())).toList();
+            rows = rows.stream().filter(r -> r.get("examTitle") != null && r.get("examTitle").toString().toLowerCase().contains(exam.toLowerCase())).toList();
         }
         if (locked != null && !locked.isBlank()) {
             boolean lockBool = Boolean.parseBoolean(locked);
-            rows = rows.stream().filter(r -> ((Boolean) r.get("locked")) == lockBool).toList();
+            rows = rows.stream().filter(r -> Boolean.TRUE.equals(r.get("locked")) == lockBool).toList();
         }
- 
+
         Map<String, Object> result = new HashMap<>();
         result.put("rows", rows);
         result.put("total", rows.size());
@@ -291,49 +290,39 @@ public class AdminController {
             @PathVariable UUID candidateId,
             @RequestBody Map<String, UUID> request,
             Principal principal) {
- 
-        System.out.println("========== APPROVE OVERRIDE ==========");
-        System.out.println("Candidate ID: " + candidateId);
-        System.out.println("Request Body: " + request);
- 
+
         UUID examId = request.get("examId");
- 
+
         if (examId == null) {
             throw new BadRequestException("Exam ID is required.");
         }
- 
+
         User candidate = userRepository.findById(candidateId)
                 .orElseThrow(() -> new RuntimeException("Candidate not found: " + candidateId));
- 
+
         ExamAttempt latestAttempt = attemptRepository
-                .findFirstByCandidateIdAndExamIdOrderByCreatedAtDesc(
-                        candidateId,
-                        examId)
+                .findFirstByCandidateIdAndExamIdOrderByCreatedAtDesc(candidateId, examId)
                 .orElseThrow(() -> new RuntimeException("No exam attempt found for this exam."));
- 
+
         latestAttempt.setRetryOverrideApproved(true);
- 
         attemptRepository.save(latestAttempt);
- 
+
         auditLogRepository.save(
                 AccessAuditLog.builder()
                         .userName(principal != null ? principal.getName() : "Admin")
-                        .action("Approved retry override for " + candidate.getFullName() + " - " + latestAttempt.getExam().getTitle())
+                        .action("Approved retry override for " + candidate.getFullName() + " - " + (latestAttempt.getExam() != null ? latestAttempt.getExam().getTitle() : ""))
                         .module("Candidates")
                         .oldValue("LOCKED")
                         .newValue("UNLOCKED")
                         .build());
- 
+
         Map<String, Object> response = new HashMap<>();
         response.put("candidateId", candidateId);
         response.put("examId", examId);
         response.put("candidateName", candidate.getFullName());
-        response.put("examTitle", latestAttempt.getExam().getTitle());
- 
-        return ResponseEntity.ok(
-                ApiResponse.success(
-                        "Candidate unlocked successfully.",
-                        response));
+        response.put("examTitle", latestAttempt.getExam() != null ? latestAttempt.getExam().getTitle() : "");
+
+        return ResponseEntity.ok(ApiResponse.success("Candidate unlocked successfully.", response));
     }
 
     @GetMapping("/logs")
@@ -365,57 +354,80 @@ public class AdminController {
 
     @GetMapping("/analytics/dashboard")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getDashboardAnalytics() {
-        List<ExamAttempt> attempts = attemptRepository.findAllByOrderByCreatedAtDesc();
+        try {
+            List<ExamAttempt> attempts;
+            try {
+                attempts = attemptRepository != null ? attemptRepository.findAllByOrderByCreatedAtDesc() : List.of();
+            } catch (Exception e) {
+                try {
+                    attempts = attemptRepository != null ? attemptRepository.findAll() : List.of();
+                } catch (Exception ex) {
+                    attempts = new ArrayList<>();
+                }
+            }
+            if (attempts == null) attempts = new ArrayList<>();
 
-        int totalAttempts = attempts.size();
-        long passCount = attempts.stream()
-                .filter(a -> "PASS".equalsIgnoreCase(String.valueOf(a.getResultStatus()))).count();
-        long needsReviewCount = attempts.stream()
-                .filter(a -> "NEEDS_REVIEW".equalsIgnoreCase(String.valueOf(a.getResultStatus())))
-                .count();
-        double passRate = totalAttempts > 0 ? Math.round((double) passCount / totalAttempts * 1000.0) / 10.0
-                : 84.5;
+            int totalAttempts = attempts.size();
+            long passCount = attempts.stream()
+                    .filter(a -> a != null && (a.getResultStatus() == ResultStatus.PASSED || "PASS".equalsIgnoreCase(String.valueOf(a.getResultStatus())) || "PASSED".equalsIgnoreCase(String.valueOf(a.getResultStatus())))).count();
+            long needsReviewCount = attempts.stream()
+                    .filter(a -> a != null && (a.getResultPublishStatus() == ResultPublishStatus.PENDING || "NEEDS_REVIEW".equalsIgnoreCase(String.valueOf(a.getResultStatus()))))
+                    .count();
+            double passRate = totalAttempts > 0 ? Math.round((double) passCount / totalAttempts * 1000.0) / 10.0 : 84.5;
 
-        Map<String, Object> kpis = new HashMap<>();
-        kpis.put("totalAttempts", totalAttempts);
-        kpis.put("passRate", passRate);
-        kpis.put("needsReview", needsReviewCount);
-        kpis.put("avgDurationMin", 42);
+            Map<String, Object> kpis = new HashMap<>();
+            kpis.put("totalAttempts", totalAttempts);
+            kpis.put("passRate", passRate);
+            kpis.put("needsReview", needsReviewCount);
+            kpis.put("avgDurationMin", 42);
 
-        List<Map<String, Object>> levelDistribution = List.of(
-                Map.of("level", "L1", "count", 12),
-                Map.of("level", "L2", "count", 25),
-                Map.of("level", "L3", "count", 45),
-                Map.of("level", "L4", "count", 18),
-                Map.of("level", "L5", "count", 8));
+            List<Map<String, Object>> levelDistribution = List.of(
+                    Map.of("level", "L1", "count", 12),
+                    Map.of("level", "L2", "count", 25),
+                    Map.of("level", "L3", "count", 45),
+                    Map.of("level", "L4", "count", 18),
+                    Map.of("level", "L5", "count", 8));
 
-        List<Map<String, Object>> passRateSplit = List.of(
-                Map.of("name", "Pass", "value", (int) passCount),
-                Map.of("name", "Fail", "value",
-                        Math.max(0, totalAttempts - (int) passCount - (int) needsReviewCount)),
-                Map.of("name", "Needs Review", "value", (int) needsReviewCount));
+            List<Map<String, Object>> passRateSplit = List.of(
+                    Map.of("name", "Pass", "value", (int) passCount),
+                    Map.of("name", "Fail", "value", Math.max(0, totalAttempts - (int) passCount - (int) needsReviewCount)),
+                    Map.of("name", "Needs Review", "value", (int) needsReviewCount));
 
-        List<Map<String, Object>> attemptsByStack = List.of(
-                Map.of("stack", "Java", "attempts", 48),
-                Map.of("stack", "React", "attempts", 32),
-                Map.of("stack", "Python", "attempts", 24),
-                Map.of("stack", "Node", "attempts", 16),
-                Map.of("stack", "SQL", "attempts", 12));
+            List<Map<String, Object>> attemptsByStack = List.of(
+                    Map.of("stack", "Java", "attempts", 48),
+                    Map.of("stack", "React", "attempts", 32),
+                    Map.of("stack", "Python", "attempts", 24),
+                    Map.of("stack", "Node", "attempts", 16),
+                    Map.of("stack", "SQL", "attempts", 12));
 
-        List<Map<String, Object>> needsReviewQueue = attempts.stream()
-                .filter(a -> a.getResultStatus() != ResultStatus.IN_PROGRESS || a.getResultPublishStatus() == ResultPublishStatus.PENDING)
-                .limit(10)
-                .map(this::mapAttemptSummary)
-                .toList();
+            List<Map<String, Object>> needsReviewQueue = new ArrayList<>();
+            for (ExamAttempt a : attempts) {
+                if (a != null) {
+                    try {
+                        needsReviewQueue.add(mapAttemptSummary(a));
+                    } catch (Exception ignored) {}
+                }
+                if (needsReviewQueue.size() >= 10) break;
+            }
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("kpis", kpis);
-        data.put("levelDistribution", levelDistribution);
-        data.put("passRateSplit", passRateSplit);
-        data.put("attemptsByStack", attemptsByStack);
-        data.put("needsReviewQueue", needsReviewQueue);
+            Map<String, Object> data = new HashMap<>();
+            data.put("kpis", kpis);
+            data.put("levelDistribution", levelDistribution);
+            data.put("passRateSplit", passRateSplit);
+            data.put("attemptsByStack", attemptsByStack);
+            data.put("needsReviewQueue", needsReviewQueue);
 
-        return ResponseEntity.ok(ApiResponse.success("Dashboard analytics retrieved", data));
+            return ResponseEntity.ok(ApiResponse.success("Dashboard analytics retrieved", data));
+        } catch (Exception e) {
+            System.err.println("Dashboard error: " + e.getMessage());
+            Map<String, Object> fallback = new HashMap<>();
+            fallback.put("kpis", Map.of("totalAttempts", 0, "passRate", 0, "needsReview", 0, "avgDurationMin", 0));
+            fallback.put("levelDistribution", List.of());
+            fallback.put("passRateSplit", List.of());
+            fallback.put("attemptsByStack", List.of());
+            fallback.put("needsReviewQueue", List.of());
+            return ResponseEntity.ok(ApiResponse.success("Dashboard analytics retrieved (fallback)", fallback));
+        }
     }
 
     @GetMapping("/attempts")
@@ -425,57 +437,74 @@ public class AdminController {
             @RequestParam(required = false) String result,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
-
-        List<ExamAttempt> attempts = attemptRepository.findAllByOrderByCreatedAtDesc();
-        if (from != null && !from.isBlank()) {
+        try {
+            List<ExamAttempt> attempts;
             try {
-                java.time.LocalDate fromDate = java.time.LocalDate.parse(from);
-                attempts = attempts.stream().filter(a -> {
-                    java.time.LocalDateTime dt = a.getSubmittedAt() != null ? a.getSubmittedAt()
-                            : a.getCreatedAt();
-                    return dt != null && !dt.toLocalDate().isBefore(fromDate);
-                }).toList();
-            } catch (Exception ignored) {
+                attempts = attemptRepository != null ? attemptRepository.findAllByOrderByCreatedAtDesc() : List.of();
+            } catch (Exception e) {
+                try {
+                    attempts = attemptRepository != null ? attemptRepository.findAll() : List.of();
+                } catch (Exception ex) {
+                    attempts = new ArrayList<>();
+                }
             }
-        }
-        if (to != null && !to.isBlank()) {
-            try {
-                java.time.LocalDate toDate = java.time.LocalDate.parse(to);
-                attempts = attempts.stream().filter(a -> {
-                    java.time.LocalDateTime dt = a.getSubmittedAt() != null ? a.getSubmittedAt()
-                            : a.getCreatedAt();
-                    return dt != null && !dt.toLocalDate().isAfter(toDate);
-                }).toList();
-            } catch (Exception ignored) {
+            if (attempts == null) attempts = new ArrayList<>();
+
+            if (from != null && !from.isBlank()) {
+                try {
+                    java.time.LocalDate fromDate = java.time.LocalDate.parse(from);
+                    attempts = attempts.stream().filter(a -> {
+                        java.time.LocalDateTime dt = a != null ? (a.getSubmittedAt() != null ? a.getSubmittedAt() : a.getCreatedAt()) : null;
+                        return dt != null && !dt.toLocalDate().isBefore(fromDate);
+                    }).toList();
+                } catch (Exception ignored) {}
             }
-        }
+            if (to != null && !to.isBlank()) {
+                try {
+                    java.time.LocalDate toDate = java.time.LocalDate.parse(to);
+                    attempts = attempts.stream().filter(a -> {
+                        java.time.LocalDateTime dt = a != null ? (a.getSubmittedAt() != null ? a.getSubmittedAt() : a.getCreatedAt()) : null;
+                        return dt != null && !dt.toLocalDate().isAfter(toDate);
+                    }).toList();
+                } catch (Exception ignored) {}
+            }
 
-        List<Map<String, Object>> rows = attempts.stream().map(this::mapAttemptSummary).toList();
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (ExamAttempt a : attempts) {
+                if (a != null) {
+                    try {
+                        rows.add(mapAttemptSummary(a));
+                    } catch (Exception ignored) {}
+                }
+            }
 
-        if (stack != null && !stack.isBlank()) {
-            rows = rows.stream().filter(r -> stack.equalsIgnoreCase(String.valueOf(r.get("stack"))))
-                    .toList();
-        }
-        if (level != null && !level.isBlank()) {
-            rows = rows.stream().filter(r -> level.equalsIgnoreCase(String.valueOf(r.get("level"))))
-                    .toList();
-        }
-        if (result != null && !result.isBlank()) {
-            rows = rows.stream().filter(r -> result.equalsIgnoreCase(String.valueOf(r.get("result"))))
-                    .toList();
-        }
+            if (stack != null && !stack.isBlank()) {
+                rows = rows.stream().filter(r -> r.get("stack") != null && stack.equalsIgnoreCase(String.valueOf(r.get("stack")))).toList();
+            }
+            if (level != null && !level.isBlank()) {
+                rows = rows.stream().filter(r -> r.get("level") != null && level.equalsIgnoreCase(String.valueOf(r.get("level")))).toList();
+            }
+            if (result != null && !result.isBlank()) {
+                rows = rows.stream().filter(r -> r.get("result") != null && result.equalsIgnoreCase(String.valueOf(r.get("result")))).toList();
+            }
 
-        Map<String, Object> res = new HashMap<>();
-        res.put("rows", rows);
-        res.put("total", rows.size());
+            Map<String, Object> res = new HashMap<>();
+            res.put("rows", rows);
+            res.put("total", rows.size());
 
-        return ResponseEntity.ok(ApiResponse.success("Attempts retrieved", res));
+            return ResponseEntity.ok(ApiResponse.success("Attempts retrieved", res));
+        } catch (Exception e) {
+            System.err.println("Attempts error: " + e.getMessage());
+            Map<String, Object> res = new HashMap<>();
+            res.put("rows", List.of());
+            res.put("total", 0);
+            return ResponseEntity.ok(ApiResponse.success("Attempts retrieved (fallback)", res));
+        }
     }
 
     @GetMapping("/attempts/{id}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getAttemptById(@PathVariable UUID id) {
-        ExamAttempt attempt = attemptRepository.findById(id)
-                .orElse(null);
+        ExamAttempt attempt = attemptRepository.findById(id).orElse(null);
 
         Map<String, Object> data = attempt != null ? mapAttemptSummary(attempt) : Map.of(
             "id", id.toString(),
@@ -518,55 +547,63 @@ public class AdminController {
             "COPY_PASTE", "SECOND_DEVICE", "VOICE_DETECTED", "SCREEN_SHARE_LOST"
         );
 
-        List<IntegrityViolation> violations = integrityViolationRepository.findByAttemptIdOrderByCreatedAtAsc(id);
-        List<AIFlag> aiFlags = aiFlagRepository.findByAttemptId(id);
+        List<IntegrityViolation> violations = integrityViolationRepository != null
+                ? integrityViolationRepository.findByAttemptIdOrderByCreatedAtAsc(id)
+                : List.of();
+        List<AIFlag> aiFlags = aiFlagRepository != null
+                ? aiFlagRepository.findByAttemptId(id)
+                : List.of();
 
         List<Map<String, Object>> items = new ArrayList<>();
         int index = 1;
 
-        for (IntegrityViolation v : violations) {
-            Map<String, Object> item = new HashMap<>();
-            item.put("id", v.getId() != null ? v.getId().toString() : ("flag-" + index));
-            String code = v.getViolationCode() != null ? v.getViolationCode() : "TAB_SWITCH";
-            item.put("type", code);
+        if (violations != null) {
+            for (IntegrityViolation v : violations) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("id", v.getId() != null ? v.getId().toString() : ("flag-" + index));
+                String code = v.getViolationCode() != null ? v.getViolationCode() : "TAB_SWITCH";
+                item.put("type", code);
 
-            int tSec = 45;
-            try {
-                if (v.getTimestampOffset() != null) {
-                    String ts = v.getTimestampOffset();
-                    if (ts.contains(":")) {
-                        String[] parts = ts.split(":");
-                        tSec = Integer.parseInt(parts[0]) * 60 + Integer.parseInt(parts[1]);
-                    } else {
-                        tSec = Integer.parseInt(ts);
+                int tSec = 45;
+                try {
+                    if (v.getTimestampOffset() != null) {
+                        String ts = v.getTimestampOffset();
+                        if (ts.contains(":")) {
+                            String[] parts = ts.split(":");
+                            tSec = Integer.parseInt(parts[0]) * 60 + Integer.parseInt(parts[1]);
+                        } else {
+                            tSec = Integer.parseInt(ts);
+                        }
                     }
-                }
-            } catch (Exception ignored) {}
+                } catch (Exception ignored) {}
 
-            item.put("tSec", tSec);
-            item.put("timestampSec", tSec);
-            item.put("severity", (code.contains("TAB") || code.contains("FACE")) ? "HIGH" : "MEDIUM");
-            item.put("note", v.getMetaDescription() != null ? v.getMetaDescription() : ("Proctoring violation: " + code));
-            item.put("description", v.getMetaDescription() != null ? v.getMetaDescription() : ("Proctoring violation: " + code));
-            item.put("thumbnail", v.getSnapshotUrl() != null ? v.getSnapshotUrl() : "");
-            items.add(item);
-            index++;
+                item.put("tSec", tSec);
+                item.put("timestampSec", tSec);
+                item.put("severity", (code.contains("TAB") || code.contains("FACE")) ? "HIGH" : "MEDIUM");
+                item.put("note", v.getMetaDescription() != null ? v.getMetaDescription() : ("Proctoring violation: " + code));
+                item.put("description", v.getMetaDescription() != null ? v.getMetaDescription() : ("Proctoring violation: " + code));
+                item.put("thumbnail", v.getSnapshotUrl() != null ? v.getSnapshotUrl() : "");
+                items.add(item);
+                index++;
+            }
         }
 
-        for (AIFlag f : aiFlags) {
-            Map<String, Object> item = new HashMap<>();
-            item.put("id", f.getId() != null ? f.getId().toString() : ("flag-" + index));
-            String type = f.getType() != null ? f.getType() : "GAZE_AWAY";
-            item.put("type", type);
-            item.put("tSec", 120);
-            item.put("timestampSec", 120);
-            item.put("severity", (f.getConfidence() != null && f.getConfidence() > 0.8) ? "HIGH" : "MEDIUM");
-            String desc = "AI Flag: " + type + " (Confidence: " + Math.round((f.getConfidence() != null ? f.getConfidence() : 0.95) * 100) + "%)";
-            item.put("note", desc);
-            item.put("description", desc);
-            item.put("thumbnail", f.getSnapshotUrl() != null ? f.getSnapshotUrl() : "");
-            items.add(item);
-            index++;
+        if (aiFlags != null) {
+            for (AIFlag f : aiFlags) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("id", f.getId() != null ? f.getId().toString() : ("flag-" + index));
+                String type = f.getType() != null ? f.getType() : "GAZE_AWAY";
+                item.put("type", type);
+                item.put("tSec", 120);
+                item.put("timestampSec", 120);
+                item.put("severity", (f.getConfidence() != null && f.getConfidence() > 0.8) ? "HIGH" : "MEDIUM");
+                String desc = "AI Flag: " + type + " (Confidence: " + Math.round((f.getConfidence() != null ? f.getConfidence() : 0.95) * 100) + "%)";
+                item.put("note", desc);
+                item.put("description", desc);
+                item.put("thumbnail", f.getSnapshotUrl() != null ? f.getSnapshotUrl() : "");
+                items.add(item);
+                index++;
+            }
         }
 
         if (items.isEmpty()) {
@@ -594,8 +631,8 @@ public class AdminController {
         ExamAttempt attempt = attemptRepository.findById(id)
                 .orElseThrow(() -> new BadRequestException("Attempt not found"));
 
-        List<AttemptAnswer> savedAnswers = attemptAnswerRepository.findByAttemptId(id);
-        List<Section> examSections = sectionRepository.findByExamId(attempt.getExam().getId());
+        List<AttemptAnswer> savedAnswers = attemptAnswerRepository != null ? attemptAnswerRepository.findByAttemptId(id) : List.of();
+        List<Section> examSections = (attempt.getExam() != null && sectionRepository != null) ? sectionRepository.findByExamId(attempt.getExam().getId()) : List.of();
 
         List<Map<String, Object>> sectionScores = new ArrayList<>();
         int totalScore = 0;
@@ -607,9 +644,9 @@ public class AdminController {
                 : List.of();
         if (attemptQuestions != null && !attemptQuestions.isEmpty()) {
             for (ExamAttemptQuestion eq : attemptQuestions) {
-                questions.add(eq.getQuestion());
+                if (eq.getQuestion() != null) questions.add(eq.getQuestion());
             }
-        } else {
+        } else if (attempt.getExam() != null && questionRepository != null) {
             questions = questionRepository.findByExamId(attempt.getExam().getId());
             if (questions.isEmpty() && attempt.getExam().getStack() != null) {
                 questions = questionRepository.findByStackIgnoreCase(attempt.getExam().getStack());
@@ -623,12 +660,13 @@ public class AdminController {
             int sectionScore = 0;
             int sectionMax = 0;
             for (Question q : questions) {
-                sectionMax += q.getMarks();
+                int qMarks = (q.getMarks() != null && q.getMarks() > 0) ? q.getMarks() : 1;
+                sectionMax += qMarks;
                 Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
-                        .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
+                        .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
                         .findFirst();
-                if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
-                    sectionScore += q.getMarks();
+                if (ansOpt.isPresent() && ansOpt.get().getSelectedOption() != null && q.getCorrectOption() != null && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption().trim())) {
+                    sectionScore += qMarks;
                 }
             }
             Map<String, Object> secMap = new HashMap<>();
@@ -645,12 +683,13 @@ public class AdminController {
                 int sectionMax = 0;
                 for (Question q : questions) {
                     if (q.getSection() != null && q.getSection().getId().equals(section.getId())) {
-                        sectionMax += q.getMarks();
+                        int qMarks = (q.getMarks() != null && q.getMarks() > 0) ? q.getMarks() : 1;
+                        sectionMax += qMarks;
                         Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
-                                .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
+                                .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
                                 .findFirst();
-                        if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
-                            sectionScore += q.getMarks();
+                        if (ansOpt.isPresent() && ansOpt.get().getSelectedOption() != null && q.getCorrectOption() != null && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption().trim())) {
+                            sectionScore += qMarks;
                         }
                     }
                 }
@@ -665,8 +704,9 @@ public class AdminController {
             }
         }
 
+        int passMark = attempt.getExam() != null ? attempt.getExam().getPassMark() : 70;
         int finalScorePercent = maxTotal > 0 ? (int) Math.round(((double) totalScore / maxTotal) * 100) : 0;
-        String autoResult = finalScorePercent >= attempt.getExam().getPassMark() ? "PASS" : "FAIL";
+        String autoResult = finalScorePercent >= passMark ? "PASS" : "FAIL";
 
         Map<String, Object> scoreMap = new HashMap<>();
         scoreMap.put("total", totalScore);
@@ -688,8 +728,8 @@ public class AdminController {
         String finalResultStr = "NEEDS_REVIEW";
         if (attempt != null) {
             try {
-                List<AttemptAnswer> savedAnswers = attemptAnswerRepository.findByAttemptId(id);
-                List<Section> examSections = sectionRepository.findByExamId(attempt.getExam().getId());
+                List<AttemptAnswer> savedAnswers = attemptAnswerRepository != null ? attemptAnswerRepository.findByAttemptId(id) : List.of();
+                List<Section> examSections = (attempt.getExam() != null && sectionRepository != null) ? sectionRepository.findByExamId(attempt.getExam().getId()) : List.of();
                 int totalScore = 0;
                 int maxTotal = 0;
 
@@ -699,9 +739,9 @@ public class AdminController {
                         : List.of();
                 if (attemptQuestions != null && !attemptQuestions.isEmpty()) {
                     for (ExamAttemptQuestion eq : attemptQuestions) {
-                        questions.add(eq.getQuestion());
+                        if (eq.getQuestion() != null) questions.add(eq.getQuestion());
                     }
-                } else {
+                } else if (attempt.getExam() != null && questionRepository != null) {
                     questions = questionRepository.findByExamId(attempt.getExam().getId());
                     if (questions.isEmpty() && attempt.getExam().getStack() != null) {
                         questions = questionRepository.findByStackIgnoreCase(attempt.getExam().getStack());
@@ -713,24 +753,26 @@ public class AdminController {
 
                 if (examSections == null || examSections.isEmpty()) {
                     for (Question q : questions) {
-                        maxTotal += q.getMarks();
+                        int qMarks = (q.getMarks() != null && q.getMarks() > 0) ? q.getMarks() : 1;
+                        maxTotal += qMarks;
                         Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
-                                .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
+                                .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
                                 .findFirst();
-                        if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
-                            totalScore += q.getMarks();
+                        if (ansOpt.isPresent() && ansOpt.get().getSelectedOption() != null && q.getCorrectOption() != null && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption().trim())) {
+                            totalScore += qMarks;
                         }
                     }
                 } else {
                     for (Section section : examSections) {
                         for (Question q : questions) {
                             if (q.getSection() != null && q.getSection().getId().equals(section.getId())) {
-                                maxTotal += q.getMarks();
+                                int qMarks = (q.getMarks() != null && q.getMarks() > 0) ? q.getMarks() : 1;
+                                maxTotal += qMarks;
                                 Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
-                                        .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
+                                        .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
                                         .findFirst();
-                                if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
-                                    totalScore += q.getMarks();
+                                if (ansOpt.isPresent() && ansOpt.get().getSelectedOption() != null && q.getCorrectOption() != null && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption().trim())) {
+                                    totalScore += qMarks;
                                 }
                             }
                         }
@@ -741,7 +783,7 @@ public class AdminController {
                 attempt.setScore(finalScorePercent);
 
                 CompetencyLevel level = CompetencyLevel.L5;
-                List<CompetencyBand> bands = attempt.getExam().getCompetencyBands();
+                List<CompetencyBand> bands = attempt.getExam() != null ? attempt.getExam().getCompetencyBands() : null;
                 if (bands == null || bands.isEmpty()) {
                     bands = new ArrayList<>();
                     bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
@@ -758,7 +800,8 @@ public class AdminController {
                 }
                 attempt.setAssignedLevel(level);
 
-                if (finalScorePercent >= attempt.getExam().getPassMark()) {
+                int passMark = attempt.getExam() != null ? attempt.getExam().getPassMark() : 70;
+                if (finalScorePercent >= passMark) {
                     attempt.setResultStatus(com.oryfolks.certify.enums.ResultStatus.PASSED);
                 } else {
                     attempt.setResultStatus(com.oryfolks.certify.enums.ResultStatus.FAILED);
@@ -791,7 +834,7 @@ public class AdminController {
             @RequestBody Map<String, Object> payload,
             Principal principal) {
 
-        String note = payload.getOrDefault("note", "").toString();
+        String note = payload != null ? payload.getOrDefault("note", "").toString() : "";
 
         approvalRepository.save(ApprovalRequest.builder()
                 .type("FOUR_EYES_REVIEW")
@@ -850,56 +893,77 @@ public class AdminController {
 
     private Map<String, Object> mapAttemptSummary(ExamAttempt a) {
         Map<String, Object> map = new HashMap<>();
-        map.put("id", a.getId().toString());
-        map.put("candidate", a.getCandidate() != null ? (a.getCandidate().getFullName() != null ? a.getCandidate().getFullName() : a.getCandidate().getUsername()) : "Candidate");
-        map.put("email", a.getCandidate() != null ? a.getCandidate().getUsername() : "");
-        map.put("exam", a.getExam() != null ? a.getExam().getTitle() : "Java Certification");
-        map.put("stack", a.getExam() != null ? a.getExam().getStack() : "Java");
-        map.put("level", a.getAssignedLevel() != null ? a.getAssignedLevel().name()
-                : (a.getCompetencyLevel() != null ? a.getCompetencyLevel().name() : "L3"));
+        if (a == null) return map;
+        try {
+            map.put("id", a.getId() != null ? a.getId().toString() : UUID.randomUUID().toString());
+            map.put("candidate", a.getCandidate() != null ? (a.getCandidate().getFullName() != null ? a.getCandidate().getFullName() : a.getCandidate().getUsername()) : "Candidate");
+            map.put("email", a.getCandidate() != null ? a.getCandidate().getUsername() : "");
+            map.put("exam", a.getExam() != null ? a.getExam().getTitle() : "Java Certification");
+            map.put("stack", a.getExam() != null ? a.getExam().getStack() : "Java");
+            map.put("level", a.getAssignedLevel() != null ? a.getAssignedLevel().name()
+                    : (a.getCompetencyLevel() != null ? a.getCompetencyLevel().name() : "L3"));
 
-        int score = a.getScore() != null ? a.getScore() : 0;
-        if (score == 0 && a.getExam() != null) {
-            score = calculateAttemptScore(a);
-            if (score > 0) {
-                a.setScore(score);
-                try { attemptRepository.save(a); } catch (Exception ignored) {}
+            int score = a.getScore() != null ? a.getScore() : 0;
+            if (score == 0 && a.getExam() != null) {
+                try {
+                    score = calculateAttemptScore(a);
+                    if (score > 0) {
+                        a.setScore(score);
+                        if (attemptRepository != null) attemptRepository.save(a);
+                    }
+                } catch (Exception ignored) {}
             }
-        }
 
-        map.put("score", score);
+            map.put("score", score);
 
-        String resultStr = "NEEDS_REVIEW";
-        if (a.getResultPublishStatus() == ResultPublishStatus.PUBLISHED) {
-            if (a.getResultStatus() == ResultStatus.PASSED) {
-                resultStr = "PASS";
-            } else if (a.getResultStatus() == ResultStatus.FAILED || a.getResultStatus() == ResultStatus.TERMINATED) {
-                resultStr = "FAIL";
+            String resultStr = "NEEDS_REVIEW";
+            if (a.getResultPublishStatus() == ResultPublishStatus.PUBLISHED) {
+                if (a.getResultStatus() == ResultStatus.PASSED) {
+                    resultStr = "PASS";
+                } else if (a.getResultStatus() == ResultStatus.FAILED || a.getResultStatus() == ResultStatus.TERMINATED) {
+                    resultStr = "FAIL";
+                }
+            } else if (a.getResultStatus() == ResultStatus.IN_PROGRESS) {
+                resultStr = "IN_PROGRESS";
             }
-        } else if (a.getResultStatus() == ResultStatus.IN_PROGRESS) {
-            resultStr = "IN_PROGRESS";
+            map.put("result", resultStr);
+
+            map.put("submittedAt", a.getSubmittedAt() != null ? a.getSubmittedAt().toString()
+                    : (a.getEndTime() != null ? a.getEndTime().toString()
+                    : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : new Date().toString())));
+
+            long violationCount = 0;
+            if (integrityViolationRepository != null && a.getId() != null) {
+                try {
+                    List<IntegrityViolation> vList = integrityViolationRepository.findByAttemptIdOrderByCreatedAtAsc(a.getId());
+                    if (vList != null) violationCount = vList.size();
+                } catch (Exception ignored) {}
+            }
+
+            long aiFlagCount = 0;
+            if (aiFlagRepository != null && a.getId() != null) {
+                try {
+                    List<AIFlag> fList = aiFlagRepository.findByAttemptId(a.getId());
+                    if (fList != null) aiFlagCount = fList.size();
+                } catch (Exception ignored) {}
+            }
+
+            long totalFlags = violationCount + aiFlagCount;
+
+            map.put("flagCount", totalFlags);
+            map.put("flaggedAt", a.getSubmittedAt() != null ? a.getSubmittedAt().toString()
+                    : (a.getEndTime() != null ? a.getEndTime().toString()
+                    : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : new Date().toString())));
+        } catch (Exception e) {
+            System.err.println("mapAttemptSummary error: " + e.getMessage());
         }
-        map.put("result", resultStr);
-
-        map.put("submittedAt", a.getSubmittedAt() != null ? a.getSubmittedAt().toString()
-                : (a.getEndTime() != null ? a.getEndTime().toString()
-                : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : new Date().toString())));
-
-        long violationCount = integrityViolationRepository.findByAttemptIdOrderByCreatedAtAsc(a.getId()).size();
-        long aiFlagCount = aiFlagRepository.findByAttemptId(a.getId()).size();
-        long totalFlags = violationCount + aiFlagCount;
-
-        map.put("flagCount", totalFlags);
-        map.put("flaggedAt", a.getSubmittedAt() != null ? a.getSubmittedAt().toString()
-                : (a.getEndTime() != null ? a.getEndTime().toString()
-                : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : new Date().toString())));
         return map;
     }
 
     private int calculateAttemptScore(ExamAttempt attempt) {
         if (attempt == null || attempt.getExam() == null) return 0;
-        List<AttemptAnswer> aaList = attemptAnswerRepository.findByAttemptId(attempt.getId());
-        List<Answer> aList = answerRepository.findByAttemptId(attempt.getId());
+        List<AttemptAnswer> aaList = attemptAnswerRepository != null ? attemptAnswerRepository.findByAttemptId(attempt.getId()) : List.of();
+        List<Answer> aList = answerRepository != null ? answerRepository.findByAttemptId(attempt.getId()) : List.of();
 
         List<Question> questions = new ArrayList<>();
         List<ExamAttemptQuestion> attemptQuestions = examAttemptQuestionRepository != null
@@ -907,9 +971,9 @@ public class AdminController {
                 : List.of();
         if (attemptQuestions != null && !attemptQuestions.isEmpty()) {
             for (ExamAttemptQuestion eq : attemptQuestions) {
-                questions.add(eq.getQuestion());
+                if (eq.getQuestion() != null) questions.add(eq.getQuestion());
             }
-        } else {
+        } else if (questionRepository != null) {
             questions = questionRepository.findByExamId(attempt.getExam().getId());
             if (questions.isEmpty() && attempt.getExam().getStack() != null) {
                 questions = questionRepository.findByStackIgnoreCase(attempt.getExam().getStack());
@@ -928,12 +992,15 @@ public class AdminController {
             String correct = q.getCorrectOption() != null ? q.getCorrectOption().trim() : "";
 
             String userSelected = null;
-            Optional<AttemptAnswer> aaOpt = aaList.stream()
-                    .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
-                    .findFirst();
-            if (aaOpt.isPresent() && aaOpt.get().getSelectedOption() != null) {
-                userSelected = aaOpt.get().getSelectedOption().trim();
-            } else {
+            if (aaList != null) {
+                Optional<AttemptAnswer> aaOpt = aaList.stream()
+                        .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
+                        .findFirst();
+                if (aaOpt.isPresent() && aaOpt.get().getSelectedOption() != null) {
+                    userSelected = aaOpt.get().getSelectedOption().trim();
+                }
+            }
+            if (userSelected == null && aList != null) {
                 Optional<Answer> aOpt = aList.stream()
                         .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
                         .findFirst();
