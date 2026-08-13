@@ -266,6 +266,11 @@ public class AdminController {
         User candidate = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Candidate not found: " + id));
 
+        if (approvalRepository.findFirstByTargetIdAndStatus(id.toString(), "PENDING").isPresent()) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("An unlock approval request is already pending for this candidate."));
+        }
+
         String note = body != null ? body.getOrDefault("note", "") : "";
 
         ApprovalRequest req = ApprovalRequest.builder()
