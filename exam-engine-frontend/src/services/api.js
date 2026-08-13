@@ -35,10 +35,39 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+async function encryptPassword(password) {
+  try {
+    if (!window.crypto || !window.crypto.subtle) {
+      return btoa(password);
+    }
+    const keyText = "OryFolksCertifyK";
+    const ivText = "OryFolksCertifyI";
+    const enc = new TextEncoder();
+    const rawKey = enc.encode(keyText);
+    const iv = enc.encode(ivText);
+    const key = await window.crypto.subtle.importKey(
+      "raw",
+      rawKey,
+      { name: "AES-CBC" },
+      false,
+      ["encrypt"]
+    );
+    const encrypted = await window.crypto.subtle.encrypt(
+      { name: "AES-CBC", iv: iv },
+      key,
+      enc.encode(password)
+    );
+    return btoa(String.fromCharCode(...new Uint8Array(encrypted)));
+  } catch (err) {
+    console.error("Encryption failed, falling back to base64", err);
+    return btoa(password);
+  }
+}
 
 export const authService = {
   login: async (username, password) => {
-    const response = await api.post('/auth/login', { username, password });
+    const encryptedPassword = await encryptPassword(password);
+    const response = await api.post('/auth/login', { username, password: encryptedPassword });
     if (response.data.success && response.data.data.token) {
       localStorage.setItem('token', response.data.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.data));
