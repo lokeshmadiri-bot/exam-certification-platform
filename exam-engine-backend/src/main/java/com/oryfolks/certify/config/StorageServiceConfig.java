@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Primary;
 @Configuration
 public class StorageServiceConfig {
 
-    @Value("${app.storage.provider:local}")
+    @Value("${app.storage.provider}")
     private String storageProvider;
 
     @Autowired
@@ -23,8 +23,10 @@ public class StorageServiceConfig {
     public StorageService storageService() {
         if ("s3".equalsIgnoreCase(storageProvider)) {
             return (StorageService) applicationContext.getBean("s3");
-        } else {
+        } else if ("local".equalsIgnoreCase(storageProvider)) {
             return (StorageService) applicationContext.getBean("local");
+        } else {
+            throw new IllegalStateException("Invalid app.storage.provider value: '" + storageProvider + "'. Allowed values are: 'local' or 's3'.");
         }
     }
 }
