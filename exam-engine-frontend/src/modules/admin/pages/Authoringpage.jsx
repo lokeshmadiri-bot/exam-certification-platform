@@ -134,7 +134,7 @@ export default function AuthoringPage() {
                 <div>
                     <h1>Authoring</h1>
                     <p className="a1-sub">
-                        {examId ? `Editing exam configuration · ${examId}` : "Configure a new exam's format, then define its difficulty bands."}
+                        {examId ? `Editing Exam: ${form.title || "Certification Exam"}` : "Configure a new exam's format, then define its difficulty bands."}
                     </p>
                 </div>
                 <button className="a1-btn a1-btn-ghost" onClick={() => navigate("/admin/exams")}>

@@ -18,14 +18,15 @@ import java.util.Map;
 
 /**
  * GeminiService — AI question generator supporting Groq Cloud (gsk_...),
- * Grok (xAI), and Google Gemini API, with fallback to local question generation.
+ * Grok (xAI), and Google Gemini API, with fallback to local question
+ * generation.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class GeminiService {
 
-    @Value("${groq.api.key:}")
+    @Value("${groq.api.key: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}")
     private String groqApiKey;
 
     @Value("${groq.api.url:https://api.groq.com/openai/v1/chat/completions}")
@@ -81,18 +82,18 @@ public class GeminiService {
         return generateLocalFallback(req);
     }
 
-    private List<GeneratedQuestionDTO> generateWithOpenAiFormat(GenerateQuestionRequest req, String key, String endpointUrl, String model, String providerName) {
+    private List<GeneratedQuestionDTO> generateWithOpenAiFormat(GenerateQuestionRequest req, String key,
+            String endpointUrl, String model, String providerName) {
         String prompt = buildPrompt(req);
         String selectedModel = (model != null && !model.isBlank()) ? model : "llama-3.3-70b-versatile";
 
         Map<String, Object> requestBody = Map.of(
-            "model", selectedModel,
-            "messages", List.of(
-                Map.of("role", "system", "content", "You are an expert technical exam question author. Respond ONLY with a valid JSON array."),
-                Map.of("role", "user", "content", prompt)
-            ),
-            "temperature", 0.7
-        );
+                "model", selectedModel,
+                "messages", List.of(
+                        Map.of("role", "system", "content",
+                                "You are an expert technical exam question author. Respond ONLY with a valid JSON array."),
+                        Map.of("role", "user", "content", prompt)),
+                "temperature", 0.7);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -104,7 +105,8 @@ public class GeminiService {
             ResponseEntity<String> response = restTemplate.postForEntity(endpointUrl, entity, String.class);
             return parseOpenAiResponse(response.getBody(), req, providerName + " (" + selectedModel + ")");
         } catch (Exception e) {
-            log.warn("{} API call failed ({}), falling back to local question generator.", providerName, e.getMessage());
+            log.warn("{} API call failed ({}), falling back to local question generator.", providerName,
+                    e.getMessage());
             return generateLocalFallback(req);
         }
     }
@@ -113,15 +115,12 @@ public class GeminiService {
         String prompt = buildPrompt(req);
 
         Map<String, Object> requestBody = Map.of(
-            "contents", List.of(
-                Map.of("parts", List.of(Map.of("text", prompt)))
-            ),
-            "generationConfig", Map.of(
-                "temperature", 0.7,
-                "maxOutputTokens", 4096,
-                "responseMimeType", "application/json"
-            )
-        );
+                "contents", List.of(
+                        Map.of("parts", List.of(Map.of("text", prompt)))),
+                "generationConfig", Map.of(
+                        "temperature", 0.7,
+                        "maxOutputTokens", 4096,
+                        "responseMimeType", "application/json"));
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -150,8 +149,11 @@ public class GeminiService {
         for (int i = 0; i < count; i++) {
             list.add(GeneratedQuestionDTO.builder()
                     .tempId("gen-" + i + "-" + System.currentTimeMillis())
-                    .questionText(String.format("What is the primary function of %s concept #%d in %s development?", stack, i + 1, type))
-                    .codeSnippet("CODING".equalsIgnoreCase(type) ? String.format("// Sample %s code snippet\npublic class Demo {\n  public static void main(String[] args) {\n    System.out.println(\"Test %d\");\n  }\n}", stack, i + 1) : "")
+                    .questionText(String.format("What is the primary function of %s concept #%d in %s development?",
+                            stack, i + 1, type))
+                    .codeSnippet("CODING".equalsIgnoreCase(type) ? String.format(
+                            "// Sample %s code snippet\npublic class Demo {\n  public static void main(String[] args) {\n    System.out.println(\"Test %d\");\n  }\n}",
+                            stack, i + 1) : "")
                     .stack(stack)
                     .type(type)
                     .level(level)
@@ -220,10 +222,12 @@ public class GeminiService {
                     "marks": 1
                   }
                 ]
-                """.formatted(count, req.getStack(), req.getLevel(), req.getDifficulty(), req.getType(), topicClause);
+                """
+                .formatted(count, req.getStack(), req.getLevel(), req.getDifficulty(), req.getType(), topicClause);
     }
 
-    private List<GeneratedQuestionDTO> parseOpenAiResponse(String responseBody, GenerateQuestionRequest req, String modelName) {
+    private List<GeneratedQuestionDTO> parseOpenAiResponse(String responseBody, GenerateQuestionRequest req,
+            String modelName) {
         try {
             JsonNode root = objectMapper.readTree(responseBody);
             String jsonText = root.path("choices").get(0).path("message").path("content").asText();
@@ -245,7 +249,8 @@ public class GeminiService {
         }
     }
 
-    private List<GeneratedQuestionDTO> parseQuestionsJsonString(String jsonText, GenerateQuestionRequest req, String modelName) {
+    private List<GeneratedQuestionDTO> parseQuestionsJsonString(String jsonText, GenerateQuestionRequest req,
+            String modelName) {
         List<GeneratedQuestionDTO> result = new ArrayList<>();
         try {
             String cleanText = jsonText.trim();
@@ -259,7 +264,8 @@ public class GeminiService {
             }
             cleanText = cleanText.trim();
 
-            List<Map<String, Object>> questions = objectMapper.readValue(cleanText, new TypeReference<>() {});
+            List<Map<String, Object>> questions = objectMapper.readValue(cleanText, new TypeReference<>() {
+            });
 
             for (int i = 0; i < questions.size(); i++) {
                 Map<String, Object> q = questions.get(i);
@@ -296,7 +302,12 @@ public class GeminiService {
 
     private Integer num(Map<String, Object> map, String key) {
         Object val = map.get(key);
-        if (val == null) return 1;
-        try { return Integer.parseInt(val.toString()); } catch (Exception e) { return 1; }
+        if (val == null)
+            return 1;
+        try {
+            return Integer.parseInt(val.toString());
+        } catch (Exception e) {
+            return 1;
+        }
     }
 }

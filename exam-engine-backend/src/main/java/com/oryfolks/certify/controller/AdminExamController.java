@@ -78,17 +78,80 @@ public class AdminExamController {
             exams = exams.stream().filter(e -> e.getStatus().name().equalsIgnoreCase(status)).toList();
         }
 
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Exam e : exams) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", e.getId());
+            map.put("title", e.getTitle());
+            map.put("stack", e.getStack());
+            map.put("durationMinutes", e.getDurationMinutes());
+            map.put("durationMin", e.getDurationMinutes());
+            map.put("questionPool", e.getQuestionPool());
+            map.put("questionPoolSize", e.getQuestionPool());
+            map.put("perAttempt", e.getPerAttempt());
+            map.put("questionsPerAttempt", e.getPerAttempt());
+            map.put("passMark", e.getPassMark());
+            map.put("instructions", e.getInstructions());
+            map.put("version", e.getVersion());
+            map.put("status", e.getStatus() != null ? e.getStatus().name() : "DRAFT");
+            map.put("createdAt", e.getCreatedAt());
+            map.put("updatedAt", e.getUpdatedAt());
+
+            long activeCount = questionRepository.countByExamIdAndIsActiveTrue(e.getId());
+            if (activeCount == 0) {
+                activeCount = questionRepository.countByExamId(e.getId());
+            }
+            int poolSize = e.getQuestionPool() != null ? e.getQuestionPool() : 0;
+            long remaining = Math.max(0, poolSize - activeCount);
+            boolean eligible = activeCount >= poolSize && poolSize > 0;
+
+            map.put("currentQuestionCount", activeCount);
+            map.put("remainingQuestionsNeeded", remaining);
+            map.put("isActivationEligible", eligible);
+
+            rows.add(map);
+        }
+
         Map<String, Object> result = new HashMap<>();
-        result.put("rows", exams);
-        result.put("total", exams.size());
+        result.put("rows", rows);
+        result.put("total", rows.size());
         return ResponseEntity.ok(ApiResponse.success("Exams retrieved", result));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Exam>> getExam(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getExam(@PathVariable UUID id) {
         Exam exam = examRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Exam not found: " + id));
-        return ResponseEntity.ok(ApiResponse.success("Exam details retrieved", exam));
+
+        long activeCount = questionRepository.countByExamIdAndIsActiveTrue(exam.getId());
+        if (activeCount == 0) {
+            activeCount = questionRepository.countByExamId(exam.getId());
+        }
+        int poolSize = exam.getQuestionPool() != null ? exam.getQuestionPool() : 0;
+        long remaining = Math.max(0, poolSize - activeCount);
+        boolean eligible = activeCount >= poolSize && poolSize > 0;
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", exam.getId());
+        map.put("title", exam.getTitle());
+        map.put("stack", exam.getStack());
+        map.put("durationMinutes", exam.getDurationMinutes());
+        map.put("durationMin", exam.getDurationMinutes());
+        map.put("questionPool", exam.getQuestionPool());
+        map.put("questionPoolSize", exam.getQuestionPool());
+        map.put("perAttempt", exam.getPerAttempt());
+        map.put("questionsPerAttempt", exam.getPerAttempt());
+        map.put("passMark", exam.getPassMark());
+        map.put("instructions", exam.getInstructions());
+        map.put("version", exam.getVersion());
+        map.put("status", exam.getStatus() != null ? exam.getStatus().name() : "DRAFT");
+        map.put("createdAt", exam.getCreatedAt());
+        map.put("updatedAt", exam.getUpdatedAt());
+        map.put("currentQuestionCount", activeCount);
+        map.put("remainingQuestionsNeeded", remaining);
+        map.put("isActivationEligible", eligible);
+
+        return ResponseEntity.ok(ApiResponse.success("Exam details retrieved", map));
     }
 
     @PostMapping
@@ -114,7 +177,7 @@ public class AdminExamController {
                 .action("CREATE_EXAM")
                 .module("Exams Library")
                 .oldValue("-")
-                .newValue(saved.getId().toString())
+                .newValue(saved.getTitle() != null ? saved.getTitle() : "New Exam")
                 .build());
 
         return ResponseEntity.ok(ApiResponse.success("Exam created successfully", saved));
@@ -151,7 +214,7 @@ public class AdminExamController {
                 .action("EDIT_EXAM_METADATA")
                 .module("Exams Library")
                 .oldValue("-")
-                .newValue(saved.getId().toString())
+                .newValue(saved.getTitle() != null ? saved.getTitle() : "Exam Metadata")
                 .build());
 
         return ResponseEntity.ok(ApiResponse.success("Exam updated successfully", saved));
@@ -180,8 +243,8 @@ public class AdminExamController {
                 .userName(principal != null ? principal.getName() : "Admin User")
                 .action("DUPLICATE_EXAM")
                 .module("Exams Library")
-                .oldValue(id.toString())
-                .newValue(savedCopy.getId().toString())
+                .oldValue(src.getTitle())
+                .newValue(savedCopy.getTitle())
                 .build());
 
         return ResponseEntity.ok(ApiResponse.success("Exam duplicated", savedCopy));
@@ -192,27 +255,19 @@ public class AdminExamController {
         Exam exam = examRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Exam not found: " + id));
 
+        List<CompetencyBand> bands = bandRepository.findByExamId(id);
+
         Map<String, int[]> map = new LinkedHashMap<>();
-        List<CompetencyBand> bands = exam.getCompetencyBands();
-        if (bands == null || bands.isEmpty()) {
-            map.put("L1", new int[]{90, 100});
-            map.put("L2", new int[]{75, 89});
-            map.put("L3", new int[]{60, 74});
-            map.put("L4", new int[]{40, 59});
-            map.put("L5", new int[]{0, 39});
-        } else {
-            for (CompetencyBand b : bands) {
-                map.put(b.getLevelName().name(), new int[]{b.getMinScore(), b.getMaxScore()});
-            }
+        for (CompetencyBand b : bands) {
+            map.put(b.getLevelName().name(), new int[]{b.getMinScore(), b.getMaxScore()});
         }
         return ResponseEntity.ok(ApiResponse.success("Bands retrieved", map));
     }
 
     @PutMapping("/{id}/bands")
-    @Transactional
     public ResponseEntity<ApiResponse<Map<String, int[]>>> saveBands(
             @PathVariable UUID id,
-            @RequestBody Map<String, List<Integer>> bandsMap,
+            @RequestBody Map<String, List<Integer>> payload,
             Principal principal) {
 
         Exam exam = examRepository.findById(id)
@@ -221,18 +276,14 @@ public class AdminExamController {
         bandRepository.deleteByExamId(id);
 
         List<CompetencyBand> bandList = new ArrayList<>();
-        for (Map.Entry<String, List<Integer>> entry : bandsMap.entrySet()) {
-            CompetencyLevel lvl = CompetencyLevel.valueOf(entry.getKey());
+        for (Map.Entry<String, List<Integer>> entry : payload.entrySet()) {
+            String lvlStr = entry.getKey();
             List<Integer> range = entry.getValue();
-            int min = range.get(0);
-            int max = range.get(1);
-            String title = switch (lvl) {
-                case L1 -> "Expert";
-                case L2 -> "Advanced";
-                case L3 -> "Intermediate";
-                case L4 -> "Beginner";
-                case L5 -> "Needs Training";
-            };
+
+            CompetencyLevel lvl = CompetencyLevel.valueOf(lvlStr);
+            int min = (range != null && range.size() > 0) ? range.get(0) : 0;
+            int max = (range != null && range.size() > 1) ? range.get(1) : 100;
+            String title = lvlStr + " Competency";
 
             bandList.add(CompetencyBand.builder()
                     .exam(exam)
@@ -250,7 +301,7 @@ public class AdminExamController {
                 .action("UPDATE_DIFFICULTY_BANDS")
                 .module("Authoring")
                 .oldValue("-")
-                .newValue(id.toString())
+                .newValue("Updated Bands for " + exam.getTitle())
                 .build());
 
         Map<String, int[]> responseMap = new LinkedHashMap<>();
@@ -269,6 +320,20 @@ public class AdminExamController {
         try {
             Exam exam = examRepository.findById(id)
                     .orElseThrow(() -> new com.oryfolks.certify.exception.ResourceNotFoundException("Exam not found with id: " + id));
+
+            long activeCount = questionRepository.countByExamIdAndIsActiveTrue(exam.getId());
+            if (activeCount == 0) {
+                activeCount = questionRepository.countByExamId(exam.getId());
+            }
+            int poolSize = exam.getQuestionPool() != null ? exam.getQuestionPool() : 0;
+            if (activeCount < poolSize) {
+                long remaining = poolSize - activeCount;
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error(String.format(
+                            "Cannot activate exam. Required Question Pool Size is %d, but currently only %d question(s) are assigned to this exam. %d more question(s) must be added before activation.",
+                            poolSize, activeCount, remaining
+                        )));
+            }
 
             if (approvalRepository.findFirstByTargetIdAndStatus(id.toString(), "PENDING").isPresent()) {
                 return ResponseEntity.badRequest()

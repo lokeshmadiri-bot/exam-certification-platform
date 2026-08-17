@@ -317,7 +317,10 @@ export const fetchDashboard = () =>
     withFallback(() => get("/analytics/dashboard"), MOCK.dashboard);
 
 export const fetchAttempts = (filters) =>
-    withFallback(() => get("/attempts", filters), () => mockAttempts(filters));
+    withFallback(() => get("/attempts", filters), () => mockAttempts(filters, false));
+
+export const fetchReviewAttempts = (filters) =>
+    withFallback(() => get("/attempts/review", filters), () => mockAttempts(filters, true));
 
 export const fetchAttempt = (id) =>
     withFallback(
@@ -355,6 +358,9 @@ export const fetchNotifications = () =>
 
 export const markNotificationRead = (id) =>
     withFallback(() => post(`/notifications/${id}/read`, {}), { ok: true });
+
+export const markAllNotificationsRead = () =>
+    withFallback(() => post("/notifications/read-all", {}), { ok: true });
 
 // ---------------- Helper Generators & Utils ----------------
 
@@ -839,8 +845,11 @@ function pushAudit(action, module, oldValue, newValue) {
     });
 }
 
-function mockAttempts(filters = {}) {
-    let rows = MOCK.attemptList;
+function mockAttempts(filters = {}, isReview = false) {
+    let rows = MOCK.attemptList || [];
+    if (isReview) {
+        rows = rows.filter((r) => r.result === "NEEDS_REVIEW");
+    }
     if (filters.stack) rows = rows.filter((r) => r.stack === filters.stack);
     if (filters.level) rows = rows.filter((r) => r.level === filters.level);
     if (filters.result) rows = rows.filter((r) => r.result === filters.result);
