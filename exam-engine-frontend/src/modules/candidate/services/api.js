@@ -227,6 +227,12 @@ export const candidateService = {
   getMyResults: async () => {
     const response = await api.get('/candidate/results');
     return response.data;
+  },
+
+  // Candidate Notifications
+  getNotifications: async () => {
+    const response = await api.get('/candidate/notifications');
+    return response.data;
   }
 };
 

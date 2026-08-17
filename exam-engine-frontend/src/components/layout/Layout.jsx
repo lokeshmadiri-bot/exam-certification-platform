@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Outlet } from 'react-router-dom';
+import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import CmdPalette from '../common/CmdPalette';
@@ -8,9 +8,14 @@ import { authService } from '../../modules/candidate/services/api';
 
 export default function Layout({ title }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(null);
   const [navOpen, setNavOpen] = useState(false);
   const [cmdPaletteOpen, setCmdPaletteOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const hideTopbar = location.pathname.includes('/instructions/') || location.pathname.includes('/check/');
+  const hideSearch = location.pathname.includes('/help') || hideTopbar;
 
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
@@ -56,14 +61,19 @@ export default function Layout({ title }) {
 
       {/* Main Content Area */}
       <div className="main flex flex-col min-w-0 bg-[#F4F7FC]">
-        <Topbar
-          user={user}
-          title={title}
-          onMenuToggle={() => setNavOpen(!navOpen)}
-          onOpenCmdPalette={() => setCmdPaletteOpen(true)}
-        />
+        {!hideTopbar && (
+          <Topbar
+            user={user}
+            title={title}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            hideSearch={hideSearch}
+            onMenuToggle={() => setNavOpen(!navOpen)}
+            onOpenCmdPalette={() => setCmdPaletteOpen(true)}
+          />
+        )}
         <main className="content p-[28px_30px_48px] max-w-[1280px] w-full mx-auto">
-          <Outlet context={{ user }} />
+          <Outlet context={{ user, searchQuery }} />
         </main>
       </div>
 

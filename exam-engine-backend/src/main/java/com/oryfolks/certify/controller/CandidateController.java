@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -97,6 +98,18 @@ public class CandidateController {
                 return ResponseEntity.ok(
                                 ApiResponse.success(
                                                 "Results retrieved successfully.",
+                                                response));
+        }
+
+        @GetMapping("/notifications")
+        public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getNotifications(
+                        Principal principal) {
+
+                List<Map<String, Object>> response = candidateService.getNotifications(principal.getName());
+
+                return ResponseEntity.ok(
+                                ApiResponse.success(
+                                                "Notifications retrieved successfully.",
                                                 response));
         }
 

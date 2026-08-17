@@ -33,6 +33,7 @@ import { useTimeUp } from '../hooks/useTimeUp';
 import { useUnload } from '../hooks/useUnload';
 import { useRecording as useModularRecording } from '../hooks/useRecording';
 import { useAIFlags } from '../hooks/useAIFlags';
+import { useCameraMonitor } from '../hooks/useCameraMonitor';
 
 import { examService } from '../services/examService';
 import { useExamTimer } from '../hooks/useExamTimer';
@@ -78,6 +79,15 @@ function ExamRunnerContent() {
     videoRef
   } = useExam();
 
+  // Reconnect hook
+  const { online, syncing, reconnecting } = useReconnect({
+    attemptId,
+    answers,
+    timeRemaining,
+    setTimeRemaining,
+    onResumed: () => setOffline(false)
+  });
+
   const [examTitle, setExamTitle] = useState('Certification Exam');
   const [examDuration, setExamDuration] = useState(45 * 60);
   const [initialStrikeCount, setInitialStrikeCount] = useState(0);
@@ -87,11 +97,28 @@ function ExamRunnerContent() {
   const [submitError, setSubmitError] = useState('');
   const [terminatedState, setTerminatedState] = useState(false);
   const [submittingState, setSubmittingState] = useState(false);
+  const [submitStatusText, setSubmitStatusText] = useState('Submitting Exam...');
+  const [loadError, setLoadError] = useState('');
+  const isProctoringActive = !loading && online && !offline && !terminatedState && !submittingState && !showThanks && !showThankYouPage;
+
+  // Modular recording & AI flags hooks declared at the top so they are in scope for all helper functions
+  const { recording, stopAndUploadRecording } = useModularRecording({
+    attemptId,
+    active: isProctoringActive,
+    streamRef,
+    videoRef
+  });
+
+  const { fetchSummary, recordSilentFlag } = useAIFlags({
+    attemptId,
+    active: isProctoringActive
+  });
+
 
   // Ensure the live webcam stream is bound to the sidebar PIP element once it mounts
   useEffect(() => {
     if (streamRef?.current && videoRef?.current) {
-      if (videoRef.current.srcObject !== streamRef.current) {
+      if (streamRef.current instanceof MediaStream && videoRef.current.srcObject !== streamRef.current) {
         videoRef.current.srcObject = streamRef.current;
         videoRef.current.play().catch(err => console.warn("Exam runner PIP play failed:", err));
       }
@@ -133,11 +160,16 @@ function ExamRunnerContent() {
           }
         });
 
+        if (allQuestions.length === 0) {
+          throw new Error("This exam does not contain any questions. Please check the question bank or section settings.");
+        }
+
         setSections(loadedSections);
         setQuestions(allQuestions);
         setAnswers(data.answers || {});
       } catch (err) {
         console.error('Failed to load runner data:', err);
+        setLoadError(err?.response?.data?.message || err?.message || 'Failed to load exam data. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -153,6 +185,18 @@ function ExamRunnerContent() {
 
     setSubmittingState(true);
     setShowThanks(true);
+    setSubmitStatusText('Uploading proctoring recording...');
+
+    // Stop and upload recording before calling backend submit
+    try {
+      console.log('[ExamRunner] Stopping and uploading recording inside handleGradingSubmit…');
+      await stopAndUploadRecording(attemptId);
+      console.log('[ExamRunner] Recording upload finished.');
+    } catch (err) {
+      console.warn('[ExamRunner] Recording upload error during grading submit (non-blocking):', err);
+    }
+
+    setSubmitStatusText('Finalizing exam results...');
 
     const request = {
       attemptId,
@@ -211,14 +255,6 @@ function ExamRunnerContent() {
     timeRemainingRef.current = timeRemaining;
   }, [answers, timeRemaining]);
 
-  // Reconnect hook
-  const { online, syncing, reconnecting } = useReconnect({
-    attemptId,
-    answers,
-    timeRemaining,
-    setTimeRemaining,
-    onResumed: () => setOffline(false)
-  });
 
   // Time-up hook
   const { submitting, isTimeUp } = useTimeUp({
@@ -237,18 +273,6 @@ function ExamRunnerContent() {
     active: !loading
   });
 
-  // Modular recording & AI flags hooks
-  const { recording, stopAndUploadRecording } = useModularRecording({
-    attemptId,
-    active: !loading,
-    streamRef,
-    videoRef
-  });
-
-  const { fetchSummary, recordSilentFlag } = useAIFlags({
-    attemptId,
-    active: !loading
-  });
 
   const handleInitialSubmitTrigger = async () => {
     setShowConfirmSubmit(false);
@@ -264,11 +288,8 @@ function ExamRunnerContent() {
 
   const handleFinalSubmitAnyway = async () => {
     setShowViolationSummary(false);
-    stopAndUploadRecording(attemptId).catch(() => { });
     await handleGradingSubmit(true);
   };
-
-  const isProctoringActive = !loading && online && !offline && !terminatedState && !submittingState && !showThanks && !showThankYouPage;
 
   const handleFrontendTerminate = () => {
     setTerminatedState(true);
@@ -291,7 +312,8 @@ function ExamRunnerContent() {
     attemptId,
     initialStrikeCount,
     active: isProctoringActive,
-    onTerminate: handleFrontendTerminate
+    onTerminate: handleFrontendTerminate,
+    videoRef
   });
 
   // Sync strike count back to global ExamContext so headers/indicators render it correctly
@@ -301,13 +323,20 @@ function ExamRunnerContent() {
 
   const { enterFullscreenMode } = useFullscreen();
 
-  // Expose simulated violation handler globally for the camera feed simulation controls
+  // Continuous camera monitoring (real face detection during exam)
+  useCameraMonitor({
+    videoRef,
+    active: isProctoringActive,
+    handleViolation,
+    recordSilentFlag,
+    attemptId
+  });
+
+  // Expose simulated violation handler globally for dev testing (kept for debugging)
   useEffect(() => {
     window.simulateProctorViolation = (type) => {
       console.log(`[Simulated Proctor Violation] ${type}`);
-      // Record a silent AI flag
       recordSilentFlag(type);
-      // Trigger the warning via strike engine
       handleViolation(type);
     };
     return () => {
@@ -338,6 +367,42 @@ function ExamRunnerContent() {
       }
     };
   }, [streamRef]);
+
+  if (loadError) {
+    return (
+      <div style={{
+        backgroundColor: '#081627',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#e8eefb',
+        padding: '24px',
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+        <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>Failed to Load Exam</h2>
+        <p style={{ color: '#8A99AE', fontSize: '14px', maxWidth: '400px', marginBottom: '24px', lineHeight: '1.6' }}>
+          {loadError}
+        </p>
+        <button
+          onClick={() => navigate('/candidate')}
+          style={{
+            backgroundColor: '#2F6BFF',
+            color: '#ffffff',
+            padding: '10px 20px',
+            borderRadius: '10px',
+            fontWeight: '600',
+            border: 'none',
+            cursor: 'pointer'
+          }}
+        >
+          Return to Dashboard
+        </button>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -383,14 +448,70 @@ function ExamRunnerContent() {
 
       {/* Thanks Submission Blockout */}
       {showThanks && (
-        <div className="run-overlay fixed inset-0 z-50 bg-[#061222]/90 backdrop-blur-md flex items-center justify-center">
-          <div className="ov-card bg-[#0e2745] border border-white/10 rounded-2xl p-[34px_38px] text-center max-w-[430px] shadow-2xl">
-            <div className="ov-ic w-14 h-14 rounded-2xl bg-[#0e9f6e]/20 text-[#34d27b] flex items-center justify-center mx-auto mb-4">
-              <Check className="w-7 h-7" />
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#061222', // solid background to block out the exam page
+            padding: '24px'
+          }}
+        >
+          <div 
+            style={{
+              backgroundColor: '#0a1628',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '20px',
+              padding: '40px 32px 32px 32px',
+              maxWidth: '430px',
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.7)'
+            }}
+          >
+            <div 
+              style={{
+                width: '76px',
+                height: '76px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                border: '2px solid #10B981',
+                color: '#10B981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 24px auto',
+                boxShadow: '0 0 20px rgba(16, 185, 129, 0.3)'
+              }}
+            >
+              {/* Spinner */}
+              <div className="w-8 h-8 border-4 border-t-[#10B981] border-r-transparent border-b-[#10B981] border-l-transparent rounded-full animate-spin" />
             </div>
-            <h3 className="font-display text-white text-[21px] font-semibold mb-2">Submission received</h3>
-            <p className="text-[#b9c9e2] text-[13.5px]">
-              Thank you. Your answers have been recorded and are being scored. Your result will appear in a moment…
+            <h3 
+              style={{
+                color: '#ffffff',
+                fontSize: '21px',
+                fontWeight: '700',
+                margin: '0 0 12px 0'
+              }}
+            >
+              {submitStatusText}
+            </h3>
+            <p 
+              style={{
+                color: '#b9c9e2',
+                fontSize: '14px',
+                lineHeight: '1.6',
+                margin: 0
+              }}
+            >
+              Uploading proctoring recording and finalizing your results. Please do not close or refresh this page.
             </p>
           </div>
         </div>
