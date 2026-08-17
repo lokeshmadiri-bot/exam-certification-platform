@@ -16,6 +16,8 @@ export default function WarningModal({ isOpen, strikeCount, lastViolation, onClo
       description = 'You exited fullscreen mode. Fullscreen is strictly required during the proctored exam.';
     } else if (type === 'MULTIPLE_FACES') {
       description = 'Multiple faces detected in the camera feed. Please ensure you are alone in front of the webcam.';
+    } else if (type === 'FACE_NOT_DETECTED') {
+      description = 'Your face was not detected in the camera for 30 seconds. Please ensure you remain visible to the webcam throughout the exam.';
     } else if (type === 'MOBILE_PHONE') {
       description = 'Mobile phone detected in the camera feed. Mobile devices are not allowed during the exam.';
     } else if (type === 'TAB_SWITCH' || type === 'VISIBILITY_CHANGE') {

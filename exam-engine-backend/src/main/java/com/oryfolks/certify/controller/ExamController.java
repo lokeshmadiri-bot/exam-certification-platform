@@ -173,7 +173,12 @@ public class ExamController {
             answersMap.put(ans.getQuestion().getId().toString(), ans.getSelectedOption());
         }
 
-        int perAttempt = exam.getPerAttempt();
+        Integer perAttemptVal = exam.getPerAttempt();
+        if (perAttemptVal == null) {
+            perAttemptVal = exam.getQuestionsPerAttempt();
+        }
+        int perAttempt = (perAttemptVal != null) ? perAttemptVal : 0;
+
         if (perAttempt > 0 && questions.size() > perAttempt) {
             Random rand = new Random(attemptId.getMostSignificantBits() ^ attemptId.getLeastSignificantBits());
             List<Question> shuffled = new ArrayList<>(questions);
@@ -366,12 +371,11 @@ public class ExamController {
         List<Answer> savedAnswers = answerRepository.findByAttemptId(attemptId);
         List<AttemptAnswer> savedAttemptAnswers = attemptAnswerRepository.findByAttemptId(attemptId);
 
-        int totalMarks = 0;
-        int earnedMarks = 0;
+        int totalQuestions = 0;
+        int correctCount = 0;
 
         for (Question q : questions) {
-            int qMarks = (q.getMarks() != null && q.getMarks() > 0) ? q.getMarks() : 1;
-            totalMarks += qMarks;
+            totalQuestions++; // 1 question = 1 point
 
             String correct = q.getCorrectOption() != null ? q.getCorrectOption().trim() : "";
             String selectedOption = null;
@@ -391,16 +395,19 @@ public class ExamController {
             }
 
             if (selectedOption != null && !correct.isEmpty() && correct.equalsIgnoreCase(selectedOption)) {
-                earnedMarks += qMarks;
+                correctCount++;
             }
         }
 
-        int finalScore = totalMarks > 0 ? (int) Math.round(((double) earnedMarks / totalMarks) * 100) : 0;
+        // Score = number of correct answers (1 per question)
+        int finalScore = correctCount;
         attempt.setScore(finalScore);
         attempt.setEndTime(LocalDateTime.now());
 
+        int percentScore = totalQuestions > 0 ? (int) Math.round(((double) correctCount / totalQuestions) * 100) : 0;
+
         CompetencyLevel level = CompetencyLevel.L5;
-        List<CompetencyBand> bands = exam.getCompetencyBands();
+        List<CompetencyBand> bands = competencyBandRepository.findByExamId(exam.getId());
         if (bands == null || bands.isEmpty()) {
             bands = new ArrayList<>();
             bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
@@ -410,14 +417,15 @@ public class ExamController {
             bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
         }
         for (CompetencyBand band : bands) {
-            if (finalScore >= band.getMinScore() && finalScore <= band.getMaxScore()) {
+            if (percentScore >= band.getMinScore() && percentScore <= band.getMaxScore()) {
                 level = band.getLevelName();
                 break;
             }
         }
         attempt.setAssignedLevel(level);
 
-        if (finalScore >= exam.getPassMark()) {
+        // Pass/fail: compare percentage against passMark (backward compatible)
+        if (percentScore >= exam.getPassMark()) {
             attempt.setResultStatus(ResultStatus.PASSED);
         } else {
             attempt.setResultStatus(ResultStatus.FAILED);
@@ -474,7 +482,8 @@ public class ExamController {
                 .attempt(attempt)
                 .type(request.getType())
                 .strikeNumber(strikeNumber)
-                .description("Violation of type " + request.getType() + " detected.")
+                .description(getReadableViolationDescription(request.getType()))
+                .snapshotUrl(request.getSnapshotUrl())
                 .createdAt(violationTime)
                 .build();
 
@@ -487,6 +496,33 @@ public class ExamController {
 
         return ResponseEntity.ok(ApiResponse.success("Violation recorded",
                 new ViolationResponseDTO(strikeNumber, terminate)));
+    }
+
+    private String getReadableViolationDescription(String type) {
+        if (type == null) return "Integrity Warning";
+        switch (type.toUpperCase()) {
+            case "WINDOW_BLUR":
+                return "Window Focus Lost (Tab Switched / Minimised)";
+            case "WINDOW_RESIZE":
+                return "Browser Window Resized";
+            case "TAB_SWITCH":
+                return "Tab Switched";
+            case "FULLSCREEN_EXIT":
+                return "Fullscreen Mode Exited";
+            case "MULTIPLE_FACES":
+            case "MULTIPLE_FACE":
+                return "Multiple Faces Detected";
+            case "FACE_NOT_DETECTED":
+                return "Candidate Not Visible / Out of Camera";
+            case "GAZE_AWAY":
+                return "Candidate Gaze Away from Screen";
+            case "SECOND_DEVICE":
+                return "Mobile Phone / Second Device Detected";
+            case "VOICE_DETECTED":
+                return "Voice Detected";
+            default:
+                return "Proctoring violation: " + type.replace("_", " ");
+        }
     }
 
     @PostMapping("/attempts/{attemptId}/terminate")
@@ -515,26 +551,27 @@ public class ExamController {
         }
         List<Answer> savedAnswers = answerRepository.findByAttemptId(attempt.getId());
 
-        int totalMarks = 0;
-        int earnedMarks = 0;
+        int totalQuestions2 = 0;
+        int correctCount2 = 0;
 
         for (Question q : questions) {
-            totalMarks += q.getMarks();
+            totalQuestions2++;
             Optional<Answer> ansOpt = savedAnswers.stream()
                     .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
                     .findFirst();
 
             if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
-                earnedMarks += q.getMarks();
+                correctCount2++;
             }
         }
 
-        int finalScore = totalMarks > 0 ? (int) Math.round(((double) earnedMarks / totalMarks) * 100) : 0;
-        attempt.setScore(finalScore);
+        // Score = number of correct answers (1 per question)
+        int finalScore2 = correctCount2;
+        attempt.setScore(finalScore2);
         attempt.setEndTime(LocalDateTime.now());
 
         CompetencyLevel level = CompetencyLevel.L5;
-        List<CompetencyBand> bands = exam.getCompetencyBands();
+        List<CompetencyBand> bands = competencyBandRepository.findByExamId(exam.getId());
         if (bands == null || bands.isEmpty()) {
             bands = new ArrayList<>();
             bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
@@ -544,7 +581,7 @@ public class ExamController {
             bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
         }
         for (CompetencyBand band : bands) {
-            if (finalScore >= band.getMinScore() && finalScore <= band.getMaxScore()) {
+            if (finalScore2 >= band.getMinScore() && finalScore2 <= band.getMaxScore()) {
                 level = band.getLevelName();
                 break;
             }
@@ -823,7 +860,12 @@ public class ExamController {
     private List<Question> getAttemptQuestions(ExamAttempt attempt, List<Answer> savedAnswers) {
         Exam exam = attempt.getExam();
         List<Question> questions = fetchQuestionsForExam(exam);
-        int perAttempt = exam.getPerAttempt();
+        Integer perAttemptVal = exam.getPerAttempt();
+        if (perAttemptVal == null) {
+            perAttemptVal = exam.getQuestionsPerAttempt();
+        }
+        int perAttempt = (perAttemptVal != null) ? perAttemptVal : 0;
+
         if (perAttempt > 0 && questions.size() > perAttempt) {
             Random rand = new Random(attempt.getId().getMostSignificantBits() ^ attempt.getId().getLeastSignificantBits());
             List<Question> shuffled = new ArrayList<>(questions);

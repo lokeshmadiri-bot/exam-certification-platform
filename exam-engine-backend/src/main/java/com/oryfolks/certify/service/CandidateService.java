@@ -5,6 +5,7 @@ import com.oryfolks.certify.dto.CandidateProfileResponseDTO;
 import com.oryfolks.certify.entity.User;
 import com.oryfolks.certify.enums.ResultPublishStatus;
 import com.oryfolks.certify.enums.ResultStatus;
+import com.oryfolks.certify.enums.CompetencyLevel;
 import com.oryfolks.certify.entity.CompetencyBand;
 import com.oryfolks.certify.exception.ResourceNotFoundException;
 import com.oryfolks.certify.exception.BadRequestException;
@@ -12,6 +13,7 @@ import com.oryfolks.certify.repository.ExamAttemptRepository;
 import com.oryfolks.certify.repository.UserRepository;
 import com.oryfolks.certify.repository.AttemptAnswerRepository;
 import com.oryfolks.certify.repository.IntegrityViolationRepository;
+import com.oryfolks.certify.repository.CompetencyBandRepository;
 
 import com.oryfolks.certify.dto.ResultResponseDTO;
 import com.oryfolks.certify.dto.AttemptHistoryResponseDTO;
@@ -23,6 +25,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Date;
 
 import lombok.RequiredArgsConstructor;
 
@@ -44,6 +51,8 @@ public class CandidateService {
         private final AttemptAnswerRepository attemptAnswerRepository;
 
         private final IntegrityViolationRepository integrityViolationRepository;
+
+        private final CompetencyBandRepository competencyBandRepository;
 
         public CandidateDashboardResponseDTO getDashboard(String username) {
 
@@ -147,14 +156,15 @@ public class CandidateService {
                                 .toList();
 
                 CompetencyBand band = null;
-                if (attempt.getExam() != null && attempt.getExam().getCompetencyBands() != null && attempt.getAssignedLevel() != null) {
-                    band = attempt.getExam().getCompetencyBands().stream()
+                if (attempt.getExam() != null && attempt.getAssignedLevel() != null) {
+                    List<CompetencyBand> bands = competencyBandRepository.findByExamId(attempt.getExam().getId());
+                    band = bands.stream()
                             .filter(cb -> cb.getLevelName() == attempt.getAssignedLevel())
                             .findFirst().orElse(null);
                 }
 
                 String levelStr = attempt.getAssignedLevel() != null ? attempt.getAssignedLevel().name() : "L3";
-                String levelTitle = band != null ? band.getTitle() : "Intermediate Developer";
+                String levelTitle = band != null ? band.getTitle() : getDefaultLevelTitle(attempt.getAssignedLevel());
 
                 return AttemptDetailsResponseDTO.builder()
                                 .attemptId(attempt.getId())
@@ -238,12 +248,14 @@ public class CandidateService {
                         }
                 }
  
-                CompetencyBand band = attempt.getExam()
-                                .getCompetencyBands()
-                                .stream()
-                                .filter(cb -> cb.getLevelName() == attempt.getAssignedLevel())
-                                .findFirst()
-                                .orElse(null);
+                CompetencyBand band = null;
+                if (attempt.getExam() != null && attempt.getAssignedLevel() != null) {
+                    List<CompetencyBand> bands = competencyBandRepository.findByExamId(attempt.getExam().getId());
+                    band = bands.stream()
+                            .filter(cb -> cb.getLevelName() == attempt.getAssignedLevel())
+                            .findFirst()
+                            .orElse(null);
+                }
  
                 return AttemptHistoryResponseDTO.builder()
                                 .attemptId(attempt.getId())
@@ -259,12 +271,78 @@ public class CandidateService {
                                                                 ? attempt.getAssignedLevel().name()
                                                                 : null)
                                 .assignedLevelTitle(
-                                                band != null
-                                                                ? band.getTitle()
-                                                                : null)
+                                                 band != null
+                                                                 ? band.getTitle()
+                                                                 : getDefaultLevelTitle(attempt.getAssignedLevel()))
                                 .canAttempt(canAttempt)
  
                                 .retryDaysLeft(retryDaysLeft)
                                 .build();
+        }
+
+
+        public List<Map<String, Object>> getNotifications(String username) {
+                User candidate = userRepository.findByUsername(username)
+                                .orElseThrow(() -> new ResourceNotFoundException("Candidate not found."));
+
+                List<ExamAttempt> attempts = attemptRepository.findByCandidateIdOrderByEndTimeDesc(candidate.getId());
+
+                List<Map<String, Object>> notifs = new ArrayList<>();
+                for (ExamAttempt attempt : attempts) {
+                        // 1. Result published notification
+                        if (attempt.getResultPublishStatus() == ResultPublishStatus.PUBLISHED) {
+                                Map<String, Object> notif = new HashMap<>();
+                                notif.put("id", attempt.getId().toString() + "-published");
+                                notif.put("title", "Exam Result Published");
+                                if (attempt.getResultStatus() == ResultStatus.PASSED) {
+                                        notif.put("desc", "Congratulations! You passed the " + attempt.getExam().getTitle() + " exam.");
+                                } else if (attempt.getResultStatus() == ResultStatus.FAILED) {
+                                        notif.put("desc", "Your result for the " + attempt.getExam().getTitle() + " exam has been published.");
+                                } else {
+                                        notif.put("desc", "Your exam for " + attempt.getExam().getTitle() + " has been processed.");
+                                }
+                                notif.put("time", attempt.getPublishedAt() != null ? attempt.getPublishedAt().toString() : LocalDateTime.now().toString());
+                                notif.put("read", false);
+                                notif.put("unread", true);
+                                notifs.add(notif);
+                        }
+
+                        // 2. Terminated notification
+                        if (attempt.getResultStatus() == ResultStatus.TERMINATED) {
+                                Map<String, Object> notif = new HashMap<>();
+                                notif.put("id", attempt.getId().toString() + "-terminated");
+                                notif.put("title", "Exam Attempt Terminated");
+                                notif.put("desc", "Your attempt for " + attempt.getExam().getTitle() + " was terminated due to integrity violations.");
+                                notif.put("time", attempt.getEndTime() != null ? attempt.getEndTime().toString() : LocalDateTime.now().toString());
+                                notif.put("read", false);
+                                notif.put("unread", true);
+                                notifs.add(notif);
+                        }
+
+                        // 3. Retry override approved notification
+                        if (Boolean.TRUE.equals(attempt.getRetryOverrideApproved())) {
+                                Map<String, Object> notif = new HashMap<>();
+                                notif.put("id", attempt.getId().toString() + "-override");
+                                notif.put("title", "Retry Approved");
+                                notif.put("desc", "Your retry request for " + attempt.getExam().getTitle() + " has been approved.");
+                                notif.put("time", attempt.getEndTime() != null ? attempt.getEndTime().plusMinutes(5).toString() : LocalDateTime.now().toString());
+                                notif.put("read", false);
+                                notif.put("unread", true);
+                                notifs.add(notif);
+                        }
+                }
+
+                return notifs;
+        }
+
+        private String getDefaultLevelTitle(CompetencyLevel lvl) {
+                if (lvl == null) return "Intermediate";
+                return switch (lvl) {
+                        case L1 -> "Expert";
+                        case L2 -> "Advanced";
+                        case L3 -> "Intermediate";
+                        case L4 -> "Beginner";
+                        case L5 -> "Needs Training";
+                };
         }
 }

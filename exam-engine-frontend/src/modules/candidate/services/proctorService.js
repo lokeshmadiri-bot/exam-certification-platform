@@ -7,10 +7,11 @@ export const proctorService = {
   recordViolation: async (attemptId, code, meta, offset, imageFile) => {
     return attemptService.recordViolation(attemptId, code, meta, offset, imageFile);
   },
-  reportViolation: async (attemptId, type, timestamp) => {
+  reportViolation: async (attemptId, type, timestamp, snapshotUrl = null) => {
     const response = await api.post(`/exams/attempts/${attemptId}/violations`, {
       type,
-      timestamp
+      timestamp,
+      snapshotUrl
     });
     return response.data;
   },

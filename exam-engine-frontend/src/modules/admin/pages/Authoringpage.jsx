@@ -72,7 +72,7 @@ export default function AuthoringPage() {
                     instructions: exam.instructions || "",
                 });
             }
-            setBands(b || defaultBands);
+            setBands(b && Object.keys(b).length > 0 ? b : defaultBands);
             setBandsModified(false);
             setLoading(false);
         });
@@ -111,7 +111,8 @@ export default function AuthoringPage() {
     const setBandValue = (level, idx, value) => {
         setBandsModified(true);
         setBands((prev) => {
-            const next = { ...prev, [level]: [...prev[level]] };
+            const currentRange = prev[level] || [0, 0];
+            const next = { ...prev, [level]: [...currentRange] };
             next[level][idx] = value === "" ? "" : Number(value);
             return next;
         });
@@ -336,36 +337,61 @@ export default function AuthoringPage() {
 // Must cover 0 to 100, no overlaps, no gaps, continuous ranges only.
 function validateBands(bands) {
     const errors = [];
-    const sortedLevels = [...LEVELS].sort((a, b) => (bands[a]?.[0] ?? 0) - (bands[b]?.[0] ?? 0));
-    let prevEnd = null;
-
-    sortedLevels.forEach((lvl, idx) => {
+    
+    // 1. Initial validation of input completeness and values
+    for (const lvl of LEVELS) {
         const range = bands[lvl];
         const start = range?.[0];
         const end = range?.[1];
 
         if (start === "" || end === "" || start == null || end == null) {
             errors.push(`${lvl}: enter both a start and an end value`);
-            return;
+            continue;
         }
-        if (Number(start) > Number(end)) {
+
+        const startNum = Number(start);
+        const endNum = Number(end);
+
+        if (isNaN(startNum) || isNaN(endNum)) {
+            errors.push(`${lvl}: start and end must be valid numbers`);
+            continue;
+        }
+        if (startNum < 0 || startNum > 100 || endNum < 0 || endNum > 100) {
+            errors.push(`${lvl}: values must be between 0 and 100`);
+            continue;
+        }
+        if (startNum > endNum) {
             errors.push(`${lvl}: min score must not be greater than max score`);
-            return;
         }
-        if (idx === 0 && Number(start) !== 0) {
+    }
+
+    if (errors.length > 0) {
+        return errors;
+    }
+
+    // 2. Continuity checks over sorted range
+    const sortedLevels = [...LEVELS].sort((a, b) => Number(bands[a][0]) - Number(bands[b][0]));
+    let prevEnd = null;
+
+    sortedLevels.forEach((lvl, idx) => {
+        const range = bands[lvl];
+        const start = Number(range[0]);
+        const end = Number(range[1]);
+
+        if (idx === 0 && start !== 0) {
             errors.push(`${lvl}: lowest band range must start at 0%`);
         }
-        if (idx === sortedLevels.length - 1 && Number(end) !== 100) {
+        if (idx === sortedLevels.length - 1 && end !== 100) {
             errors.push(`${lvl}: highest band range must end at 100%`);
         }
         if (prevEnd !== null) {
-            if (Number(start) <= prevEnd) {
+            if (start <= prevEnd) {
                 errors.push(`${lvl}: overlaps with the previous band range`);
-            } else if (Number(start) > prevEnd + 1) {
+            } else if (start > prevEnd + 1) {
                 errors.push(`${lvl}: leaves a gap after the previous band range`);
             }
         }
-        prevEnd = Number(end);
+        prevEnd = end;
     });
 
     return errors;

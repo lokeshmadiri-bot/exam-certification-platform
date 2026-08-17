@@ -3,7 +3,7 @@ import { Monitor } from 'lucide-react';
 import { useExam } from '../context/ExamContext';
 import RecordingIndicator from './RecordingIndicator';
 
-export default function Header({ examTitle, attemptId }) {
+export default function Header({ examTitle }) {
   const { strikes } = useExam();
 
   return (
@@ -14,9 +14,6 @@ export default function Header({ examTitle, attemptId }) {
         </div>
         <div>
           <b className="font-display text-sm font-semibold text-white">{examTitle}</b>
-          <span className="text-[11px] text-[#8fa9d0] font-mono block">
-            ATTEMPT #{attemptId?.substring(0, 8).toUpperCase()} · PROCTORED SESSION
-          </span>
         </div>
       </div>
 

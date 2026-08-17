@@ -9,26 +9,28 @@ export default function Navigator() {
       <div className="aside-h text-[11px] text-[#8A99AE] font-semibold uppercase font-mono mb-2">
         Question navigator
       </div>
-      <div className="qnav grid grid-cols-6 gap-1.5">
+      <div className="qnav grid grid-cols-6 gap-1.5" style={{ marginBottom: '28px' }}>
         {questions.map((q, i) => {
-          const isAnswered = answers[q.id] !== undefined;
-          const isVisited = visitedQuestions.has(q.id);
-          const isMarked = markedQuestions.has(q.id);
-          const isActive = i === currentIdx;
+          const isAnswered   = answers[q.id] !== undefined;
+          const isVisited    = visitedQuestions.has(q.id);
+          const isMarked     = markedQuestions.has(q.id);
+          const isActive     = i === currentIdx;
 
-          let btnClass = 'bg-white/5 text-[#9fb6d6] border-white/10'; // Not Visited (Gray)
-          if (isAnswered && isMarked) {
-            btnClass = 'bg-[#f97316]/20 text-[#fdba74] border-[#f97316]/40'; // Answered + Marked (Orange)
-          } else if (isMarked) {
-            btnClass = 'bg-[#8b5cf6]/20 text-[#a78bfa] border-[#8b5cf6]/40'; // Marked for Review (Purple)
-          } else if (isAnswered) {
-            btnClass = 'bg-[#10b981]/20 text-[#34d27b] border-[#10b981]/40'; // Answered (Green)
-          } else if (isVisited) {
-            btnClass = 'bg-[#2f6bff]/20 text-[#7fa6ff] border-[#2f6bff]/40'; // Visited (Blue)
-          }
+          // Priority order: active > answered+marked > marked > answered > visited (unanswered) > not visited
+          let btnClass;
 
           if (isActive) {
-            btnClass = 'bg-[#2F6BFF] text-white border-white shadow-[0_0_8px_rgba(47,107,255,0.8)] font-bold';
+            btnClass = 'status-current';
+          } else if (isAnswered && isMarked) {
+            btnClass = 'status-answered-marked';
+          } else if (isMarked) {
+            btnClass = 'status-marked';
+          } else if (isAnswered) {
+            btnClass = 'status-answered';
+          } else if (isVisited) {
+            btnClass = 'status-visited';
+          } else {
+            btnClass = 'status-unvisited';
           }
 
           return (
@@ -41,6 +43,23 @@ export default function Navigator() {
             </button>
           );
         })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-col gap-2.5" style={{ marginTop: '28px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+        {[
+          { className: 'status-current', label: 'Current' },
+          { className: 'status-answered', label: 'Answered' },
+          { className: 'status-answered-marked', label: 'Answered + Marked' },
+          { className: 'status-marked', label: 'Marked for Review' },
+          { className: 'status-visited', label: 'Unanswered (Visited)' },
+          { className: 'status-unvisited', label: 'Not Visited' },
+        ].map(({ className, label }) => (
+          <div key={label} className="flex items-center gap-2">
+            <span className={`w-3.5 h-3.5 rounded-sm shrink-0 border ${className}`} style={{ display: 'inline-block' }} />
+            <span className="text-[10px] text-[#8A99AE] font-semibold font-mono">{label}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

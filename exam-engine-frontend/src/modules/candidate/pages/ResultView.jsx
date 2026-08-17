@@ -161,7 +161,7 @@ export default function CandidateResultView() {
                 <div className="txt text-left">
                   <b className="font-display font-bold text-lg text-white block">{attempt.assignedLevelTitle || `${attempt.assignedLevel} Competency Level`}</b>
                   {attempt.score !== null && attempt.score !== undefined && (
-                    <span className="text-xs font-mono" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Exam Score: {attempt.score}%</span>
+                    <span className="text-xs font-mono" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Exam Score: {attempt.score} / {attempt.answers?.length || 10}</span>
                   )}
                 </div>
               </div>

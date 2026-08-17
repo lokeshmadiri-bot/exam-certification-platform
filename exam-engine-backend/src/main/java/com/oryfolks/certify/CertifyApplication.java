@@ -36,10 +36,9 @@ public class CertifyApplication {
                                                 .build());
                         } else {
                                 User aarav = aaravOpt.get();
-                                if (aarav.getRole() != UserRole.ROLE_ADMIN) {
-                                        aarav.setRole(UserRole.ROLE_ADMIN);
-                                        userRepository.save(aarav);
-                                }
+                                aarav.setPassword(passwordEncoder.encode("password123"));
+                                aarav.setRole(UserRole.ROLE_ADMIN);
+                                userRepository.save(aarav);
                         }
 
                         java.util.Optional<User> raviOpt = userRepository.findByUsername("ravi");
@@ -53,10 +52,9 @@ public class CertifyApplication {
                                                 .build());
                         } else {
                                 User ravi = raviOpt.get();
-                                if (ravi.getRole() != UserRole.ROLE_CANDIDATE) {
-                                        ravi.setRole(UserRole.ROLE_CANDIDATE);
-                                        userRepository.save(ravi);
-                                }
+                                ravi.setPassword(passwordEncoder.encode("password123"));
+                                ravi.setRole(UserRole.ROLE_CANDIDATE);
+                                userRepository.save(ravi);
                         }
 
                         // 2. Remove seeded dummy exams — only show admin-created exams in library.
