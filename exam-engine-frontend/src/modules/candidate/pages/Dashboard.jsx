@@ -187,12 +187,8 @@ export default function CandidateDashboard() {
         </div>
 
         <div 
-          className={filteredExams.length > 5 ? "flex overflow-x-auto gap-6 pb-4 no-scrollbar scroll-smooth" : "grid"} 
-          style={
-            filteredExams.length > 5 
-              ? { display: 'flex', overflowX: 'auto', gap: '24px', paddingBottom: '16px' }
-              : { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }
-          }
+          className="grid" 
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' }}
         >
           {filteredExams.length > 0 ? (
             filteredExams.map((exam) => {
@@ -200,7 +196,6 @@ export default function CandidateDashboard() {
               const lastAttempt = attempts.find(a => a.examId === exam.examId);
               const canAttempt = lastAttempt?.canAttempt ?? true;
               const daysLeft = lastAttempt?.retryDaysLeft ?? 0;
-              const isScrollable = filteredExams.length > 5;
 
               return (
                 <div 
@@ -213,8 +208,7 @@ export default function CandidateDashboard() {
                     backgroundColor: '#ffffff',
                     border: '1px solid #E4EAF2',
                     borderRadius: '16px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
-                    ...(isScrollable ? { minWidth: '340px', flex: '0 0 auto' } : {})
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)'
                   }}
                 >
                   <div className="top flex items-start justify-between gap-4 mb-4" style={{ display: 'flex', alignItems: 'start', justifyContent: 'between', gap: '16px', marginBottom: '16px' }}>

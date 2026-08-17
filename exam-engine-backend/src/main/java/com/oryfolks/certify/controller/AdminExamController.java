@@ -251,11 +251,21 @@ public class AdminExamController {
     }
 
     @GetMapping("/{id}/bands")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, int[]>>> getBands(@PathVariable UUID id) {
         Exam exam = examRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Exam not found: " + id));
 
         List<CompetencyBand> bands = bandRepository.findByExamId(id);
+        if (bands.isEmpty()) {
+            bands = new ArrayList<>();
+            bands.add(CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L1).title("Expert").minScore(90).maxScore(100).build());
+            bands.add(CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L2).title("Advanced").minScore(75).maxScore(89).build());
+            bands.add(CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L3).title("Intermediate").minScore(60).maxScore(74).build());
+            bands.add(CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L4).title("Beginner").minScore(40).maxScore(59).build());
+            bands.add(CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L5).title("Needs Training").minScore(0).maxScore(39).build());
+            bandRepository.saveAll(bands);
+        }
 
         Map<String, int[]> map = new LinkedHashMap<>();
         for (CompetencyBand b : bands) {
@@ -265,6 +275,7 @@ public class AdminExamController {
     }
 
     @PutMapping("/{id}/bands")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, int[]>>> saveBands(
             @PathVariable UUID id,
             @RequestBody Map<String, List<Integer>> payload,

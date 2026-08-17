@@ -404,6 +404,8 @@ public class ExamController {
         attempt.setScore(finalScore);
         attempt.setEndTime(LocalDateTime.now());
 
+        int percentScore = totalQuestions > 0 ? (int) Math.round(((double) correctCount / totalQuestions) * 100) : 0;
+
         CompetencyLevel level = CompetencyLevel.L5;
         List<CompetencyBand> bands = competencyBandRepository.findByExamId(exam.getId());
         if (bands == null || bands.isEmpty()) {
@@ -415,7 +417,7 @@ public class ExamController {
             bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
         }
         for (CompetencyBand band : bands) {
-            if (finalScore >= band.getMinScore() && finalScore <= band.getMaxScore()) {
+            if (percentScore >= band.getMinScore() && percentScore <= band.getMaxScore()) {
                 level = band.getLevelName();
                 break;
             }
@@ -423,7 +425,6 @@ public class ExamController {
         attempt.setAssignedLevel(level);
 
         // Pass/fail: compare percentage against passMark (backward compatible)
-        int percentScore = totalQuestions > 0 ? (int) Math.round(((double) correctCount / totalQuestions) * 100) : 0;
         if (percentScore >= exam.getPassMark()) {
             attempt.setResultStatus(ResultStatus.PASSED);
         } else {
