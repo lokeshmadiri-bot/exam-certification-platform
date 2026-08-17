@@ -29,7 +29,6 @@ export default function AdminDashboard() {
   return (
     <div className="a2-page">
       <header className="a2-page-head">
-        <h1>Dashboard</h1>
         <p className="a2-sub">Attempts, results and integrity review across all stacks</p>
       </header>
 

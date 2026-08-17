@@ -12,6 +12,7 @@ import com.oryfolks.certify.repository.ApprovalRequestRepository;
 import com.oryfolks.certify.repository.ExamAttemptRepository;
 import com.oryfolks.certify.repository.ExamRepository;
 import com.oryfolks.certify.repository.UserRepository;
+import com.oryfolks.certify.repository.CompetencyBandRepository;
 import com.oryfolks.certify.response.ApiResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -25,14 +26,18 @@ import com.oryfolks.certify.repository.AttemptAnswerRepository;
 import com.oryfolks.certify.repository.AnswerRepository;
 import com.oryfolks.certify.repository.SectionRepository;
 import com.oryfolks.certify.repository.IntegrityViolationRepository;
+import com.oryfolks.certify.repository.ExamViolationRepository;
 import com.oryfolks.certify.repository.AIFlagRepository;
+import com.oryfolks.certify.repository.RecordingSessionRepository;
 import com.oryfolks.certify.entity.AttemptAnswer;
 import com.oryfolks.certify.entity.Answer;
 import com.oryfolks.certify.entity.Section;
 import com.oryfolks.certify.entity.Question;
 import com.oryfolks.certify.entity.CompetencyBand;
 import com.oryfolks.certify.entity.IntegrityViolation;
+import com.oryfolks.certify.entity.ExamViolation;
 import com.oryfolks.certify.entity.AIFlag;
+import com.oryfolks.certify.entity.RecordingSession;
 import com.oryfolks.certify.enums.ResultPublishStatus;
 import com.oryfolks.certify.enums.ResultStatus;
 import com.oryfolks.certify.enums.CompetencyLevel;
@@ -59,6 +64,9 @@ public class AdminController {
     private ApprovalRequestRepository approvalRepository;
 
     @Autowired
+    private CompetencyBandRepository competencyBandRepository;
+
+    @Autowired
     private QuestionRepository questionRepository;
 
     @Autowired
@@ -78,6 +86,12 @@ public class AdminController {
 
     @Autowired
     private AIFlagRepository aiFlagRepository;
+
+    @Autowired
+    private ExamViolationRepository examViolationRepository;
+
+    @Autowired
+    private RecordingSessionRepository recordingSessionRepository;
 
     @Autowired
     private ExamAttemptQuestionRepository examAttemptQuestionRepository;
@@ -585,11 +599,32 @@ public class AdminController {
                 .build());
 
         Map<String, Object> res = new HashMap<>();
-        res.put("url", "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4");
-        res.put("expiresAt", new Date(System.currentTimeMillis() + 3600 * 1000).toString());
         res.put("accessLogged", true);
+        res.put("expiresAt", new Date(System.currentTimeMillis() + 3600 * 1000).toString());
 
-        return ResponseEntity.ok(ApiResponse.success("Signed recording URL generated", res));
+        // Look up the real RecordingSession for this attempt
+        List<RecordingSession> sessions = recordingSessionRepository.findByAttemptId(id);
+        if (!sessions.isEmpty()) {
+            // Use the most recent completed session
+            sessions.sort((a, b) -> {
+                if (a.getEndedAt() == null) return 1;
+                if (b.getEndedAt() == null) return -1;
+                return b.getEndedAt().compareTo(a.getEndedAt());
+            });
+            RecordingSession session = sessions.get(0);
+            String videoUrl = session.getVideoUrl();
+            res.put("url", videoUrl != null ? videoUrl : "");
+            res.put("sessionId", session.getId());
+            res.put("status", session.getStatus());
+            res.put("startedAt", session.getStartedAt() != null ? session.getStartedAt().toString() : null);
+            res.put("endedAt", session.getEndedAt() != null ? session.getEndedAt().toString() : null);
+        } else {
+            res.put("url", "");
+            res.put("sessionId", null);
+            res.put("status", "NOT_FOUND");
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("Recording URL retrieved", res));
     }
 
     @GetMapping("/attempts/{id}/flags")
@@ -605,6 +640,9 @@ public class AdminController {
         List<AIFlag> aiFlags = aiFlagRepository != null
                 ? aiFlagRepository.findByAttemptId(id)
                 : List.of();
+        List<ExamViolation> examViolations = examViolationRepository != null
+                ? examViolationRepository.findByAttemptIdOrderByCreatedAtAsc(id)
+                : List.of();
 
         List<Map<String, Object>> items = new ArrayList<>();
         int index = 1;
@@ -616,24 +654,35 @@ public class AdminController {
                 String code = v.getViolationCode() != null ? v.getViolationCode() : "TAB_SWITCH";
                 item.put("type", code);
 
-                int tSec = 45;
-                try {
-                    if (v.getTimestampOffset() != null) {
-                        String ts = v.getTimestampOffset();
-                        if (ts.contains(":")) {
-                            String[] parts = ts.split(":");
-                            tSec = Integer.parseInt(parts[0]) * 60 + Integer.parseInt(parts[1]);
-                        } else {
-                            tSec = Integer.parseInt(ts);
-                        }
-                    }
-                } catch (Exception ignored) {}
+                int tSec = calculateOffsetSeconds(v.getCreatedAt(), id);
 
                 item.put("tSec", tSec);
                 item.put("timestampSec", tSec);
                 item.put("severity", (code.contains("TAB") || code.contains("FACE")) ? "HIGH" : "MEDIUM");
-                item.put("note", v.getMetaDescription() != null ? v.getMetaDescription() : ("Proctoring violation: " + code));
-                item.put("description", v.getMetaDescription() != null ? v.getMetaDescription() : ("Proctoring violation: " + code));
+                String readableDesc = getReadableDescription(code);
+                item.put("note", readableDesc);
+                item.put("description", readableDesc);
+                item.put("thumbnail", v.getSnapshotUrl() != null ? v.getSnapshotUrl() : "");
+                items.add(item);
+                index++;
+            }
+        }
+
+        if (examViolations != null) {
+            for (ExamViolation v : examViolations) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("id", v.getId() != null ? v.getId().toString() : ("flag-" + index));
+                String code = v.getType() != null ? v.getType() : "TAB_SWITCH";
+                item.put("type", code);
+
+                int tSec = calculateOffsetSeconds(v.getCreatedAt(), id);
+
+                item.put("tSec", tSec);
+                item.put("timestampSec", tSec);
+                item.put("severity", (code.contains("TAB") || code.contains("FACE") || code.contains("BLUR") || code.contains("RESIZE")) ? "HIGH" : "MEDIUM");
+                String readableDesc = v.getDescription() != null ? v.getDescription() : getReadableDescription(code);
+                item.put("note", readableDesc);
+                item.put("description", readableDesc);
                 item.put("thumbnail", v.getSnapshotUrl() != null ? v.getSnapshotUrl() : "");
                 items.add(item);
                 index++;
@@ -646,29 +695,20 @@ public class AdminController {
                 item.put("id", f.getId() != null ? f.getId().toString() : ("flag-" + index));
                 String type = f.getType() != null ? f.getType() : "GAZE_AWAY";
                 item.put("type", type);
-                item.put("tSec", 120);
-                item.put("timestampSec", 120);
+
+                int tSec = calculateOffsetSeconds(f.getTimestamp(), id);
+
+                item.put("tSec", tSec);
+                item.put("timestampSec", tSec);
                 item.put("severity", (f.getConfidence() != null && f.getConfidence() > 0.8) ? "HIGH" : "MEDIUM");
-                String desc = "AI Flag: " + type + " (Confidence: " + Math.round((f.getConfidence() != null ? f.getConfidence() : 0.95) * 100) + "%)";
-                item.put("note", desc);
-                item.put("description", desc);
+                String readableDesc = getReadableDescription(type);
+                String note = readableDesc + " (Confidence: " + Math.round((f.getConfidence() != null ? f.getConfidence() : 0.95) * 100) + "%)";
+                item.put("note", note);
+                item.put("description", note);
                 item.put("thumbnail", f.getSnapshotUrl() != null ? f.getSnapshotUrl() : "");
                 items.add(item);
                 index++;
             }
-        }
-
-        if (items.isEmpty()) {
-            items.add(Map.of(
-                    "id", "flag-default-1",
-                    "type", "TAB_SWITCH",
-                    "tSec", 30,
-                    "timestampSec", 30,
-                    "severity", "LOW",
-                    "note", "Candidate focus lost briefly during section transition.",
-                    "description", "Candidate focus lost briefly during section transition.",
-                    "thumbnail", ""
-            ));
         }
 
         Map<String, Object> res = new HashMap<>();
@@ -721,13 +761,12 @@ public class AdminController {
                 int sectionScore = 0;
                 int sectionMax = 0;
                 for (Question q : questions) {
-                    int qMarks = (q.getMarks() != null && q.getMarks() > 0) ? q.getMarks() : 1;
-                    sectionMax += qMarks;
+                    sectionMax++;
                     Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
                             .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
                             .findFirst();
-                    if (ansOpt.isPresent() && ansOpt.get().getSelectedOption() != null && q.getCorrectOption() != null && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption().trim())) {
-                        sectionScore += qMarks;
+                    if (ansOpt.isPresent() && ansOpt.get().getSelectedOption() != null && q.getCorrectOption() != null && q.getCorrectOption().trim().equalsIgnoreCase(ansOpt.get().getSelectedOption().trim())) {
+                        sectionScore++;
                     }
                 }
                 Map<String, Object> secMap = new HashMap<>();
@@ -744,13 +783,12 @@ public class AdminController {
                     int sectionMax = 0;
                     for (Question q : questions) {
                         if (q.getSection() != null && q.getSection().getId().equals(section.getId())) {
-                            int qMarks = (q.getMarks() != null && q.getMarks() > 0) ? q.getMarks() : 1;
-                            sectionMax += qMarks;
+                            sectionMax++;
                             Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
                                     .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
                                     .findFirst();
-                            if (ansOpt.isPresent() && ansOpt.get().getSelectedOption() != null && q.getCorrectOption() != null && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption().trim())) {
-                                sectionScore += qMarks;
+                            if (ansOpt.isPresent() && ansOpt.get().getSelectedOption() != null && q.getCorrectOption() != null && q.getCorrectOption().trim().equalsIgnoreCase(ansOpt.get().getSelectedOption().trim())) {
+                                sectionScore++;
                             }
                         }
                     }
@@ -1111,11 +1149,10 @@ public class AdminController {
         }
         if (questions.isEmpty()) return 0;
 
-        int totalMarks = 0;
-        int earnedMarks = 0;
+        int totalQuestions = 0;
+        int correctCount = 0;
         for (Question q : questions) {
-            int qMarks = (q.getMarks() != null && q.getMarks() > 0) ? q.getMarks() : 1;
-            totalMarks += qMarks;
+            totalQuestions++; // 1 question = 1 point
             String correct = q.getCorrectOption() != null ? q.getCorrectOption().trim() : "";
 
             String userSelected = null;
@@ -1137,9 +1174,65 @@ public class AdminController {
             }
 
             if (userSelected != null && !correct.isEmpty() && correct.equalsIgnoreCase(userSelected)) {
-                earnedMarks += qMarks;
+                correctCount++;
             }
         }
-        return totalMarks > 0 ? (int) Math.round(((double) earnedMarks / totalMarks) * 100) : 0;
+        return correctCount;
+    }
+
+    private int calculateOffsetSeconds(LocalDateTime eventTime, UUID attemptId) {
+        if (eventTime == null) return 0;
+        
+        List<RecordingSession> sessions = recordingSessionRepository.findByAttemptId(attemptId);
+        LocalDateTime startedAt = null;
+        if (sessions != null && !sessions.isEmpty()) {
+            sessions.sort((a, b) -> {
+                if (a.getStartedAt() == null) return 1;
+                if (b.getStartedAt() == null) return -1;
+                return a.getStartedAt().compareTo(b.getStartedAt());
+            });
+            startedAt = sessions.get(0).getStartedAt();
+        }
+        
+        if (startedAt == null) {
+            ExamAttempt attempt = attemptRepository.findById(attemptId).orElse(null);
+            if (attempt != null) {
+                startedAt = attempt.getStartTime();
+            }
+        }
+        
+        if (startedAt != null) {
+            long seconds = java.time.Duration.between(startedAt, eventTime).toSeconds();
+            return seconds >= 0 ? (int) seconds : 0;
+        }
+        
+        return 0;
+    }
+
+    private String getReadableDescription(String type) {
+        if (type == null) return "Integrity Warning";
+        switch (type.toUpperCase()) {
+            case "WINDOW_BLUR":
+                return "Window Focus Lost (Tab Switched / Minimised)";
+            case "WINDOW_RESIZE":
+                return "Browser Window Resized";
+            case "TAB_SWITCH":
+                return "Tab Switched";
+            case "FULLSCREEN_EXIT":
+                return "Fullscreen Mode Exited";
+            case "MULTIPLE_FACES":
+            case "MULTIPLE_FACE":
+                return "Multiple Faces Detected";
+            case "FACE_NOT_DETECTED":
+                return "Candidate Not Visible / Out of Camera";
+            case "GAZE_AWAY":
+                return "Candidate Gaze Away from Screen";
+            case "SECOND_DEVICE":
+                return "Mobile Phone / Second Device Detected";
+            case "VOICE_DETECTED":
+                return "Voice Detected";
+            default:
+                return type.replace("_", " ");
+        }
     }
 }

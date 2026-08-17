@@ -34,7 +34,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
 
         {/* Candidate Routes */}
-        <Route path="/candidate" element={<Layout title="Dashboard" />}>
+        <Route path="/candidate" element={<Layout title="" />}>
           <Route index element={<CandidateDashboard />} />
           <Route path="catalog" element={<CandidateCatalog />} />
           <Route path="results" element={<CandidateResults />} />

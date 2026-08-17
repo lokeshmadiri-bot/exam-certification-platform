@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Award, Play, Clock, BookOpen, Shield } from 'lucide-react';
 import { examService, candidateService } from '../services/api';
 
 export default function CandidateCatalog() {
   const navigate = useNavigate();
+  const { searchQuery } = useOutletContext();
   const [exams, setExams] = useState([]);
   const [attempts, setAttempts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,17 +29,14 @@ export default function CandidateCatalog() {
   }, []);
 
   const getStackIcon = (stack) => {
-    const configs = {
-      selenium: { bg: '#eaf1ff', fg: '#2F6BFF' },
-      api: { bg: '#e7f7f0', fg: '#0E9F6E' },
-      java: { bg: '#fdf3da', fg: '#b58600' },
-      react: { bg: '#e0f7fa', fg: '#00838f' },
-      python: { bg: '#eceff1', fg: '#37474f' },
-      node: { bg: '#efebe9', fg: '#4e342e' },
-      sql: { bg: '#fbe9e7', fg: '#d84315' },
-      devops: { bg: '#f0ecff', fg: '#6b54d4' }
+    const STACK_ICONS = { java: "☕", react: "⚛", python: "🐍", node: "⬡", sql: "🗄" };
+    const STACK_BG = { java: "#fdf6e7", react: "#eaf2fb", python: "#e9f5ee", node: "#f0f6ee", sql: "#f0ecfb" };
+    const key = stack ? stack.toLowerCase() : '';
+    return {
+      icon: STACK_ICONS[key] || "📝",
+      bg: STACK_BG[key] || "#eef3f9",
+      fg: "#0E1B2E"
     };
-    return configs[stack ? stack.toLowerCase() : ''] || { bg: '#eef2f8', fg: '#5C6B82' };
   };
 
   if (loading) {
@@ -53,9 +51,6 @@ export default function CandidateCatalog() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div className="page-head">
-        <span className="eyebrow font-mono text-[10px] tracking-[2px] uppercase text-[#2F6BFF] bg-[#2F6BFF]/10 px-3 py-1 rounded-full border border-[#2F6BFF]/20 font-bold">
-          Catalogue
-        </span>
         <h1 className="font-display font-extrabold text-3xl text-[#0E1B2E] tracking-tight mt-3 mb-1">Exam Catalogue</h1>
         <p className="text-[#5C6B82] text-sm font-medium">
           Browse certifications across all tech stacks. Active candidates can attempt each exam once per 30-day window.
@@ -63,15 +58,15 @@ export default function CandidateCatalog() {
       </div>
 
       <div className="grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
-        {exams.filter(e => e.status === 'ACTIVE').map((exam) => {
+        {exams.filter(e => e.status === 'ACTIVE' && (!searchQuery || e.title.toLowerCase().includes(searchQuery.toLowerCase()) || (e.stack && e.stack.toLowerCase().includes(searchQuery.toLowerCase())))).map((exam) => {
           const styleIcon = getStackIcon(exam.stack);
           const lastAttempt = attempts.find(a => a.examId === exam.examId);
           const canAttempt = lastAttempt?.canAttempt ?? true;
           const daysLeft = lastAttempt?.retryDaysLeft ?? 0;
 
           return (
-            <div 
-              key={exam.examId} 
+            <div
+              key={exam.examId}
               className="group relative bg-white border border-[#E4EAF2] hover:border-[#2F6BFF]/40 rounded-2xl p-6 shadow-sm hover:shadow-[0_12px_28px_rgba(47,107,255,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col"
               style={{
                 display: 'flex',
@@ -85,8 +80,8 @@ export default function CandidateCatalog() {
             >
               <div className="top flex items-start justify-between gap-4 mb-4" style={{ display: 'flex', alignItems: 'start', gap: '16px', marginBottom: '16px' }}>
                 <div className="flex items-center gap-3" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div className="ic w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105" style={{ width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', backgroundColor: styleIcon.bg, color: styleIcon.fg }}>
-                    <Award className="w-6 h-6" />
+                  <div className="ic w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105" style={{ width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', backgroundColor: styleIcon.bg, color: styleIcon.fg, fontSize: '22px' }}>
+                    {styleIcon.icon}
                   </div>
                   <div>
                     <h3 className="font-display font-bold text-[16px] text-[#0E1B2E] tracking-tight line-clamp-1" style={{ fontSize: '16px', fontWeight: '700', color: '#0E1B2E', margin: '0' }}>{exam.title}</h3>

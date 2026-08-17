@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { proctorService } from '../services/proctorService';
+import { aiService } from '../services/aiService';
 import { useVisibility } from './useVisibility';
 import { useWindowBlur } from './useWindowBlur';
 import { useWindowResize } from './useWindowResize';
@@ -11,7 +12,7 @@ const getLocalISOString = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
-export function useStrikeEngine({ attemptId, initialStrikeCount, active, onTerminate }) {
+export function useStrikeEngine({ attemptId, initialStrikeCount, active, onTerminate, videoRef }) {
   const [state, setState] = useState({
     strikeCount: 0,
     violations: [],
@@ -24,6 +25,30 @@ export function useStrikeEngine({ attemptId, initialStrikeCount, active, onTermi
 
   // Cooldown tracker per violation type: Mapping of type -> timestamp (ms)
   const lastViolationTimeRef = useRef({});
+
+  // Capture a snapshot frame from candidate camera, upload to MinIO and get URL
+  const captureAndUploadSnapshot = useCallback(async () => {
+    if (!videoRef?.current || !attemptId) return null;
+    try {
+      const video = videoRef.current;
+      if (video.readyState < 2 || video.videoWidth === 0) return null;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 320;
+      canvas.height = 240;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, 320, 240);
+
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.75));
+      if (!blob) return null;
+
+      const res = await aiService.uploadSnapshot(attemptId, blob);
+      return res?.data?.snapshotUrl || null;
+    } catch (err) {
+      console.warn('[StrikeEngine] Snapshot upload failed:', err.message);
+      return null;
+    }
+  }, [videoRef, attemptId]);
 
   useEffect(() => {
     if (active) {
@@ -65,16 +90,25 @@ export function useStrikeEngine({ attemptId, initialStrikeCount, active, onTermi
 
     const timestamp = getLocalISOString();
     
+    let snapshotUrl = null;
     try {
-      const res = await proctorService.reportViolation(attemptId, type, timestamp);
+      snapshotUrl = await captureAndUploadSnapshot();
+    } catch (snapErr) {
+      console.warn('[StrikeEngine] Snapshot capture failed (non-critical):', snapErr);
+    }
+    
+    try {
+      const res = await proctorService.reportViolation(attemptId, type, timestamp, snapshotUrl);
       const { strikeCount: serverStrikeCount, terminate: serverTerminate } = res.data;
 
       const isTerminated = serverTerminate || serverStrikeCount >= 4;
 
+      // Always set warningVisible=true so even an already-open modal re-renders
+      // with the fresh strikeCount, giving the candidate accurate feedback.
       setState((prev) => ({
         strikeCount: serverStrikeCount,
         violations: [...prev.violations, { type, timestamp, strikeNumber: serverStrikeCount }],
-        warningVisible: !isTerminated && serverStrikeCount <= 3,
+        warningVisible: !isTerminated,   // always show/refresh on each new violation
         terminated: isTerminated
       }));
 

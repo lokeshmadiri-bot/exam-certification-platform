@@ -37,6 +37,9 @@ public class ExamViolation {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "snapshot_url", length = 500)
+    private String snapshotUrl;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

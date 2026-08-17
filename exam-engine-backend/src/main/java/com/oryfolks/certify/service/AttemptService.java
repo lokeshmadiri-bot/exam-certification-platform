@@ -43,6 +43,8 @@ public class AttemptService {
 
         private final StorageService storageService;
 
+        private final CompetencyBandRepository competencyBandRepository;
+
         public StartExamResponseDTO startExam(
                         StartExamRequestDTO request,
                         String username) {
@@ -320,21 +322,17 @@ public class AttemptService {
                                         questions = questionRepository.findByStackIgnoreCase(exam.getStack());
                                 }
                         }
-                        if (questions.isEmpty()) {
-                                questions = questionRepository.findByIsActiveTrue();
-                        }
-                }
+                } // end else (no attempt questions)
 
-                int totalMarks = 0;
-                int earnedMarks = 0;
+                int totalQuestions = 0;
+                int correctCount = 0;
 
                 for (Question q : questions) {
-                        int qMarks = (q.getMarks() != null && q.getMarks() > 0) ? q.getMarks() : 1;
-                        totalMarks += qMarks;
+                        totalQuestions++; // 1 question = 1 point
 
                         String correct = q.getCorrectOption() != null ? q.getCorrectOption().trim() : "";
                         String userSelected = null;
-                        
+
                         Optional<AttemptAnswer> ansOpt = savedAttemptAnswers.stream()
                                         .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
                                         .findFirst();
@@ -349,18 +347,19 @@ public class AttemptService {
                         }
 
                         if (userSelected != null && !correct.isEmpty() && correct.equalsIgnoreCase(userSelected)) {
-                                earnedMarks += qMarks;
+                                correctCount++;
                         }
                 }
 
-                int finalScore = totalMarks > 0 ? (int) Math.round(((double) earnedMarks / totalMarks) * 100) : 0;
+                // Score = number of correct answers (1 per question)
+                int finalScore = correctCount;
                 attempt.setScore(finalScore);
                 LocalDateTime now = LocalDateTime.now();
                 attempt.setEndTime(now);
                 attempt.setSubmittedAt(now);
 
                 CompetencyLevel level = CompetencyLevel.L5;
-                List<CompetencyBand> bands = exam.getCompetencyBands();
+                List<CompetencyBand> bands = competencyBandRepository.findByExamId(exam.getId());
                 if (bands == null || bands.isEmpty()) {
                         bands = new ArrayList<>();
                         bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
@@ -377,7 +376,10 @@ public class AttemptService {
                 }
                 attempt.setAssignedLevel(level);
 
-                if (finalScore >= exam.getPassMark()) {
+                // Pass/fail: compare percentage of correct answers against passMark threshold
+                // passMark is stored as a percentage (e.g. 60 = 60%) for backward compatibility
+                int percentScore = totalQuestions > 0 ? (int) Math.round(((double) correctCount / totalQuestions) * 100) : 0;
+                if (percentScore >= exam.getPassMark()) {
                         attempt.setResultStatus(ResultStatus.PASSED);
                 } else {
                         attempt.setResultStatus(ResultStatus.FAILED);
