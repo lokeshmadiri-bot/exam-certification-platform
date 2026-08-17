@@ -85,7 +85,7 @@ public class GeminiService {
     private List<GeneratedQuestionDTO> generateWithOpenAiFormat(GenerateQuestionRequest req, String key,
             String endpointUrl, String model, String providerName) {
         String prompt = buildPrompt(req);
-        String selectedModel = (model != null && !model.isBlank()) ? model : "llama-3.3-70b-versatile";
+        String selectedModel = (model != null && !model.isBlank()) ? model : "groq/compound-mini";
 
         Map<String, Object> requestBody = Map.of(
                 "model", selectedModel,

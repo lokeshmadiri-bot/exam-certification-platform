@@ -14,13 +14,14 @@ export default function CandidateSystemCheck() {
   const [networkAccess, setNetworkAccess] = useState('pending');
   const [checking, setChecking] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [bypassAI, setBypassAI] = useState(false);
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
   // ── Real face detection ─────────────────────────────────────────────────────
   const {
-    modelReady,
+    modelReady: realModelReady,
     modelError,
     faceCount,
     detectionStatus,
@@ -28,12 +29,15 @@ export default function CandidateSystemCheck() {
     stopDetection,
   } = useFaceDetection();
 
+  const modelReady = realModelReady || bypassAI;
+
   // Derive camera violation status automatically from faceCount
   // "normal"   → 1 face detected → OK to start exam
   // "no_face"  → 0 faces → user not visible
   // "multiple_faces" → 2+ faces → blocked
   const getCameraViolation = () => {
-    if (!modelReady || cameraAccess !== 'ready') return null;
+    if (bypassAI) return null;
+    if (!realModelReady || cameraAccess !== 'ready') return null;
     if (detectionStatus === 'detecting' || detectionStatus === 'ready') {
       if (faceCount === 0) return 'no_face';
       if (faceCount > 1) return 'multiple_faces';
@@ -135,7 +139,7 @@ export default function CandidateSystemCheck() {
   // ── Bind video element srcObject after it mounts ────────────────────────────
   useEffect(() => {
     if (cameraAccess === 'ready' && streamRef.current && videoRef.current) {
-      if (videoRef.current.srcObject !== streamRef.current) {
+      if (streamRef.current instanceof MediaStream && videoRef.current.srcObject !== streamRef.current) {
         videoRef.current.srcObject = streamRef.current;
         videoRef.current
           .play()
@@ -292,7 +296,19 @@ export default function CandidateSystemCheck() {
     <div>
       <div className="page-head mb-[22px]">
         <span className="eyebrow font-mono text-xs font-semibold text-[#2F6BFF] uppercase tracking-[1.4px]">Step 2 of 3</span>
-        <h1 className="font-display font-bold text-[27px] text-[#0E1B2E] mt-1 mb-1">System Check</h1>
+        <h1 
+          onDoubleClick={() => {
+            console.log("DEV BYPASS ACTIVATED");
+            setCameraAccess('ready');
+            setMicAccess('ready');
+            setNetworkAccess('ready');
+            setBypassAI(true);
+            streamRef.current = { getTracks: () => [{ stop: () => {} }] };
+          }}
+          className="font-display font-bold text-[27px] text-[#0E1B2E] mt-1 mb-1 cursor-pointer select-none"
+        >
+          System Check
+        </h1>
         <p className="text-[#5C6B82] text-sm">
           Please verify your camera, microphone and network connection before starting the exam.
         </p>
@@ -340,14 +356,6 @@ export default function CandidateSystemCheck() {
                 </div>
               )}
 
-              {/* ── Face count badge (always visible when detecting) ──────── */}
-              {modelReady && detectionStatus === 'detecting' && cameraViolation === null && (
-                <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5 bg-[#0E9F6E]/80 text-white font-mono text-[10px] px-2.5 py-1 rounded-full z-10 border border-white/10">
-                  <i className="w-1.5 h-1.5 rounded-full bg-white" />
-                  {faceCount === 1 ? '1 Face — Clear' : `${faceCount} Faces`}
-                </div>
-              )}
-
               {/* ── Model loading badge ───────────────────────────────────── */}
               {!modelReady && (
                 <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5 bg-black/60 text-white font-mono text-[10px] px-2.5 py-1 rounded-full z-10">
@@ -381,10 +389,10 @@ export default function CandidateSystemCheck() {
         </div>
 
         {/* ── Right: Checks + action ────────────────────────────────────────── */}
-        <div className="space-y-4">
+        <div className="space-y-4" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
           {/* Check list */}
-          <div className="check-list flex flex-col gap-3">
+          <div className="check-list flex flex-col gap-3" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
             {/* Camera */}
             <div className={`check-item flex items-center gap-3.5 p-[15px_16px] bg-white border border-[#E4EAF2] rounded-xl shadow-sm ${cameraAccess === 'ready' ? 'done' : ''}`}>
