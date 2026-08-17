@@ -120,14 +120,14 @@ export default function AdminDashboard() {
         <table className="a2-table">
           <thead>
             <tr>
-              <th>Attempt</th><th>Candidate</th><th>Stack</th><th>Level</th>
+              <th>Exam</th><th>Candidate</th><th>Stack</th><th>Level</th>
               <th>Flags</th><th>Flagged at</th><th />
             </tr>
           </thead>
           <tbody>
             {needsReviewQueue.map((q) => (
               <tr key={q.id}>
-                <td className="a2-mono">{q.id}</td>
+                <td>{q.exam}</td>
                 <td>{q.candidate}</td>
                 <td>{q.stack}</td>
                 <td><span className={`a2-pill a2-lvl-${q.level}`}>{q.level}</span></td>

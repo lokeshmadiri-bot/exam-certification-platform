@@ -38,7 +38,7 @@ export default function AttemptReviewPage() {
     setActiveFlag(flagId);
     if (videoRef.current) {
       videoRef.current.currentTime = tSec;
-      videoRef.current.play().catch(() => {});
+      videoRef.current.play().catch(() => { });
     }
   };
 
@@ -60,10 +60,10 @@ export default function AttemptReviewPage() {
             ← Attempts
           </button>
           <h1>
-            Review <span className="a2-mono">{attempt.id}</span>
+            Review — {attempt.exam || attempt.examTitle || "Exam Attempt"}
           </h1>
           <p className="a2-sub">
-            {attempt.candidate} · {attempt.stack} · {attempt.level} ·{" "}
+            {attempt.candidate} · {attempt.stack}{attempt.level && attempt.level !== "—" ? ` · ${attempt.level}` : ""} ·{" "}
             {new Date(attempt.submittedAt).toLocaleString()}
           </p>
         </div>
@@ -169,10 +169,17 @@ export default function AttemptReviewPage() {
                       <span className="a2-mono">{s.score}/{s.max}</span>
                     </li>
                   ))}
+                  <li>
+                    <span>Result</span>
+                    <ResultPill result={score.autoResult} />
+                  </li>
+                  {(score.level || (attempt.level && attempt.level !== "—")) && (
+                    <li>
+                      <span>Level</span>
+                      <span className={`a2-pill a2-lvl-${score.level || attempt.level}`}>{score.level || attempt.level}</span>
+                    </li>
+                  )}
                 </ul>
-                <div className="a2-score-auto">
-                  Auto result: <ResultPill result={score.autoResult} />
-                </div>
               </>
             )}
           </section>
@@ -210,8 +217,8 @@ export default function AttemptReviewPage() {
           <div className="a2-modal" onClick={(e) => e.stopPropagation()}>
             <h3>
               {decision.open === "confirm"
-                ? `Confirm ${attempt.result.replace("_", " ")} for ${attempt.id}?`
-                : `Escalate ${attempt.id} to a second reviewer?`}
+                ? `Confirm ${attempt.result.replace("_", " ")} for ${attempt.candidate} (${attempt.exam || attempt.examTitle || attempt.stack})?`
+                : `Escalate ${attempt.candidate}'s attempt (${attempt.exam || attempt.examTitle || attempt.stack}) to a second reviewer?`}
             </h3>
             <p className="a2-sub">
               {decision.open === "confirm"

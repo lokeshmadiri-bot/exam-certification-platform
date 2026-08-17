@@ -245,7 +245,7 @@ function ExamRunnerContent() {
     videoRef
   });
 
-  const { fetchSummary } = useAIFlags({
+  const { fetchSummary, recordSilentFlag } = useAIFlags({
     attemptId,
     active: !loading
   });

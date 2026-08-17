@@ -1,9 +1,10 @@
-// A2 · Task 2 — Attempts
-// Table + filters (stack / level / result / date) + row drill-down
+// A2 · Task 2 — Attempts & Review Queue
+// Attempts: Full audit/history page (PASS, FAIL, NEEDS_REVIEW, IN_PROGRESS, etc.)
+// Review & Flags: Dedicated review queue (NEEDS_REVIEW & IN_PROGRESS attempts only)
 
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { fetchAttempts, META } from "../services/api";
+import { fetchAttempts, fetchReviewAttempts, META } from "../services/api";
 import "../components/a2.css";
 
 export default function AttemptsPage() {
@@ -14,7 +15,7 @@ export default function AttemptsPage() {
   const filters = {
     stack: params.get("stack") || "",
     level: params.get("level") || "",
-    result: params.get("result") || (isReviewPage ? "NEEDS_REVIEW" : ""),
+    result: params.get("result") || "",
     from: params.get("from") || "",
     to: params.get("to") || "",
   };
@@ -25,12 +26,13 @@ export default function AttemptsPage() {
 
   useEffect(() => {
     setLoading(true);
-    fetchAttempts(filters).then((d) => {
+    const fetchFn = isReviewPage ? fetchReviewAttempts : fetchAttempts;
+    fetchFn(filters).then((d) => {
       setData(d?.rows ? d : { rows: Array.isArray(d) ? d : [], total: Array.isArray(d) ? d.length : 0 });
       setLoading(false);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]);
+  }, [params, isReviewPage]);
 
   const setFilter = (key, value) => {
     const next = new URLSearchParams(params);
@@ -39,35 +41,45 @@ export default function AttemptsPage() {
   };
 
   const clearAll = () => {
-    if (isReviewPage) {
-      setParams({ result: "NEEDS_REVIEW" }, { replace: true });
-    } else {
-      setParams({}, { replace: true });
-    }
+    setParams({}, { replace: true });
   };
   
-  const hasFilters = isReviewPage 
-    ? Object.entries(filters).some(([k, v]) => k !== "result" ? Boolean(v) : v !== "NEEDS_REVIEW")
-    : Object.values(filters).some(Boolean);
+  const hasFilters = Object.values(filters).some(Boolean);
+
+  const resultOptions = ["PASS", "FAIL", "NEEDS_REVIEW"];
+
+  const resultLabels = {
+    PASS: "Pass",
+    FAIL: "Fail",
+    NEEDS_REVIEW: "Needs review",
+  };
 
   return (
     <div className="a2-page">
       <header className="a2-page-head">
         <h1>{isReviewPage ? "Reviews & Flags" : "Attempts"}</h1>
-        <p className="a2-sub">{data.total} attempt{data.total === 1 ? "" : "s"} matching current filters</p>
+        <p className="a2-sub">
+          {isReviewPage
+            ? `${data.total} attempt${data.total === 1 ? "" : "s"} requiring review`
+            : `${data.total} attempt${data.total === 1 ? "" : "s"} matching current filters`}
+        </p>
       </header>
 
       {/* Filter bar */}
       <div className="a2-filterbar">
         <Select label="Stack" value={filters.stack} options={META.STACKS} onChange={(v) => setFilter("stack", v)} />
-        <Select label="Level" value={filters.level} options={META.LEVELS} onChange={(v) => setFilter("level", v)} />
-        <Select
-          label="Result"
-          value={filters.result}
-          options={META.RESULTS}
-          labels={{ PASS: "Pass", FAIL: "Fail", NEEDS_REVIEW: "Needs review" }}
-          onChange={(v) => setFilter("result", v)}
-        />
+        {!isReviewPage && (
+          <Select label="Level" value={filters.level} options={META.LEVELS} onChange={(v) => setFilter("level", v)} />
+        )}
+        {!isReviewPage && (
+          <Select
+            label="Status"
+            value={filters.result}
+            options={resultOptions}
+            labels={resultLabels}
+            onChange={(v) => setFilter("result", v)}
+          />
+        )}
         <label className="a2-field">
           <span>From</span>
           <input type="date" value={filters.from} onChange={(e) => setFilter("from", e.target.value)} />
@@ -86,42 +98,52 @@ export default function AttemptsPage() {
         {loading ? (
           <div className="a2-loading">Loading attempts…</div>
         ) : data.rows.length === 0 ? (
-          <div className="a2-empty">No attempts match these filters. Adjust or clear the filters to see results.</div>
+          <div className="a2-empty">
+            {isReviewPage
+              ? "No attempts currently require review."
+              : "No attempts match these filters. Adjust or clear the filters to see results."}
+          </div>
         ) : (
           <table className="a2-table a2-table-hover">
             <thead>
-              <tr>
-                <th>Exam</th><th>Candidate</th><th>Stack</th><th>Level</th>
-                <th>Result</th><th>Score</th><th>Flags</th><th>Submitted</th>
-              </tr>
+              {isReviewPage ? (
+                <tr>
+                  <th>Exam</th><th>Candidate</th><th>Stack</th>
+                  <th>Status</th><th>Flags</th><th>Submitted</th>
+                </tr>
+              ) : (
+                <tr>
+                  <th>Exam</th><th>Candidate</th><th>Stack</th><th>Level</th>
+                  <th>Status</th><th>Score</th><th>Flags</th><th>Submitted</th>
+                </tr>
+              )}
             </thead>
             <tbody>
               {data.rows.map((r) => (
                 <React.Fragment key={r.id}>
                   <tr
-                    className="a2-clickable"
-                    onClick={() => setExpanded(expanded === r.id ? null : r.id)}
+                    className={isReviewPage ? "a2-clickable" : ""}
+                    onClick={() => isReviewPage && setExpanded(expanded === r.id ? null : r.id)}
                   >
                     <td>{r.exam}</td>
                     <td>{r.candidate}</td>
                     <td>{r.stack}</td>
-                    <td><span className={`a2-pill a2-lvl-${r.level}`}>{r.level}</span></td>
+                    {!isReviewPage && <td><span className={`a2-pill a2-lvl-${r.level}`}>{r.level}</span></td>}
                     <td><ResultPill result={r.result} /></td>
-                    <td>{r.score}</td>
+                    {!isReviewPage && <td>{r.score}</td>}
                     <td>{r.flagCount > 0 ? <span className="a2-pill a2-pill-amber">{r.flagCount}</span> : "—"}</td>
                     <td>{new Date(r.submittedAt).toLocaleString()}</td>
                   </tr>
 
-                  {/* Row drill-down */}
-                  {expanded === r.id && (
+                  {/* Row drill-down - Only available on Review & Flags page */}
+                  {isReviewPage && expanded === r.id && (
                     <tr className="a2-drill">
-                      <td colSpan={8}>
+                      <td colSpan={6}>
                         <div className="a2-drill-body">
                           <div className="a2-drill-facts">
-                            <Fact label="Duration" value={`${r.durationMin} min`} />
-                            <Fact label="Score" value={`${r.score} / 100`} />
+                            <Fact label="Duration" value={`${r.durationMin || 60} min`} />
                             <Fact label="Integrity flags" value={r.flagCount} />
-                            <Fact label="Result" value={r.result.replace("_", " ")} />
+                            <Fact label="Status" value={(r.result || "").replace("_", " ")} />
                           </div>
                           <div className="a2-drill-actions">
                             <button
@@ -173,7 +195,8 @@ export function ResultPill({ result }) {
     PASS: ["a2-pill-green", "Pass"],
     FAIL: ["a2-pill-red", "Fail"],
     NEEDS_REVIEW: ["a2-pill-amber", "Needs review"],
+    IN_PROGRESS: ["a2-pill-amber", "Needs review"],
   };
-  const [cls, text] = map[result] || ["", result];
+  const [cls, text] = map[result] || ["", result ? result.replace("_", " ") : "—"];
   return <span className={`a2-pill ${cls}`}>{text}</span>;
 }

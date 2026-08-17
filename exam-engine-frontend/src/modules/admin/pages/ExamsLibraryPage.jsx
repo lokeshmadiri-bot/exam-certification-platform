@@ -11,7 +11,6 @@ import {
     fetchPendingApprovals,
     META,
 } from "../services/api";
-import { PendingApprovalBadge } from "../components/FourEyes";
 import "../components/a1.css";
 
 const PAGE_SIZE = 9; // cards: 3×3, table: 9 rows
@@ -74,13 +73,32 @@ export default function ExamsLibraryPage() {
 
     const openStatusAction = async (exam, target) => {
         const actionLabel = target === "ACTIVE" ? "activate" : "deactivate";
+        const poolSize = exam.questionPoolSize ?? exam.questionPool ?? 0;
+        const currentCount = exam.currentQuestionCount ?? 0;
+        const remaining = exam.remainingQuestionsNeeded ?? Math.max(0, poolSize - currentCount);
+
+        if (target === "ACTIVE" && currentCount < poolSize) {
+            alert(
+                `Cannot Activate Exam: "${exam.title}"\n\n` +
+                `• Configured Question Pool Size: ${poolSize}\n` +
+                `• Current Available Questions: ${currentCount}\n` +
+                `• Remaining Questions Needed: ${remaining}\n\n` +
+                `Please add ${remaining} more active question(s) to this exam before requesting activation.`
+            );
+            return;
+        }
+
         if (window.confirm(`Are you sure you want to ${actionLabel} exam "${exam.title}"?`)) {
-            if (target === "ACTIVE") {
-                await requestExamActivation(exam.id, "Direct activation");
-            } else {
-                await requestExamDeactivation(exam.id, "Direct deactivation");
+            try {
+                if (target === "ACTIVE") {
+                    await requestExamActivation(exam.id, "Direct activation");
+                } else {
+                    await requestExamDeactivation(exam.id, "Direct deactivation");
+                }
+                load();
+            } catch (err) {
+                alert(err?.message || "Failed to update exam status.");
             }
-            load();
         }
     };
 
@@ -181,13 +199,15 @@ export default function ExamsLibraryPage() {
                                 </div>
                             </div>
                             <div className="a1-exam-card-kpis">
-                                <div className="a1-exam-kpi-chip">
+                                <div className="a1-exam-kpi-chip" title={exam.currentQuestionCount != null ? `Available: ${exam.currentQuestionCount} / Required: ${exam.questionPoolSize ?? exam.questionPool}` : ""}>
                                     <span className="a1-kpi-chip-label">📝 Pool</span>
-                                    <span className="a1-kpi-chip-val">{exam.questionPoolSize}</span>
+                                    <span className="a1-kpi-chip-val" style={{ color: exam.currentQuestionCount != null && exam.currentQuestionCount < (exam.questionPoolSize ?? exam.questionPool ?? 0) ? "#d9383a" : "inherit" }}>
+                                        {exam.currentQuestionCount != null ? `${exam.currentQuestionCount}/${exam.questionPoolSize ?? exam.questionPool}` : (exam.questionPoolSize ?? exam.questionPool)}
+                                    </span>
                                 </div>
                                 <div className="a1-exam-kpi-chip">
                                     <span className="a1-kpi-chip-label">🎯 Attempt</span>
-                                    <span className="a1-kpi-chip-val">{exam.questionsPerAttempt}</span>
+                                    <span className="a1-kpi-chip-val">{exam.questionsPerAttempt ?? exam.perAttempt}</span>
                                 </div>
                                 <div className="a1-exam-kpi-chip">
                                     <span className="a1-kpi-chip-label">✅ Pass</span>
@@ -197,7 +217,6 @@ export default function ExamsLibraryPage() {
                             <div className="a1-exam-card-foot">
                                 <div className="a1-exam-card-status-col">
                                     <StatusPill status={exam.status} />
-                                    {isExamPending(exam) && <PendingApprovalBadge />}
                                 </div>
                                 <div className="a1-exam-card-actions">
                                     <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => navigate(`/admin/authoring?examId=${exam.id}`)}>
@@ -211,7 +230,11 @@ export default function ExamsLibraryPage() {
                                             Approval Pending…
                                         </button>
                                     ) : exam.status !== "ACTIVE" ? (
-                                        <button className="a1-btn a1-btn-primary a1-btn-sm" onClick={() => openStatusAction(exam, "ACTIVE")}>
+                                        <button
+                                            className={`a1-btn ${exam.currentQuestionCount != null && exam.currentQuestionCount < (exam.questionPoolSize ?? exam.questionPool ?? 0) ? "a1-btn-ghost" : "a1-btn-primary"} a1-btn-sm`}
+                                            title={exam.currentQuestionCount != null && exam.currentQuestionCount < (exam.questionPoolSize ?? exam.questionPool ?? 0) ? `Question pool incomplete: ${exam.currentQuestionCount}/${exam.questionPoolSize ?? exam.questionPool} (${(exam.questionPoolSize ?? exam.questionPool ?? 0) - exam.currentQuestionCount} more needed)` : "Activate exam"}
+                                            onClick={() => openStatusAction(exam, "ACTIVE")}
+                                        >
                                             ▶ Activate
                                         </button>
                                     ) : (
@@ -229,7 +252,7 @@ export default function ExamsLibraryPage() {
                 <table className="a1-table a1-table-hover">
                     <thead>
                         <tr>
-                            <th>Exam</th><th>Stack</th><th>Pool</th>
+                            <th>Exam</th><th>Stack</th><th>Pool (Avail/Req)</th>
                             <th>Per Attempt</th><th>Pass%</th><th>Status</th><th>Updated</th><th />
                         </tr>
                     </thead>
@@ -238,12 +261,13 @@ export default function ExamsLibraryPage() {
                             <tr key={exam.id}>
                                 <td style={{ fontWeight: 600 }}>{exam.title}</td>
                                 <td>{exam.stack}</td>
-                                <td className="a1-mono">{exam.questionPoolSize}</td>
-                                <td className="a1-mono">{exam.questionsPerAttempt}</td>
+                                <td className="a1-mono" style={{ color: exam.currentQuestionCount != null && exam.currentQuestionCount < (exam.questionPoolSize ?? exam.questionPool ?? 0) ? "#d9383a" : "inherit" }}>
+                                    {exam.currentQuestionCount != null ? `${exam.currentQuestionCount}/${exam.questionPoolSize ?? exam.questionPool}` : (exam.questionPoolSize ?? exam.questionPool)}
+                                </td>
+                                <td className="a1-mono">{exam.questionsPerAttempt ?? exam.perAttempt}</td>
                                 <td className="a1-mono">{exam.passMark}%</td>
                                 <td>
                                     <StatusPill status={exam.status} />
-                                    {isExamPending(exam) && <PendingApprovalBadge />}
                                 </td>
                                 <td>{new Date(exam.updatedAt).toLocaleDateString()}</td>
                                 <td>
@@ -259,7 +283,11 @@ export default function ExamsLibraryPage() {
                                                 Approval Pending…
                                             </button>
                                         ) : exam.status !== "ACTIVE" ? (
-                                            <button className="a1-btn a1-btn-primary a1-btn-sm" onClick={() => openStatusAction(exam, "ACTIVE")}>
+                                            <button
+                                                className={`a1-btn ${exam.currentQuestionCount != null && exam.currentQuestionCount < (exam.questionPoolSize ?? exam.questionPool ?? 0) ? "a1-btn-ghost" : "a1-btn-primary"} a1-btn-sm`}
+                                                title={exam.currentQuestionCount != null && exam.currentQuestionCount < (exam.questionPoolSize ?? exam.questionPool ?? 0) ? `Question pool incomplete: ${exam.currentQuestionCount}/${exam.questionPoolSize ?? exam.questionPool} (${(exam.questionPoolSize ?? exam.questionPool ?? 0) - exam.currentQuestionCount} more needed)` : "Activate exam"}
+                                                onClick={() => openStatusAction(exam, "ACTIVE")}
+                                            >
                                                 Activate
                                             </button>
                                         ) : (
