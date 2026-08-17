@@ -23,7 +23,7 @@ export default function AdminDashboard() {
 
   if (!data) return <div className="a2-page a2-loading">Loading dashboard…</div>;
 
-  const { kpis, levelDistribution, passRateSplit, attemptsByStack, needsReviewQueue } = data;
+  const { kpis, levelDistribution, passRateSplit, attemptsByStack } = data;
   const maxLevel = Math.max(...levelDistribution.map((d) => d.count), 1);
 
   return (
@@ -103,47 +103,6 @@ export default function AdminDashboard() {
             <Bar dataKey="fail" name="Fail" stackId="a" fill="#b3392f" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
-      </section>
-
-      {/* Needs-review queue */}
-      <section className="a2-card">
-        <div className="a2-card-head">
-          <h2>Needs-review queue</h2>
-          <button
-            className="a2-btn a2-btn-ghost"
-            onClick={() => navigate("/admin/review")}
-          >
-            View all
-          </button>
-        </div>
-        <table className="a2-table">
-          <thead>
-            <tr>
-              <th>Exam</th><th>Candidate</th><th>Stack</th><th>Level</th>
-              <th>Flags</th><th>Flagged at</th><th />
-            </tr>
-          </thead>
-          <tbody>
-            {needsReviewQueue.map((q) => (
-              <tr key={q.id}>
-                <td>{q.exam}</td>
-                <td>{q.candidate}</td>
-                <td>{q.stack}</td>
-                <td><span className={`a2-pill a2-lvl-${q.level}`}>{q.level}</span></td>
-                <td><span className="a2-pill a2-pill-amber">{q.flagCount}</span></td>
-                <td>{new Date(q.flaggedAt).toLocaleString()}</td>
-                <td>
-                  <button
-                    className="a2-btn a2-btn-primary a2-btn-sm"
-                    onClick={() => navigate(`/admin/attempts/${q.id}/review`)}
-                  >
-                    Review
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </section>
     </div>
   );
