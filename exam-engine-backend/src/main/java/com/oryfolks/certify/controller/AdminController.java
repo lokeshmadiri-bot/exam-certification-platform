@@ -404,7 +404,11 @@ public class AdminController {
             for (ExamAttempt a : attempts) {
                 if (a != null) {
                     try {
-                        needsReviewQueue.add(mapAttemptSummary(a));
+                        Map<String, Object> summary = mapAttemptSummary(a);
+                        String r = String.valueOf(summary.get("result"));
+                        if ("NEEDS_REVIEW".equalsIgnoreCase(r) || "IN_PROGRESS".equalsIgnoreCase(r)) {
+                            needsReviewQueue.add(summary);
+                        }
                     } catch (Exception ignored) {}
                 }
                 if (needsReviewQueue.size() >= 10) break;
@@ -436,7 +440,25 @@ public class AdminController {
             @RequestParam(required = false) String level,
             @RequestParam(required = false) String result,
             @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false, defaultValue = "false") boolean reviewOnly) {
+
+        return fetchAttemptsInternal(stack, level, result, from, to, reviewOnly);
+    }
+
+    @GetMapping("/attempts/review")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getReviewAttempts(
+            @RequestParam(required = false) String stack,
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) String result,
+            @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
+
+        return fetchAttemptsInternal(stack, level, result, from, to, true);
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> fetchAttemptsInternal(
+            String stack, String level, String result, String from, String to, boolean reviewOnly) {
         try {
             List<ExamAttempt> attempts;
             try {
@@ -473,9 +495,21 @@ public class AdminController {
             for (ExamAttempt a : attempts) {
                 if (a != null) {
                     try {
-                        rows.add(mapAttemptSummary(a));
+                        Map<String, Object> summary = mapAttemptSummary(a);
+                        if (summary != null && !summary.isEmpty()) {
+                            rows.add(summary);
+                        }
                     } catch (Exception ignored) {}
                 }
+            }
+
+            // Enforce reviewOnly logic at backend API level:
+            // Review & Flags queue MUST only return attempts that require admin review (NEEDS_REVIEW / IN_PROGRESS).
+            if (reviewOnly) {
+                rows = rows.stream().filter(r -> {
+                    String resStr = String.valueOf(r.get("result"));
+                    return "NEEDS_REVIEW".equalsIgnoreCase(resStr) || "IN_PROGRESS".equalsIgnoreCase(resStr);
+                }).toList();
             }
 
             if (stack != null && !stack.isBlank()) {
@@ -485,7 +519,13 @@ public class AdminController {
                 rows = rows.stream().filter(r -> r.get("level") != null && level.equalsIgnoreCase(String.valueOf(r.get("level")))).toList();
             }
             if (result != null && !result.isBlank()) {
-                rows = rows.stream().filter(r -> r.get("result") != null && result.equalsIgnoreCase(String.valueOf(r.get("result")))).toList();
+                rows = rows.stream().filter(r -> {
+                    String rVal = String.valueOf(r.get("result"));
+                    if ("NEEDS_REVIEW".equalsIgnoreCase(result) || "IN_PROGRESS".equalsIgnoreCase(result)) {
+                        return "NEEDS_REVIEW".equalsIgnoreCase(rVal) || "IN_PROGRESS".equalsIgnoreCase(rVal);
+                    }
+                    return result.equalsIgnoreCase(rVal);
+                }).toList();
             }
 
             Map<String, Object> res = new HashMap<>();
@@ -508,12 +548,13 @@ public class AdminController {
 
         Map<String, Object> data = attempt != null ? mapAttemptSummary(attempt) : Map.of(
             "id", id.toString(),
-            "candidate", "Sample Candidate",
-            "exam", "Java Backend Developer",
-            "stack", "Java",
-            "level", "L3",
-            "score", 78,
-            "result", "PASS"
+            "candidate", "Candidate",
+            "exam", "Certification Exam",
+            "examTitle", "Certification Exam",
+            "stack", "General",
+            "level", "—",
+            "score", "—",
+            "result", "IN_PROGRESS"
         );
 
         return ResponseEntity.ok(ApiResponse.success("Attempt details retrieved", data));
@@ -524,12 +565,23 @@ public class AdminController {
             @PathVariable UUID id,
             Principal principal) {
 
+        String attemptLabel = "Proctoring Session Log";
+        try {
+            if (attemptRepository != null) {
+                ExamAttempt a = attemptRepository.findById(id).orElse(null);
+                if (a != null && a.getExam() != null) {
+                    attemptLabel = (a.getCandidate() != null ? (a.getCandidate().getFullName() != null ? a.getCandidate().getFullName() : a.getCandidate().getUsername()) : "Candidate")
+                            + " - " + a.getExam().getTitle();
+                }
+            }
+        } catch (Exception ignored) {}
+
         auditLogRepository.save(AccessAuditLog.builder()
                 .userName(principal != null ? principal.getName() : "Admin User")
                 .action("VIEW_PROCTORING_RECORDING")
                 .module("Integrity Review")
                 .oldValue("-")
-                .newValue("Attempt: " + id)
+                .newValue(attemptLabel)
                 .build());
 
         Map<String, Object> res = new HashMap<>();
@@ -717,10 +769,28 @@ public class AdminController {
             int finalScorePercent = maxTotal > 0 ? (int) Math.round(((double) totalScore / maxTotal) * 100) : 0;
             String autoResult = finalScorePercent >= passMark ? "PASS" : "FAIL";
 
+            CompetencyLevel level = CompetencyLevel.L5;
+            List<CompetencyBand> bands = attempt.getExam() != null ? attempt.getExam().getCompetencyBands() : null;
+            if (bands == null || bands.isEmpty()) {
+                bands = new ArrayList<>();
+                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
+                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L2).minScore(75).maxScore(89).title("Advanced").build());
+                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L3).minScore(60).maxScore(74).title("Intermediate").build());
+                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L4).minScore(40).maxScore(59).title("Beginner").build());
+                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
+            }
+            for (CompetencyBand band : bands) {
+                if (finalScorePercent >= band.getMinScore() && finalScorePercent <= band.getMaxScore()) {
+                    level = band.getLevelName();
+                    break;
+                }
+            }
+
             Map<String, Object> scoreMap = new HashMap<>();
             scoreMap.put("total", totalScore);
             scoreMap.put("maxTotal", maxTotal);
             scoreMap.put("autoResult", autoResult);
+            scoreMap.put("level", level.name());
             scoreMap.put("integrityPenaltyApplied", false);
             scoreMap.put("sections", sectionScores);
 
@@ -884,10 +954,10 @@ public class AdminController {
             map.put("id", a.getId());
             map.put("title", a.getLabel());
             map.put("desc", "Requested by " + a.getRequestedBy()
-                    + (a.getNote() != null ? " · " + a.getNote() : ""));
+                    + (a.getNote() != null && !a.getNote().isBlank() ? " · " + a.getNote() : ""));
             map.put("time", a.getRequestedAt() != null ? a.getRequestedAt().toString()
                     : new Date().toString());
-            map.put("read", false);
+            map.put("read", Boolean.TRUE.equals(a.getIsRead()));
 
             map.put("ts", a.getRequestedAt() != null ? a.getRequestedAt().toString()
                     : new Date().toString());
@@ -906,7 +976,29 @@ public class AdminController {
 
     @PostMapping("/notifications/{id}/read")
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> markNotificationRead(@PathVariable String id) {
+        if ("all".equalsIgnoreCase(id)) {
+            List<ApprovalRequest> pending = approvalRepository.findByStatusOrderByRequestedAtDesc("PENDING");
+            for (ApprovalRequest req : pending) {
+                req.setIsRead(true);
+            }
+            approvalRepository.saveAll(pending);
+        } else {
+            approvalRepository.findById(id).ifPresent(req -> {
+                req.setIsRead(true);
+                approvalRepository.save(req);
+            });
+        }
         return ResponseEntity.ok(ApiResponse.success("Notification read", Map.of("ok", true)));
+    }
+
+    @PostMapping("/notifications/read-all")
+    public ResponseEntity<ApiResponse<Map<String, Boolean>>> markAllNotificationsRead() {
+        List<ApprovalRequest> pending = approvalRepository.findByStatusOrderByRequestedAtDesc("PENDING");
+        for (ApprovalRequest req : pending) {
+            req.setIsRead(true);
+        }
+        approvalRepository.saveAll(pending);
+        return ResponseEntity.ok(ApiResponse.success("All notifications marked as read", Map.of("ok", true)));
     }
 
     private Map<String, Object> mapAttemptSummary(ExamAttempt a) {
@@ -916,33 +1008,50 @@ public class AdminController {
             map.put("id", a.getId() != null ? a.getId().toString() : UUID.randomUUID().toString());
             map.put("candidate", a.getCandidate() != null ? (a.getCandidate().getFullName() != null ? a.getCandidate().getFullName() : a.getCandidate().getUsername()) : "Candidate");
             map.put("email", a.getCandidate() != null ? a.getCandidate().getUsername() : "");
-            map.put("exam", a.getExam() != null ? a.getExam().getTitle() : "Java Certification");
-            map.put("stack", a.getExam() != null ? a.getExam().getStack() : "Java");
-            map.put("level", a.getAssignedLevel() != null ? a.getAssignedLevel().name()
-                    : (a.getCompetencyLevel() != null ? a.getCompetencyLevel().name() : "L3"));
+            String examTitle = (a.getExam() != null && a.getExam().getTitle() != null && !a.getExam().getTitle().isBlank())
+                    ? a.getExam().getTitle()
+                    : "Certification Exam";
+            String stack = (a.getExam() != null && a.getExam().getStack() != null && !a.getExam().getStack().isBlank())
+                    ? a.getExam().getStack()
+                    : "General";
+            boolean isPublished = (a.getResultPublishStatus() == ResultPublishStatus.PUBLISHED);
 
-            int score = a.getScore() != null ? a.getScore() : 0;
-            if (score == 0 && a.getExam() != null) {
-                try {
-                    score = calculateAttemptScore(a);
-                    if (score > 0) {
-                        a.setScore(score);
-                        if (attemptRepository != null) attemptRepository.save(a);
-                    }
-                } catch (Exception ignored) {}
+            String level = "—";
+            if (isPublished) {
+                level = a.getAssignedLevel() != null ? a.getAssignedLevel().name()
+                        : (a.getCompetencyLevel() != null ? a.getCompetencyLevel().name() : "—");
             }
 
-            map.put("score", score);
+            map.put("exam", examTitle);
+            map.put("examTitle", examTitle);
+            map.put("stack", stack);
+            map.put("level", level);
+
+            if (isPublished) {
+                int score = a.getScore() != null ? a.getScore() : 0;
+                if (score == 0 && a.getExam() != null) {
+                    try {
+                        score = calculateAttemptScore(a);
+                        if (score > 0) {
+                            a.setScore(score);
+                            if (attemptRepository != null) attemptRepository.save(a);
+                        }
+                    } catch (Exception ignored) {}
+                }
+                map.put("score", score);
+            } else {
+                map.put("score", "—");
+            }
 
             String resultStr = "NEEDS_REVIEW";
-            if (a.getResultPublishStatus() == ResultPublishStatus.PUBLISHED) {
+            if (isPublished) {
                 if (a.getResultStatus() == ResultStatus.PASSED) {
                     resultStr = "PASS";
                 } else if (a.getResultStatus() == ResultStatus.FAILED || a.getResultStatus() == ResultStatus.TERMINATED) {
                     resultStr = "FAIL";
+                } else {
+                    resultStr = "PASS";
                 }
-            } else if (a.getResultStatus() == ResultStatus.IN_PROGRESS) {
-                resultStr = "IN_PROGRESS";
             }
             map.put("result", resultStr);
 

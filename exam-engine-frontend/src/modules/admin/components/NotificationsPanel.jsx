@@ -1,26 +1,44 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell } from "lucide-react";
-import { fetchNotifications, markNotificationRead } from "../services/api";
+import { fetchNotifications, markNotificationRead, markAllNotificationsRead } from "../services/api";
 import "./a2.css";
 
 export default function NotificationsPanel() {
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
+  const [readIds, setReadIds] = useState(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem("admin_read_notif_ids") || "[]"));
+    } catch (e) {
+      return new Set();
+    }
+  });
   const navigate = useNavigate();
 
-  const load = () => fetchNotifications().then(setItems);
+  const load = () => {
+    fetchNotifications().then((res) => {
+      const list = Array.isArray(res) ? res : (res?.rows || []);
+      setItems(list.map((n) => ({
+        ...n,
+        read: n.read || readIds.has(n.id)
+      })));
+    });
+  };
 
   useEffect(() => {
     load();
     const t = setInterval(load, 5_000); // 5s fast polling for immediate notifications
     return () => clearInterval(t);
-  }, []);
+  }, [readIds]);
 
   const unread = items.filter((n) => !n.read).length;
 
   const openItem = async (n) => {
     if (!n.read) {
+      const nextRead = new Set(readIds).add(n.id);
+      setReadIds(nextRead);
+      try { localStorage.setItem("admin_read_notif_ids", JSON.stringify(Array.from(nextRead))); } catch (e) {}
       await markNotificationRead(n.id);
       setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
     }
@@ -31,9 +49,14 @@ export default function NotificationsPanel() {
   };
 
   const handleMarkAllRead = async () => {
-    const unreadItems = items.filter(n => !n.read);
-    await Promise.all(unreadItems.map(n => markNotificationRead(n.id)));
+    const unreadItems = items.filter((n) => !n.read);
+    const nextRead = new Set(readIds);
+    unreadItems.forEach((n) => nextRead.add(n.id));
+    setReadIds(nextRead);
+    try { localStorage.setItem("admin_read_notif_ids", JSON.stringify(Array.from(nextRead))); } catch (e) {}
+
     setItems((prev) => prev.map((x) => ({ ...x, read: true })));
+    await markAllNotificationsRead();
   };
 
   return (

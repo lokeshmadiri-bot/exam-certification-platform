@@ -413,6 +413,30 @@ function AIParametersTab({ gov, onSaved }) {
 
 // ---------------- Audit Log ----------------
 
+function formatAuditValue(val, action) {
+    if (!val || val === "-") return "-";
+    const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+    if (val.startsWith("Attempt:") || (action && action.includes("RECORDING"))) {
+        return "Proctoring Session Log";
+    }
+
+    if (uuidRegex.test(val)) {
+        if (action === "UPDATE_DIFFICULTY_BANDS" || action === "UPDATE_COMPETENCY_BANDS") {
+            return "Competency Bands Updated";
+        }
+        if (action === "CREATE_EXAM") return "New Exam Configured";
+        if (action === "EDIT_EXAM_METADATA") return "Exam Metadata Updated";
+        if (action === "DUPLICATE_EXAM") return "Exam Duplicated";
+        return "Exam Configuration Update";
+    }
+
+    if (val === "{status=ACTIVE}") return "Status: ACTIVE";
+    if (val === "{status=INACTIVE}") return "Status: INACTIVE";
+
+    return val;
+}
+
 function AuditLogTab({ rows, onFilter }) {
     const [module, setModule] = useState("");
     const [user, setUser] = useState("");
@@ -436,6 +460,7 @@ function AuditLogTab({ rows, onFilter }) {
                         <option value="Authoring">Authoring</option>
                         <option value="Question Bank">Question Bank</option>
                         <option value="Candidates">Candidates</option>
+                        <option value="Integrity Review">Integrity Review</option>
                         <option value="Governance">Governance</option>
                     </select>
                 </div>
@@ -457,12 +482,12 @@ function AuditLogTab({ rows, onFilter }) {
                     <tbody>
                         {rows.map((r) => (
                             <tr key={r.id}>
-                                <td>{r.user}</td>
+                                <td>{r.user || r.userName || "Admin User"}</td>
                                 <td className="a1-mono">{r.action}</td>
                                 <td>{r.module}</td>
-                                <td>{new Date(r.date).toLocaleString()}</td>
-                                <td className="a1-mono">{r.oldValue}</td>
-                                <td className="a1-mono">{r.newValue}</td>
+                                <td>{new Date(r.date || r.createdAt).toLocaleString()}</td>
+                                <td className="a1-mono">{formatAuditValue(r.oldValue, r.action)}</td>
+                                <td className="a1-mono">{formatAuditValue(r.newValue, r.action)}</td>
                             </tr>
                         ))}
                     </tbody>

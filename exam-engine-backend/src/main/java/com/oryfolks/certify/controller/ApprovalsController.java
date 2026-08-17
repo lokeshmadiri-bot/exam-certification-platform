@@ -26,6 +26,9 @@ public class ApprovalsController {
     private ExamRepository examRepository;
 
     @Autowired
+    private QuestionRepository questionRepository;
+
+    @Autowired
     private GovernanceSettingRepository governanceSettingRepository;
 
     @Autowired
@@ -63,23 +66,36 @@ public class ApprovalsController {
 
         // Execute side effect based on approval type
         if ("EXAM_ACTIVATE".equalsIgnoreCase(req.getType()) || "EXAM_DEACTIVATE".equalsIgnoreCase(req.getType())) {
-            try {
-                UUID examId = UUID.fromString(req.getTargetId());
-                Exam exam = examRepository.findById(examId).orElse(null);
-                if (exam != null) {
-                    ExamStatus newStatus = "EXAM_ACTIVATE".equalsIgnoreCase(req.getType()) ? ExamStatus.ACTIVE : ExamStatus.INACTIVE;
-                    auditLogRepository.save(AccessAuditLog.builder()
-                            .userName(adminName)
-                            .action(req.getType())
-                            .module("Exams Library")
-                            .oldValue(exam.getStatus().name())
-                            .newValue(newStatus.name())
-                            .build());
-
-                    exam.setStatus(newStatus);
-                    examRepository.save(exam);
+            UUID examId = UUID.fromString(req.getTargetId());
+            Exam exam = examRepository.findById(examId).orElse(null);
+            if (exam != null) {
+                if ("EXAM_ACTIVATE".equalsIgnoreCase(req.getType())) {
+                    long activeCount = questionRepository != null ? questionRepository.countByExamIdAndIsActiveTrue(examId) : 0;
+                    if (activeCount == 0 && questionRepository != null) {
+                        activeCount = questionRepository.countByExamId(examId);
+                    }
+                    int poolSize = exam.getQuestionPool() != null ? exam.getQuestionPool() : 0;
+                    if (activeCount < poolSize) {
+                        long remaining = poolSize - activeCount;
+                        throw new RuntimeException(String.format(
+                            "Cannot approve activation: Question Pool Size is incomplete (%d required, %d available, %d remaining).",
+                            poolSize, activeCount, remaining
+                        ));
+                    }
                 }
-            } catch (Exception ignored) {}
+
+                ExamStatus newStatus = "EXAM_ACTIVATE".equalsIgnoreCase(req.getType()) ? ExamStatus.ACTIVE : ExamStatus.INACTIVE;
+                auditLogRepository.save(AccessAuditLog.builder()
+                        .userName(adminName)
+                        .action(req.getType())
+                        .module("Exams Library")
+                        .oldValue(exam.getStatus().name())
+                        .newValue(newStatus.name())
+                        .build());
+
+                exam.setStatus(newStatus);
+                examRepository.save(exam);
+            }
         } else if ("RETENTION_CHANGE".equalsIgnoreCase(req.getType())) {
             List<GovernanceSetting> settings = governanceSettingRepository.findAll();
             if (!settings.isEmpty() && req.getPayloadJson() != null) {

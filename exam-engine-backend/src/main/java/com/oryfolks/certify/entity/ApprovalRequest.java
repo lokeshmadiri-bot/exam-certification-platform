@@ -43,6 +43,10 @@ public class ApprovalRequest {
     @Column(name = "status", nullable = false, length = 20)
     private String status = "PENDING"; // PENDING, APPROVED, REJECTED
 
+    @Builder.Default
+    @Column(name = "is_read")
+    private Boolean isRead = false;
+
     @Column(name = "resolved_by", length = 100)
     private String resolvedBy;
 
