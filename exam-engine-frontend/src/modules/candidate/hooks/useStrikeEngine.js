@@ -26,6 +26,9 @@ export function useStrikeEngine({ attemptId, initialStrikeCount, active, onTermi
   // Cooldown tracker per violation type: Mapping of type -> timestamp (ms)
   const lastViolationTimeRef = useRef({});
 
+  // Global cooldown tracker across all violations (2 seconds)
+  const lastGlobalViolationTimeRef = useRef(0);
+
   // Capture a snapshot frame from candidate camera, upload to MinIO and get URL
   const captureAndUploadSnapshot = useCallback(async () => {
     if (!videoRef?.current || !attemptId) return null;
@@ -55,11 +58,44 @@ export function useStrikeEngine({ attemptId, initialStrikeCount, active, onTermi
       setIsGracePeriod(true);
       const timer = setTimeout(() => {
         setIsGracePeriod(false);
-      }, 5000); // 5 seconds grace period to allow fullscreen transition and focusing to settle
+      }, 5000); // 5 seconds grace period to allow initial fullscreen transition and focusing to settle
       return () => clearTimeout(timer);
     } else {
       setIsGracePeriod(true);
     }
+  }, [active]);
+
+  useEffect(() => {
+    if (!active) return;
+
+    const handleGlobalFullscreenChange = () => {
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
+
+      if (isCurrentlyFullscreen) {
+        setIsGracePeriod(true);
+        const timer = setTimeout(() => {
+          setIsGracePeriod(false);
+        }, 5000); // 5s grace period on entering fullscreen to let browser settle
+        return () => clearTimeout(timer);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleGlobalFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleGlobalFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleGlobalFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleGlobalFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleGlobalFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleGlobalFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleGlobalFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleGlobalFullscreenChange);
+    };
   }, [active]);
 
   // Sync initial strike count from backend
@@ -79,13 +115,24 @@ export function useStrikeEngine({ attemptId, initialStrikeCount, active, onTermi
       return;
     }
 
-    // Cooldown/Debounce check: 10 seconds (10000ms) cooldown per violation type
     const nowMs = Date.now();
+
+    // Global cooldown check: suppress if any violation was reported within the last 2 seconds
+    const lastGlobalTime = lastGlobalViolationTimeRef.current || 0;
+    if (nowMs - lastGlobalTime < 2000) {
+      console.log(`Violation ${type} suppressed due to 2s global cooldown`);
+      return;
+    }
+
+    // Cooldown/Debounce check: 10 seconds (10000ms) cooldown per violation type
     const lastTime = lastViolationTimeRef.current[type] || 0;
     if (nowMs - lastTime < 10000) {
       console.log(`Violation ${type} suppressed due to 10s cooldown`);
       return;
     }
+
+    // Update cooldown records before reporting to prevent race condition duplicates
+    lastGlobalViolationTimeRef.current = nowMs;
     lastViolationTimeRef.current[type] = nowMs;
 
     const timestamp = getLocalISOString();

@@ -15,7 +15,10 @@ export default function Layout({ title }) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const hideTopbar = location.pathname.includes('/instructions/') || location.pathname.includes('/check/');
-  const hideSearch = location.pathname.includes('/help') || hideTopbar;
+  const hideSearch = 
+    location.pathname.includes('/help') || 
+    location.pathname.startsWith('/admin') || 
+    hideTopbar;
 
   useEffect(() => {
     const currentUser = authService.getCurrentUser();

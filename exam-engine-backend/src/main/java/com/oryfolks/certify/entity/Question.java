@@ -1,6 +1,7 @@
 package com.oryfolks.certify.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -117,5 +118,15 @@ public class Question {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @JsonProperty("examId")
+    public UUID retrieveExamId() {
+        return exam != null ? exam.getId() : null;
+    }
+
+    @JsonProperty("examTitle")
+    public String retrieveExamTitle() {
+        return exam != null ? exam.getTitle() : null;
+    }
 
 }

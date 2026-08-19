@@ -9,7 +9,7 @@ export default function Footer() {
   const isLastQuestion = currentIdx === questions.length - 1;
 
   return (
-    <div className="run-foot flex items-center justify-between max-w-[760px] mt-[28px] mx-auto w-full">
+    <div className="run-foot flex items-center justify-between gap-4 max-w-[760px] mt-[28px] mx-auto w-full px-2 sm:px-4">
       <button
         disabled={currentIdx === 0}
         onClick={() => setCurrentIdx(currentIdx - 1)}

@@ -59,6 +59,11 @@ public class Exam {
     @Column(name = "pass_mark", nullable = false)
     private Integer passMark;
 
+    @Min(value = 1, message = "Total marks must be greater than 0.")
+    @Column(name = "total_marks", nullable = true, columnDefinition = "integer default 100")
+    @Builder.Default
+    private Integer totalMarks = 100;
+
     @Column(name = "instructions", columnDefinition = "TEXT")
     private String instructions;
 
@@ -109,5 +114,65 @@ public class Exam {
 
     public void setQuestionsPerAttempt(Integer questionsPerAttempt) {
         this.perAttempt = questionsPerAttempt;
+    }
+
+    public double getQuestionWeight(String difficulty) {
+        String diff = difficulty != null ? difficulty.trim().toUpperCase() : "EASY";
+        if ("HARD".equals(diff)) {
+            return 3.0;
+        } else if ("MEDIUM".equals(diff)) {
+            return 2.0;
+        }
+        return 1.0;
+    }
+
+    public double getQuestionMarks(String difficulty) {
+        int required = this.getPerAttempt() != null ? this.getPerAttempt() : (this.perAttempt != null ? this.perAttempt : 10);
+        if (required <= 0) {
+            required = 10;
+        }
+        int easyCount = (int) Math.round(required * 0.50);
+        int mediumCount = (int) Math.round(required * 0.30);
+        int hardCount = required - easyCount - mediumCount;
+
+        double sumOfWeights = (easyCount * 1.0) + (mediumCount * 2.0) + (hardCount * 3.0);
+        if (sumOfWeights <= 0) {
+            sumOfWeights = 1.0;
+        }
+        double weight = getQuestionWeight(difficulty);
+        Integer totMarks = this.getTotalMarks();
+        if (totMarks == null) {
+            totMarks = 100;
+        }
+        return ((double) totMarks / sumOfWeights) * weight;
+    }
+
+    public double getQuestionMarks(String difficulty, List<Question> questions) {
+        if (questions == null || questions.isEmpty()) {
+            return getQuestionMarks(difficulty);
+        }
+        int easyCount = 0;
+        int mediumCount = 0;
+        int hardCount = 0;
+        for (Question q : questions) {
+            String diff = q.getDifficulty() != null ? q.getDifficulty().trim().toUpperCase() : "EASY";
+            if ("HARD".equals(diff)) {
+                hardCount++;
+            } else if ("MEDIUM".equals(diff)) {
+                mediumCount++;
+            } else {
+                easyCount++;
+            }
+        }
+        double sumOfWeights = (easyCount * 1.0) + (mediumCount * 2.0) + (hardCount * 3.0);
+        if (sumOfWeights <= 0) {
+            sumOfWeights = 1.0;
+        }
+        double weight = getQuestionWeight(difficulty);
+        Integer totMarks = this.getTotalMarks();
+        if (totMarks == null) {
+            totMarks = 100;
+        }
+        return ((double) totMarks / sumOfWeights) * weight;
     }
 }

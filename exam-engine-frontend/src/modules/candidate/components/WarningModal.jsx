@@ -60,33 +60,117 @@ export default function WarningModal({ isOpen, strikeCount, lastViolation, onClo
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
         }}
       >
-        <div className="w-16 h-16 rounded-full bg-[#F2A93B]/10 border-2 border-[#F2A93B] text-[#F2A93B] flex items-center justify-center mx-auto mb-5 shadow-[0_0_15px_rgba(242,169,59,0.2)]">
+        <div 
+          style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(242, 169, 59, 0.12)',
+            border: '2px solid #F2A93B',
+            color: '#F2A93B',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 20px auto',
+            boxShadow: '0 0 15px rgba(242, 169, 59, 0.2)'
+          }}
+        >
           <AlertTriangle className="w-8 h-8" />
         </div>
         
-        <h3 className="font-display text-white text-[22px] font-bold mb-2">
+        <h3 style={{ color: '#white', fontSize: '22px', fontWeight: '700', marginBottom: '8px', color: '#FFFFFF', fontFamily: 'sans-serif' }}>
           {title}
         </h3>
         
-        <p className="text-[#b9c9e2] text-[14.5px] leading-relaxed mb-6">
+        <p style={{ color: '#b9c9e2', fontSize: '14.5px', lineHeight: '1.6', marginBottom: '24px', fontFamily: 'sans-serif' }}>
           {description}
         </p>
 
-        <div className="flex items-center justify-center gap-1.5 mb-6">
-          <span className="text-xs text-[#8A99AE] uppercase tracking-wider font-semibold mr-1">
+        <div 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            marginBottom: '24px'
+          }}
+        >
+          <span 
+            style={{
+              fontSize: '12px',
+              color: '#8A99AE',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              fontWeight: '700',
+              marginRight: '4px',
+              fontFamily: 'monospace'
+            }}
+          >
             Status:
           </span>
-          <span className={`w-3 h-3 rounded-full ${strikeCount >= 1 ? 'bg-[#F2A93B]' : 'bg-white/10'}`} />
-          <span className={`w-3 h-3 rounded-full ${strikeCount >= 2 ? 'bg-[#F2A93B]' : 'bg-white/10'}`} />
-          <span className={`w-3 h-3 rounded-full ${strikeCount >= 3 ? 'bg-[#F2A93B]' : 'bg-white/10'}`} />
-          <span className="text-xs text-[#F2A93B] font-mono font-bold ml-2">
+          <span 
+            style={{
+              width: '12px',
+              height: '12px',
+              borderRadius: '50%',
+              backgroundColor: strikeCount >= 1 ? '#F2A93B' : 'rgba(255, 255, 255, 0.1)',
+              display: 'inline-block'
+            }}
+          />
+          <span 
+            style={{
+              width: '12px',
+              height: '12px',
+              borderRadius: '50%',
+              backgroundColor: strikeCount >= 2 ? '#F2A93B' : 'rgba(255, 255, 255, 0.1)',
+              display: 'inline-block'
+            }}
+          />
+          <span 
+            style={{
+              width: '12px',
+              height: '12px',
+              borderRadius: '50%',
+              backgroundColor: strikeCount >= 3 ? '#F2A93B' : 'rgba(255, 255, 255, 0.1)',
+              display: 'inline-block'
+            }}
+          />
+          <span 
+            style={{
+              fontSize: '12px',
+              color: '#F2A93B',
+              fontFamily: 'monospace',
+              fontWeight: '750',
+              marginLeft: '8px'
+            }}
+          >
             {strikeCount} / 3 Warnings
           </span>
         </div>
 
         <button
           onClick={onClose}
-          className="btn w-full bg-[#F2A93B] hover:bg-[#e69f2c] hover:scale-[1.02] text-[#3a2700] justify-center py-3.5 rounded-xl font-bold text-[14px] shadow-lg shadow-[#F2A93B]/20 transition-all"
+          style={{
+            width: '100%',
+            backgroundColor: '#F2A93B',
+            color: '#3a2700',
+            border: 'none',
+            borderRadius: '12px',
+            padding: '14px 24px',
+            fontWeight: '700',
+            fontSize: '14px',
+            cursor: 'pointer',
+            boxShadow: '0 6px 16px rgba(242, 169, 59, 0.25)',
+            transition: 'all 0.15s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#e69f2c';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#F2A93B';
+            e.currentTarget.style.transform = 'none';
+          }}
         >
           {buttonText}
         </button>

@@ -28,4 +28,6 @@ public class ExamCardResponseDTO {
 
     private ExamStatus status;
 
+    private Integer totalMarks;
+
 }

@@ -10,6 +10,7 @@ import WatermarkOverlay from '../components/WatermarkOverlay';
 import FullscreenDialog from '../components/FullscreenDialog';
 import Header from '../components/ExamHeader';
 import Question from '../components/Question';
+import LeftSidebar from '../components/LeftSidebar';
 import Sidebar from '../components/ExamSidebar';
 import Footer from '../components/ExamFooter';
 import WarningModal from '../components/WarningModal';
@@ -76,7 +77,9 @@ function ExamRunnerContent() {
     offline,
     setOffline,
     setShowConfirmSubmit,
-    videoRef
+    videoRef,
+    examDuration,
+    setExamDuration
   } = useExam();
 
   // Reconnect hook
@@ -89,7 +92,6 @@ function ExamRunnerContent() {
   });
 
   const [examTitle, setExamTitle] = useState('Certification Exam');
-  const [examDuration, setExamDuration] = useState(45 * 60);
   const [initialStrikeCount, setInitialStrikeCount] = useState(0);
   const [showViolationSummary, setShowViolationSummary] = useState(false);
   const [summaryData, setSummaryData] = useState(null);
@@ -145,6 +147,7 @@ function ExamRunnerContent() {
         }
 
         setExamTitle(data.examTitle || 'Certification Exam');
+        setExamDuration((data.durationMin || 45) * 60);
         setInitialStrikeCount(data.strikeCount || 0);
         setStrikes(data.strikeCount || 0);
 
@@ -184,19 +187,14 @@ function ExamRunnerContent() {
     }
 
     setSubmittingState(true);
-    setShowThanks(true);
-    setSubmitStatusText('Uploading proctoring recording...');
 
-    // Stop and upload recording before calling backend submit
-    try {
-      console.log('[ExamRunner] Stopping and uploading recording inside handleGradingSubmit…');
-      await stopAndUploadRecording(attemptId);
-      console.log('[ExamRunner] Recording upload finished.');
-    } catch (err) {
-      console.warn('[ExamRunner] Recording upload error during grading submit (non-blocking):', err);
-    }
-
-    setSubmitStatusText('Finalizing exam results...');
+    // Stop and upload recording in the background asynchronously (do not await)
+    console.log('[ExamRunner] Triggering background recording upload inside handleGradingSubmit...');
+    stopAndUploadRecording(attemptId).then((res) => {
+      console.log('[ExamRunner] Background recording upload finished:', res);
+    }).catch((err) => {
+      console.warn('[ExamRunner] Background recording upload failed:', err);
+    });
 
     const request = {
       attemptId,
@@ -208,16 +206,12 @@ function ExamRunnerContent() {
     };
     console.log("Submit Request:", JSON.stringify(request, null, 2));
     try {
-
       const res = await examService.submitAttemptNew(request);
-
       if (res.success) {
-
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
           streamRef.current = null;
         }
-
         if (document.fullscreenElement) {
           try {
             await document.exitFullscreen();
@@ -225,27 +219,17 @@ function ExamRunnerContent() {
             console.warn("Unable to exit fullscreen", e);
           }
         }
-
-        setShowThanks(false);
         setShowThankYouPage(true);
-
       }
-
     } catch (err) {
-      setShowThanks(false);
       setSubmittingState(false);
       console.error("Submit Error:", err);
-      if (err.response) {
-        console.log("Status:", err.response.status);
-        console.log("Response:", err.response.data);
-      }
       const errMsg = err.response?.data?.message || err.message || 'Submission failed. Please check your network and try again.';
       setSubmitError(errMsg);
     }
-
   };
 
-  useExamTimer(terminatedState ? null : handleGradingSubmit);
+  useExamTimer(terminatedState ? null : () => handleGradingSubmit(true));
 
   // Maintain refs for unload/sendBeacon handlers to access latest values
   const answersRef = React.useRef(answers);
@@ -262,7 +246,7 @@ function ExamRunnerContent() {
     initialSeconds: timeRemaining,
     answers,
     active: !loading && online && !offline && !terminatedState,
-    onAutoSubmit: handleGradingSubmit
+    onAutoSubmit: () => handleGradingSubmit(true)
   });
 
   // Unload / sendBeacon hook
@@ -293,11 +277,22 @@ function ExamRunnerContent() {
 
   const handleFrontendTerminate = () => {
     setTerminatedState(true);
+    setSubmittingState(true);
+
+    // Stop and upload recording in the background asynchronously (do not await)
+    console.log('[ExamRunner] Terminating attempt: triggering background recording upload...');
+    stopAndUploadRecording(attemptId).then((res) => {
+      console.log('[ExamRunner] Background recording upload finished on termination:', res);
+    }).catch((err) => {
+      console.warn('[ExamRunner] Background recording upload failed on termination:', err);
+    });
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
     try { if (document.exitFullscreen) document.exitFullscreen(); } catch (_) { }
+    
     navigate('/candidate/terminated');
   };
 
@@ -324,7 +319,12 @@ function ExamRunnerContent() {
   const { enterFullscreenMode } = useFullscreen();
 
   // Continuous camera monitoring (real face detection during exam)
-  useCameraMonitor({
+  const { 
+    multipleFacesActive, 
+    multipleFacesTimeLeft,
+    activeViolationOverlay,
+    violationTimeLeft
+  } = useCameraMonitor({
     videoRef,
     active: isProctoringActive,
     handleViolation,
@@ -336,13 +336,12 @@ function ExamRunnerContent() {
   useEffect(() => {
     window.simulateProctorViolation = (type) => {
       console.log(`[Simulated Proctor Violation] ${type}`);
-      recordSilentFlag(type);
       handleViolation(type);
     };
     return () => {
       delete window.simulateProctorViolation;
     };
-  }, [recordSilentFlag, handleViolation]);
+  }, [handleViolation]);
 
   // Request Fullscreen on launch
   useEffect(() => {
@@ -414,121 +413,82 @@ function ExamRunnerContent() {
   }
 
   return (
-    <div ref={runnerRef} className="runner fixed inset-0 z-50 bg-gradient-to-br from-[#081627] to-[#102a4d] text-[#e8eefb] flex flex-col overflow-hidden select-none">
-      {/* Integrity Dialog and Watermark Overlay */}
-      <FullscreenDialog />
-      <WatermarkOverlay />
-
-      {/* Warnings & Modals */}
-      <WarningModal isOpen={warningVisible} strikeCount={strikeCount} lastViolation={violations[violations.length - 1]} onClose={dismissWarning} />
-      <TerminateModal isOpen={terminated} />
-      <OfflineOverlay isOpen={!online || offline} />
-      <ReconnectLoader isOpen={syncing || reconnecting} />
-      <TimeUpModal isOpen={isTimeUp} />
-      <ViolationSummaryModal
-        isOpen={showViolationSummary}
-        summary={summaryData}
-        onConfirmSubmit={handleFinalSubmitAnyway}
-        onClose={() => setShowViolationSummary(false)}
-      />
-      <ThankYouPage isOpen={showThankYouPage} attemptId={attemptId} />
-      <Reconnect />
-      <SubmitConfirmation onConfirm={handleInitialSubmitTrigger} />
-      <SubmitErrorModal isOpen={!!submitError} message={submitError} onClose={() => setSubmitError('')} />
-
-      {/* Time's Up Blockout */}
-      {showTimeUp && (
-        <div className="run-overlay fixed inset-0 z-50 bg-[#061222]/90 backdrop-blur-md flex items-center justify-center">
-          <div className="ov-card bg-[#0e2745] border border-white/10 rounded-2xl p-[34px_38px] text-center max-w-[430px] shadow-2xl">
-            <h3 className="font-display text-white text-[21px] font-semibold mb-2">Time's up</h3>
-            <p className="text-[#b9c9e2] text-[13.5px]">Submitting the answers you've completed. Please wait…</p>
-          </div>
-        </div>
-      )}
-
-      {/* Thanks Submission Blockout */}
-      {showThanks && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 10000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#061222', // solid background to block out the exam page
-            padding: '24px'
-          }}
-        >
-          <div 
-            style={{
-              backgroundColor: '#0a1628',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '20px',
-              padding: '40px 32px 32px 32px',
-              maxWidth: '430px',
-              width: '100%',
-              textAlign: 'center',
-              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.7)'
-            }}
-          >
-            <div 
-              style={{
-                width: '76px',
-                height: '76px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                border: '2px solid #10B981',
-                color: '#10B981',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 24px auto',
-                boxShadow: '0 0 20px rgba(16, 185, 129, 0.3)'
-              }}
-            >
-              {/* Spinner */}
-              <div className="w-8 h-8 border-4 border-t-[#10B981] border-r-transparent border-b-[#10B981] border-l-transparent rounded-full animate-spin" />
+    <div ref={runnerRef} className="runner fixed inset-0 z-50 bg-[#081322] flex items-center justify-center p-5 sm:p-6 overflow-hidden select-none">
+      <div className="w-full h-full max-w-[1600px] bg-gradient-to-br from-[#081627] to-[#102a4d] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden relative">
+        {/* Proctoring Active Violation Overlay */}
+        {activeViolationOverlay && (
+          <div className="run-overlay absolute inset-0 z-[9999] bg-[#061222]/95 backdrop-blur-md flex items-center justify-center select-none">
+            <div className="ov-card bg-[#0e2745] border border-red-500/30 rounded-2xl p-[40px_38px] text-center max-w-[480px] shadow-2xl animate-pulse">
+              <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/40 flex items-center justify-center mx-auto mb-5 text-[28px] font-bold text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+                ⚠️
+              </div>
+              <h3 className="font-display text-white text-[22px] font-bold mb-3">
+                {activeViolationOverlay === 'MULTIPLE_FACES' && "Multiple Faces Detected!"}
+                {activeViolationOverlay === 'FACE_NOT_DETECTED' && "No Face Detected!"}
+                {activeViolationOverlay === 'MOBILE_PHONE' && "Mobile Phone Detected!"}
+              </h3>
+              <p className="text-[#b9c9e2] text-[14.5px] leading-relaxed mb-6">
+                {activeViolationOverlay === 'MULTIPLE_FACES' && <>Please ensure that only <span className="text-[#3b82f6] font-bold">one candidate</span> is visible in front of the camera.</>}
+                {activeViolationOverlay === 'FACE_NOT_DETECTED' && <>Please ensure you are <span className="text-[#3b82f6] font-bold">fully visible</span> and facing the camera.</>}
+                {activeViolationOverlay === 'MOBILE_PHONE' && <>Please <span className="text-[#3b82f6] font-bold">remove all mobile phones</span> or secondary devices from your area.</>}
+              </p>
+              <div className="text-sm font-semibold text-red-400 bg-red-950/40 border border-red-900/50 py-3 px-4 rounded-xl inline-flex items-center gap-2 font-mono">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                <span>Exam will terminate in: {violationTimeLeft}s</span>
+              </div>
             </div>
-            <h3 
-              style={{
-                color: '#ffffff',
-                fontSize: '21px',
-                fontWeight: '700',
-                margin: '0 0 12px 0'
-              }}
-            >
-              {submitStatusText}
-            </h3>
-            <p 
-              style={{
-                color: '#b9c9e2',
-                fontSize: '14px',
-                lineHeight: '1.6',
-                margin: 0
-              }}
-            >
-              Uploading proctoring recording and finalizing your results. Please do not close or refresh this page.
-            </p>
           </div>
+        )}
+
+        {/* Integrity Dialog and Watermark Overlay */}
+        <FullscreenDialog />
+        <WatermarkOverlay />
+
+        {/* Warnings & Modals */}
+        <WarningModal isOpen={warningVisible} strikeCount={strikeCount} lastViolation={violations[violations.length - 1]} onClose={dismissWarning} />
+        <TerminateModal isOpen={terminated} />
+        <OfflineOverlay isOpen={!online || offline} />
+        <ReconnectLoader isOpen={syncing || reconnecting} />
+        <TimeUpModal isOpen={isTimeUp} />
+        <ViolationSummaryModal
+          isOpen={showViolationSummary}
+          summary={summaryData}
+          onConfirmSubmit={handleFinalSubmitAnyway}
+          onClose={() => setShowViolationSummary(false)}
+        />
+        <ThankYouPage isOpen={showThankYouPage} attemptId={attemptId} />
+        <Reconnect />
+        <SubmitConfirmation onConfirm={handleInitialSubmitTrigger} />
+        <SubmitErrorModal isOpen={!!submitError} message={submitError} onClose={() => setSubmitError('')} />
+
+        {/* Time's Up Blockout */}
+        {showTimeUp && (
+          <div className="run-overlay absolute inset-0 z-50 bg-[#061222]/90 backdrop-blur-md flex items-center justify-center">
+            <div className="ov-card bg-[#0e2745] border border-white/10 rounded-2xl p-[34px_38px] text-center max-w-[430px] shadow-2xl">
+              <h3 className="font-display text-white text-[21px] font-semibold mb-2">Time's up</h3>
+              <p className="text-[#b9c9e2] text-[13.5px]">Submitting the answers you've completed. Please wait…</p>
+            </div>
+          </div>
+        )}
+
+
+
+        {/* Top Header */}
+        <Header examTitle={examTitle} attemptId={attemptId} />
+
+        {/* Main Runner Screen Layout */}
+        <div className="run-body">
+          {/* Left Sidebar: Collapsible Sections */}
+          <LeftSidebar />
+
+          <div className="run-main">
+            <SectionStepper />
+            <Question />
+            <Footer />
+          </div>
+
+          <Sidebar durationSeconds={examDuration} />
         </div>
-      )}
-
-      {/* Top Header */}
-      <Header examTitle={examTitle} attemptId={attemptId} />
-
-      {/* Main Runner Screen Layout */}
-      <div className="run-body flex-1 grid grid-cols-1 lg:grid-cols-[1fr_350px] overflow-hidden">
-        <div className="run-main p-[30px_38px] overflow-y-auto">
-          <SectionStepper />
-          <Question />
-          <Footer />
-        </div>
-
-        <Sidebar durationSeconds={examDuration} />
       </div>
     </div>
   );

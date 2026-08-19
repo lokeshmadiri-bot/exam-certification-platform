@@ -14,30 +14,37 @@ import { generateAIQuestions, saveAIQuestions, regenerateAIQuestion, META } from
 import "./a1.css";
 
 const DIFFICULTY_OPTIONS = ["EASY", "MEDIUM", "HARD"];
-
+// NONE means auto-distribute: 50% Easy, 30% Medium, 20% Hard
 const DEFAULT_FORM = {
-    stack: META.STACKS[0],
+    stack: "",
     level: "L3",
-    difficulty: "MEDIUM",
+    difficulty: "NONE",
     type: "MCQ",
-    count: 5,
+    count: 10,
     topic: "",
     examId: "",
 };
-
-const LEVEL_LABELS = { L1: "L1 · Beginner", L2: "L2 · Elementary", L3: "L3 · Intermediate", L4: "L4 · Advanced", L5: "L5 · Expert" };
-
+ 
+const LEVEL_LABELS = { L1: "L1 · Expert", L2: "L2 · Advanced", L3: "L3 · Intermediate", L4: "L4 · Elementary", L5: "L5 · Beginner" };
+ 
 export default function AIQuestionGenerator({ examId, exams = [], onClose, onSaved }) {
+    const filteredExams = exams.filter((ex) => {
+        if (!ex.id) return false;
+        const idStr = ex.id.toString();
+        const titleStr = (ex.title || "").toString();
+        return !idStr.startsWith("17") && !titleStr.includes("17");
+    });
     const [step, setStep] = useState("form"); // "form" | "preview" | "saving"
-    const [form, setForm] = useState({ ...DEFAULT_FORM, examId: examId || (exams[0]?.id || "") });
+    const [form, setForm] = useState({ ...DEFAULT_FORM, examId: examId || (filteredExams[0]?.id || "") });
     const [questions, setQuestions] = useState([]);
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState(null);
     const [regeneratingIdx, setRegeneratingIdx] = useState(null);
     const [editingIdx, setEditingIdx] = useState(null);
-
+    const [isOther, setIsOther] = useState(false);
+ 
     const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
+ 
     // ---- Step 1: Generate ----
     const handleGenerate = async (e) => {
         e.preventDefault();
@@ -47,7 +54,8 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
             const payload = {
                 stack: form.stack,
                 level: form.level,
-                difficulty: form.difficulty,
+                // Send null when admin selects NONE — backend will apply 50/30/20 distribution
+                difficulty: (form.difficulty === "NONE" || !form.difficulty) ? null : form.difficulty,
                 type: form.type,
                 count: Number(form.count),
                 topic: form.topic || null,
@@ -62,18 +70,18 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
             setGenerating(false);
         }
     };
-
+ 
     // ---- Step 2: Edit a question inline ----
     const updateQuestion = (idx, field, value) => {
         setQuestions((prev) =>
             prev.map((q, i) => (i === idx ? { ...q, [field]: value } : q))
         );
     };
-
+ 
     const deleteQuestion = (idx) => {
         setQuestions((prev) => prev.filter((_, i) => i !== idx));
     };
-
+ 
     const handleRegenerate = async (idx) => {
         setRegeneratingIdx(idx);
         setError(null);
@@ -86,7 +94,7 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
             setRegeneratingIdx(null);
         }
     };
-
+ 
     // ---- Step 3: Save ----
     const handleSave = async () => {
         if (questions.length === 0) return;
@@ -104,7 +112,7 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
             setStep("preview");
         }
     };
-
+ 
     return (
         <div className="a1-modal-overlay" onClick={onClose}>
             <div
@@ -125,65 +133,112 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
                     </div>
                     <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={onClose}>✕ Close</button>
                 </div>
-
+ 
                 {error && (
                     <div className="a1-banner a1-banner-amber" style={{ marginBottom: 14 }}>
                         ⚠ {error}
                     </div>
                 )}
-
+ 
                 {/* ---- Step 1: Config Form ---- */}
                 {step === "form" && (
                     <form onSubmit={handleGenerate}>
                         <div className="a1-form-grid" style={{ gap: 14, marginBottom: 14 }}>
                             <div className="a1-field">
-                                <label>Technology Stack</label>
-                                <select value={form.stack} onChange={(e) => setField("stack", e.target.value)}>
+                                <label>Technology Stack *</label>
+                                <select
+                                    required
+                                    value={isOther ? "other" : (META.STACKS.includes(form.stack) ? form.stack : "")}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === "other") {
+                                            setIsOther(true);
+                                            setField("stack", "");
+                                        } else {
+                                            setIsOther(false);
+                                            setField("stack", val);
+                                        }
+                                    }}
+                                >
+                                    <option value="">-- Select Stack --</option>
                                     {META.STACKS.map((s) => <option key={s} value={s}>{s}</option>)}
+                                    <option value="other">Other (Manual Entry)</option>
                                 </select>
+                                {isOther && (
+                                    <input
+                                        required
+                                        placeholder="Enter stack manually"
+                                        value={form.stack}
+                                        onChange={(e) => setField("stack", e.target.value)}
+                                        style={{ marginTop: 8 }}
+                                    />
+                                )}
                             </div>
                             <div className="a1-field">
-                                <label>Difficulty Level</label>
-                                <select value={form.level} onChange={(e) => setField("level", e.target.value)}>
-                                    {META.LEVELS.map((l) => <option key={l} value={l}>{LEVEL_LABELS[l]}</option>)}
-                                </select>
-                            </div>
-                            <div className="a1-field">
-                                <label>Difficulty Tag</label>
+                                <label>Difficulty</label>
                                 <select value={form.difficulty} onChange={(e) => setField("difficulty", e.target.value)}>
+                                    <option value="NONE">None (Auto-distribute)</option>
                                     {DIFFICULTY_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
                                 </select>
+                                {(form.difficulty === "NONE" || !form.difficulty) ? (
+                                    <p style={{ margin: "5px 0 0", fontSize: 11.5, color: "#2d6cdf", fontStyle: "italic" }}>
+                                        ✦ Questions will be generated using the default 50% Easy, 30% Medium, 20% Hard distribution.
+                                    </p>
+                                ) : (
+                                    <p style={{ margin: "5px 0 0", fontSize: 11.5, color: "#b45309", fontStyle: "italic" }}>
+                                        ⚡ Override active — all {form.count} questions will be {form.difficulty} difficulty.
+                                    </p>
+                                )}
                             </div>
                             <div className="a1-field">
-                                <label>Question Type</label>
-                                <select value={form.type} onChange={(e) => setField("type", e.target.value)}>
+                                <label>Question Type *</label>
+                                <select required value={form.type} onChange={(e) => setField("type", e.target.value)}>
                                     {META.QUESTION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                                 </select>
                             </div>
                             <div className="a1-field">
-                                <label>Number of Questions (1–10)</label>
+                                <label>Number of Questions (1–10) *</label>
                                 <input
                                     type="number"
                                     min={1}
                                     max={10}
+                                    required
                                     value={form.count}
                                     onChange={(e) => setField("count", e.target.value)}
                                 />
+                                {(form.difficulty === "NONE" || !form.difficulty) && Number(form.count) === 10 && (
+                                    <p style={{ margin: "5px 0 0", fontSize: 11, color: "#5C6B82" }}>
+                                        Distribution: 5 Easy · 3 Medium · 2 Hard
+                                    </p>
+                                )}
                             </div>
                             <div className="a1-field">
-                                <label>Target Exam</label>
-                                {exams.length > 0 ? (
-                                    <select value={form.examId} onChange={(e) => setField("examId", e.target.value)}>
+                                <label>Target Exam *</label>
+                                {filteredExams.length > 0 ? (
+                                    <select
+                                        required
+                                        value={form.examId}
+                                        onChange={(e) => {
+                                            const selectedExamId = e.target.value;
+                                            setField("examId", selectedExamId);
+                                            const matchedExam = filteredExams.find(ex => String(ex.id) === String(selectedExamId));
+                                            if (matchedExam) {
+                                                setField("stack", matchedExam.stack);
+                                                setIsOther(false);
+                                            }
+                                        }}
+                                    >
                                         <option value="">-- Select Exam --</option>
-                                        {exams.map((ex) => (
+                                        {filteredExams.map((ex) => (
                                             <option key={ex.id} value={ex.id}>
-                                                {ex.title} ({ex.stack})
+                                                {ex.title}
                                             </option>
                                         ))}
                                     </select>
                                 ) : (
                                     <input
-                                        placeholder="e.g. Exam UUID or leave blank"
+                                        required
+                                        placeholder="e.g. Exam UUID"
                                         value={form.examId}
                                         onChange={(e) => setField("examId", e.target.value)}
                                     />
@@ -234,6 +289,7 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
                                     key={q.tempId || idx}
                                     question={q}
                                     idx={idx}
+                                    exams={filteredExams}
                                     isEditing={editingIdx === idx}
                                     isRegenerating={regeneratingIdx === idx}
                                     disabled={step === "saving"}
@@ -266,7 +322,11 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
 }
 
 // ---- Preview Card ----
-function QuestionPreviewCard({ question, idx, isEditing, isRegenerating, disabled, onEdit, onDelete, onRegenerate, onChange, onDoneEdit }) {
+function QuestionPreviewCard({ question, idx, exams = [], isEditing, isRegenerating, disabled, onEdit, onDelete, onRegenerate, onChange, onDoneEdit }) {
+    const assignedExam = exams.find(e => String(e.id || e.examId) === String(question.examId));
+    const assignedExamName = assignedExam ? assignedExam.title : "Unassigned";
+    const displayDiff = question.difficulty ? (question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1).toLowerCase()) : "Medium";
+    
     return (
         <div
             className="a1-card"
@@ -278,11 +338,10 @@ function QuestionPreviewCard({ question, idx, isEditing, isRegenerating, disable
             }}
         >
             {/* Card header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                     <span className="a1-pill">{question.stack}</span>
-                    <span className={`a1-pill a1-lvl-${question.level}`}>{question.level}</span>
-                    <span className="a1-pill a1-pill-amber">{question.difficulty}</span>
+                    <span className="a1-pill a1-pill-amber">{displayDiff}</span>
                     <span className="a1-pill a1-pill-navy">{question.type}</span>
                     <span className="a1-pill a1-pill-green">AI · {question.aiModel || "Gemini"}</span>
                 </div>

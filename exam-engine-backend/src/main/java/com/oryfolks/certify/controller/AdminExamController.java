@@ -94,6 +94,7 @@ public class AdminExamController {
             map.put("instructions", e.getInstructions());
             map.put("version", e.getVersion());
             map.put("status", e.getStatus() != null ? e.getStatus().name() : "DRAFT");
+            map.put("totalMarks", e.getTotalMarks() != null ? e.getTotalMarks() : 100);
             map.put("createdAt", e.getCreatedAt());
             map.put("updatedAt", e.getUpdatedAt());
 
@@ -145,6 +146,7 @@ public class AdminExamController {
         map.put("instructions", exam.getInstructions());
         map.put("version", exam.getVersion());
         map.put("status", exam.getStatus() != null ? exam.getStatus().name() : "DRAFT");
+        map.put("totalMarks", exam.getTotalMarks() != null ? exam.getTotalMarks() : 100);
         map.put("createdAt", exam.getCreatedAt());
         map.put("updatedAt", exam.getUpdatedAt());
         map.put("currentQuestionCount", activeCount);
@@ -205,6 +207,8 @@ public class AdminExamController {
         if (payload.getPerAttempt() != null) exam.setPerAttempt(payload.getPerAttempt());
         else if (payload.getQuestionsPerAttempt() != null) exam.setPerAttempt(payload.getQuestionsPerAttempt());
 
+        if (payload.getTotalMarks() != null) exam.setTotalMarks(payload.getTotalMarks());
+
         if (payload.getInstructions() != null) exam.setInstructions(payload.getInstructions());
 
         Exam saved = examRepository.save(exam);
@@ -232,6 +236,7 @@ public class AdminExamController {
                 .questionPool(src.getQuestionPool())
                 .perAttempt(src.getPerAttempt())
                 .passMark(src.getPassMark())
+                .totalMarks(src.getTotalMarks())
                 .instructions(src.getInstructions())
                 .version("1")
                 .status(ExamStatus.DRAFT)
