@@ -45,4 +45,8 @@ public class ResultResponseDTO {
      * Null until admin publishes.
      */
     private LocalDateTime publishedAt;
+
+    private String adminDecision;
+
+    private String rejectionReason;
 }   

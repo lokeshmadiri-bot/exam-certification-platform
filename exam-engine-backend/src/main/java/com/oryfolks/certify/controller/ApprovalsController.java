@@ -117,16 +117,28 @@ public class ApprovalsController {
             }
         } else if ("CANDIDATE_UNLOCK".equalsIgnoreCase(req.getType())) {
             try {
-                UUID candidateId = UUID.fromString(req.getTargetId());
+                String[] parts = req.getTargetId().split(":");
+                UUID candidateId = UUID.fromString(parts[0]);
+                UUID examId = parts.length > 1 ? UUID.fromString(parts[1]) : null;
+
                 User candidate = userRepository.findById(candidateId).orElse(null);
                 if (candidate != null) {
-                    List<ExamAttempt> candidateAttempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(candidate.getId());
-                    for (ExamAttempt a : candidateAttempts) {
-                        a.setRetryOverrideApproved(true);
-                        attemptRepository.save(a);
+                    if (examId != null) {
+                        Optional<ExamAttempt> attemptOpt = attemptRepository.findFirstByCandidateIdAndExamIdOrderByCreatedAtDesc(candidate.getId(), examId);
+                        if (attemptOpt.isPresent()) {
+                            ExamAttempt a = attemptOpt.get();
+                            a.setRetryOverrideApproved(true);
+                            attemptRepository.save(a);
+                        }
+                    } else {
+                        List<ExamAttempt> candidateAttempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(candidate.getId());
+                        for (ExamAttempt a : candidateAttempts) {
+                            a.setRetryOverrideApproved(true);
+                            attemptRepository.save(a);
+                        }
                     }
                 }
-                String candName = candidate != null ? candidate.getFullName() : req.getTargetId();
+                String candName = candidate != null ? candidate.getFullName() : parts[0];
                 auditLogRepository.save(AccessAuditLog.builder()
                         .userName(adminName)
                         .action("Approved 30-day exam retry override lock for candidate: " + candName)

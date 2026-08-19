@@ -110,7 +110,6 @@ export default function ExamsLibraryPage() {
                     <p className="a1-sub">Create and manage your certification exams.</p>
                 </div>
                 <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <button className="a1-btn a1-btn-ghost" onClick={load}>↻ Refresh</button>
                     <button className="a1-btn a1-btn-primary" onClick={() => navigate("/admin/authoring")}>
                         + Create Exam
                     </button>
@@ -213,6 +212,10 @@ export default function ExamsLibraryPage() {
                                     <span className="a1-kpi-chip-label">✅ Pass</span>
                                     <span className="a1-kpi-chip-val">{exam.passMark}%</span>
                                 </div>
+                                <div className="a1-exam-kpi-chip">
+                                    <span className="a1-kpi-chip-label">⭐ Marks</span>
+                                    <span className="a1-kpi-chip-val">{exam.totalMarks ?? 100}</span>
+                                </div>
                             </div>
                             <div className="a1-exam-card-foot">
                                 <div className="a1-exam-card-status-col">
@@ -226,9 +229,9 @@ export default function ExamsLibraryPage() {
                                         🗑 Delete
                                     </button>
                                     {isExamPending(exam) ? (
-                                        <button className="a1-btn a1-btn-ghost a1-btn-sm" disabled style={{ opacity: 0.7, cursor: "not-allowed" }}>
-                                            Approval Pending…
-                                        </button>
+                                        <span className="a1-pending-badge" style={{ marginLeft: 0, padding: "4px 8px", whiteSpace: "nowrap", height: "32px" }}>
+                                            Pending
+                                        </span>
                                     ) : exam.status !== "ACTIVE" ? (
                                         <button
                                             className={`a1-btn ${exam.currentQuestionCount != null && exam.currentQuestionCount < (exam.questionPoolSize ?? exam.questionPool ?? 0) ? "a1-btn-ghost" : "a1-btn-primary"} a1-btn-sm`}
@@ -253,7 +256,7 @@ export default function ExamsLibraryPage() {
                     <thead>
                         <tr>
                             <th>Exam</th><th>Stack</th><th>Pool (Avail/Req)</th>
-                            <th>Per Attempt</th><th>Pass%</th><th>Status</th><th>Updated</th><th />
+                            <th>Per Attempt</th><th>Marks</th><th>Pass%</th><th>Status</th><th>Updated</th><th />
                         </tr>
                     </thead>
                     <tbody>
@@ -265,6 +268,7 @@ export default function ExamsLibraryPage() {
                                     {exam.currentQuestionCount != null ? `${exam.currentQuestionCount}/${exam.questionPoolSize ?? exam.questionPool}` : (exam.questionPoolSize ?? exam.questionPool)}
                                 </td>
                                 <td className="a1-mono">{exam.questionsPerAttempt ?? exam.perAttempt}</td>
+                                <td className="a1-mono">{exam.totalMarks ?? 100}</td>
                                 <td className="a1-mono">{exam.passMark}%</td>
                                 <td>
                                     <StatusPill status={exam.status} />
@@ -279,9 +283,9 @@ export default function ExamsLibraryPage() {
                                             Delete
                                         </button>
                                         {isExamPending(exam) ? (
-                                            <button className="a1-btn a1-btn-ghost a1-btn-sm" disabled style={{ opacity: 0.7, cursor: "not-allowed" }}>
-                                                Approval Pending…
-                                            </button>
+                                            <span className="a1-pending-badge" style={{ marginLeft: 0, padding: "4px 8px", whiteSpace: "nowrap", height: "32px" }}>
+                                                Pending
+                                            </span>
                                         ) : exam.status !== "ACTIVE" ? (
                                             <button
                                                 className={`a1-btn ${exam.currentQuestionCount != null && exam.currentQuestionCount < (exam.questionPoolSize ?? exam.questionPool ?? 0) ? "a1-btn-ghost" : "a1-btn-primary"} a1-btn-sm`}

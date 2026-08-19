@@ -271,6 +271,7 @@ public class ExamController {
         Map<String, Object> data = new HashMap<>();
         data.put("attemptId", attempt.getId());
         data.put("examTitle", exam.getTitle());
+        data.put("durationMin", exam.getDurationMin() != null ? exam.getDurationMin() : 45);
         data.put("sections", sectionsData);
         data.put("answers", answersMap);
         data.put("resultStatus", attempt.getResultStatus().toString());
@@ -371,12 +372,9 @@ public class ExamController {
         List<Answer> savedAnswers = answerRepository.findByAttemptId(attemptId);
         List<AttemptAnswer> savedAttemptAnswers = attemptAnswerRepository.findByAttemptId(attemptId);
 
-        int totalQuestions = 0;
-        int correctCount = 0;
-
+        // Sum correct question marks dynamically based on difficulty weighting
+        double correctMarksSum = 0;
         for (Question q : questions) {
-            totalQuestions++; // 1 question = 1 point
-
             String correct = q.getCorrectOption() != null ? q.getCorrectOption().trim() : "";
             String selectedOption = null;
 
@@ -395,16 +393,18 @@ public class ExamController {
             }
 
             if (selectedOption != null && !correct.isEmpty() && correct.equalsIgnoreCase(selectedOption)) {
-                correctCount++;
+                correctMarksSum += exam.getQuestionMarks(q.getDifficulty(), questions);
             }
         }
 
-        // Score = number of correct answers (1 per question)
-        int finalScore = correctCount;
+        int finalScore = (int) Math.round(correctMarksSum);
+        Integer totMarksVal = exam.getTotalMarks() != null ? exam.getTotalMarks() : 100;
+        finalScore = Math.min(finalScore, totMarksVal);
         attempt.setScore(finalScore);
         attempt.setEndTime(LocalDateTime.now());
 
-        int percentScore = totalQuestions > 0 ? (int) Math.round(((double) correctCount / totalQuestions) * 100) : 0;
+        int percentScore = totMarksVal > 0 ? (int) Math.round((correctMarksSum / totMarksVal) * 100) : 0;
+        percentScore = Math.min(percentScore, 100);
 
         CompetencyLevel level = CompetencyLevel.L5;
         List<CompetencyBand> bands = competencyBandRepository.findByExamId(exam.getId());
@@ -469,6 +469,17 @@ public class ExamController {
         }
 
         long currentCount = examViolationRepository.countByAttemptId(attemptId);
+        boolean isTimeout = request.getType() != null && (
+            request.getType().endsWith("_TIMEOUT") || 
+            request.getType().equalsIgnoreCase("MULTIPLE_FACES_TIMEOUT")
+        );
+
+        if (currentCount >= 3 && !isTimeout) {
+            terminateAttemptInternal(attempt);
+            return ResponseEntity.ok(ApiResponse.success("Violation limit exceeded, attempt terminated",
+                    new ViolationResponseDTO(3, true)));
+        }
+
         int strikeNumber = (int) currentCount + 1;
 
         LocalDateTime violationTime;
@@ -489,7 +500,7 @@ public class ExamController {
 
         examViolationRepository.save(violation);
 
-        boolean terminate = strikeNumber >= 4;
+        boolean terminate = strikeNumber >= 4 || isTimeout;
         if (terminate) {
             terminateAttemptInternal(attempt);
         }
@@ -512,12 +523,19 @@ public class ExamController {
             case "MULTIPLE_FACES":
             case "MULTIPLE_FACE":
                 return "Multiple Faces Detected";
+            case "MULTIPLE_FACES_TIMEOUT":
+                return "Multiple faces continuously detected for 60 seconds.";
             case "FACE_NOT_DETECTED":
                 return "Candidate Not Visible / Out of Camera";
+            case "FACE_NOT_DETECTED_TIMEOUT":
+                return "No face/candidate detected for 60 seconds.";
             case "GAZE_AWAY":
                 return "Candidate Gaze Away from Screen";
             case "SECOND_DEVICE":
+            case "MOBILE_PHONE":
                 return "Mobile Phone / Second Device Detected";
+            case "MOBILE_PHONE_TIMEOUT":
+                return "Mobile phone/second device continuously detected for 60 seconds.";
             case "VOICE_DETECTED":
                 return "Voice Detected";
             default:
@@ -551,24 +569,25 @@ public class ExamController {
         }
         List<Answer> savedAnswers = answerRepository.findByAttemptId(attempt.getId());
 
-        int totalQuestions2 = 0;
-        int correctCount2 = 0;
-
+        double correctMarksSum = 0;
         for (Question q : questions) {
-            totalQuestions2++;
             Optional<Answer> ansOpt = savedAnswers.stream()
                     .filter(ans -> ans.getQuestion().getId().equals(q.getId()))
                     .findFirst();
 
             if (ansOpt.isPresent() && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption())) {
-                correctCount2++;
+                correctMarksSum += exam.getQuestionMarks(q.getDifficulty(), questions);
             }
         }
 
-        // Score = number of correct answers (1 per question)
-        int finalScore2 = correctCount2;
+        int finalScore2 = (int) Math.round(correctMarksSum);
+        Integer totMarksVal = exam.getTotalMarks() != null ? exam.getTotalMarks() : 100;
+        finalScore2 = Math.min(finalScore2, totMarksVal);
         attempt.setScore(finalScore2);
         attempt.setEndTime(LocalDateTime.now());
+
+        int percentScore2 = totMarksVal > 0 ? (int) Math.round((correctMarksSum / totMarksVal) * 100) : 0;
+        percentScore2 = Math.min(percentScore2, 100);
 
         CompetencyLevel level = CompetencyLevel.L5;
         List<CompetencyBand> bands = competencyBandRepository.findByExamId(exam.getId());
@@ -581,7 +600,7 @@ public class ExamController {
             bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
         }
         for (CompetencyBand band : bands) {
-            if (finalScore2 >= band.getMinScore() && finalScore2 <= band.getMaxScore()) {
+            if (percentScore2 >= band.getMinScore() && percentScore2 <= band.getMaxScore()) {
                 level = band.getLevelName();
                 break;
             }

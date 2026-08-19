@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Bell } from "lucide-react";
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead } from "../services/api";
 import "./a2.css";
@@ -7,6 +7,8 @@ import "./a2.css";
 export default function NotificationsPanel() {
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+  const location = useLocation();
   const [readIds, setReadIds] = useState(() => {
     try {
       return new Set(JSON.parse(localStorage.getItem("admin_read_notif_ids") || "[]"));
@@ -31,6 +33,20 @@ export default function NotificationsPanel() {
     const t = setInterval(load, 5_000); // 5s fast polling for immediate notifications
     return () => clearInterval(t);
   }, [readIds]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [location]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const unread = items.filter((n) => !n.read).length;
 
@@ -60,7 +76,7 @@ export default function NotificationsPanel() {
   };
 
   return (
-    <div style={{ position: "relative", display: "inline-block" }}>
+    <div ref={containerRef} style={{ position: "relative", display: "inline-block" }}>
       <button
         className="a2-bell"
         onClick={() => setOpen((o) => !o)}
@@ -92,46 +108,34 @@ export default function NotificationsPanel() {
       </button>
 
       {open && (
-        <>
-          {/* Transparent click-catcher to close on click outside, without darkening screen */}
+        <aside
+          style={{
+            position: "absolute",
+            right: 0,
+            top: "48px",
+            width: "420px",
+            maxHeight: "520px",
+            background: "#fff",
+            border: "1px solid #E4EAF2",
+            borderRadius: "16px",
+            boxShadow: "0 12px 36px rgba(11,31,56,0.12)",
+            zIndex: 100,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            animation: "fade 0.2s ease"
+          }}
+        >
           <div
             style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 99,
-              background: "transparent"
-            }}
-            onClick={() => setOpen(false)}
-          />
-
-          <aside
-            style={{
-              position: "absolute",
-              right: 0,
-              top: "48px",
-              width: "420px",
-              maxHeight: "520px",
-              background: "#fff",
-              border: "1px solid #E4EAF2",
-              borderRadius: "16px",
-              boxShadow: "0 12px 36px rgba(11,31,56,0.12)",
-              zIndex: 100,
               display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              animation: "fade 0.2s ease"
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "14px 18px",
+              borderBottom: "1px solid #EEF2F8",
+              backgroundColor: "#FFF"
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "14px 18px",
-                borderBottom: "1px solid #EEF2F8",
-                backgroundColor: "#FFF"
-              }}
-            >
               <h2 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#0E1B2E" }}>Notifications</h2>
               <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
                 {unread > 0 && (
@@ -213,7 +217,6 @@ export default function NotificationsPanel() {
               )}
             </div>
           </aside>
-        </>
       )}
     </div>
   );

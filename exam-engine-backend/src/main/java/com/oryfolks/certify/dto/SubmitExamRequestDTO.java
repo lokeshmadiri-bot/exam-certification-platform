@@ -23,7 +23,7 @@ public class SubmitExamRequestDTO {
     private UUID attemptId;
 
     @Valid
-    @NotEmpty(message = "Answers cannot be empty.")
+    @NotNull(message = "Answers list is required.")
     private List<AnswerSubmission> answers;
 
     @Builder.Default

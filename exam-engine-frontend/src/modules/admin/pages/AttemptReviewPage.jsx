@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   fetchAttempt, fetchRecordingUrl, fetchFlags, fetchScore,
-  confirmResult, escalateForSecondReview,
+  confirmResult, rejectResult, escalateForSecondReview,
 } from "../services/api";
 import { ResultPill } from "./AttemptsPage";
 
@@ -51,9 +51,13 @@ export default function AttemptReviewPage() {
   };
 
   const submitDecision = async () => {
+    if (decision.open === "reject" && !decision.note.trim()) {
+      alert("A reason for rejection is required.");
+      return;
+    }
     setDecision((d) => ({ ...d, busy: true }));
     const payload = { note: decision.note, decidedAt: new Date().toISOString() };
-    const fn = decision.open === "confirm" ? confirmResult : escalateForSecondReview;
+    const fn = decision.open === "confirm" ? confirmResult : rejectResult;
     const res = await fn(attemptId, payload);
     setDecision({ open: null, note: "", busy: false, done: res.status });
     setTimeout(() => {
@@ -140,19 +144,30 @@ export default function AttemptReviewPage() {
       {decision.done && (
         <div style={{
           padding: "12px 28px",
-          backgroundColor: decision.done === "CONFIRMED" ? "rgba(14,159,110,0.12)" : "rgba(242,169,59,0.12)",
-          borderBottom: `1px solid ${decision.done === "CONFIRMED" ? "rgba(14,159,110,0.3)" : "rgba(242,169,59,0.3)"}`,
-          color: decision.done === "CONFIRMED" ? "#34d27b" : "#F2A93B",
+          backgroundColor: decision.done === "CONFIRMED" ? "rgba(14,159,110,0.12)" : "rgba(224,79,79,0.12)",
+          borderBottom: `1px solid ${decision.done === "CONFIRMED" ? "rgba(14,159,110,0.3)" : "rgba(224,79,79,0.3)"}`,
+          color: decision.done === "CONFIRMED" ? "#34d27b" : "#E04F4F",
           fontSize: "13px", fontWeight: "600"
         }}>
           {decision.done === "CONFIRMED"
-            ? "✓ Result confirmed. The candidate record has been updated."
-            : "⚡ Escalated. A second reviewer has been requested — result stays pending."}
+            ? "✓ Result accepted. The candidate record has been updated."
+            : "✓ Result rejected. The candidate record has been updated to Failed."}
         </div>
       )}
 
+      <style>{`
+        @media (max-width: 900px) {
+          .review-main-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .review-right-panel {
+            border-left: none !important;
+            border-top: 1px solid rgba(255,255,255,0.06) !important;
+          }
+        }
+      `}</style>
       {/* ── Main grid ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", flex: 1, minHeight: 0 }}>
+      <div className="review-main-grid" style={{ display: "grid", gridTemplateColumns: "1fr 360px", flex: 1, minHeight: 0 }}>
 
         {/* ─ Left: Video + timeline ─ */}
         <div style={{ display: "flex", flexDirection: "column", gap: "20px", padding: "24px 20px 24px 28px", overflow: "auto" }}>
@@ -177,19 +192,16 @@ export default function AttemptReviewPage() {
                 ref={videoRef}
                 controls
                 preload="auto"
-                onClick={togglePlay}
                 onTimeUpdate={e => setVideoTime(e.target.currentTime)}
                 onLoadedMetadata={e => {
-                  let dur = e.target.duration;
-                  if (dur === Infinity || isNaN(dur)) {
-                    if (recording.startedAt && recording.endedAt) {
-                      const diffMs = new Date(recording.endedAt).getTime() - new Date(recording.startedAt).getTime();
-                      if (diffMs > 0) dur = diffMs / 1000;
-                    }
-                  }
-                  setVideoDuration(dur);
+                  const dur = e.target.duration;
+                  if (isFinite(dur) && dur > 0) setVideoDuration(dur);
                 }}
-                style={{ width: "100%", height: "auto", aspectRatio: "1.3333 / 1", maxHeight: "360px", objectFit: "contain", backgroundColor: "#000", display: "block", cursor: "pointer" }}
+                onDurationChange={e => {
+                  const dur = e.target.duration;
+                  if (isFinite(dur) && dur > 0) setVideoDuration(dur);
+                }}
+                style={{ width: "100%", height: "auto", aspectRatio: "1.3333 / 1", maxHeight: "360px", objectFit: "contain", backgroundColor: "#000", display: "block" }}
               >
                 <source src={getFullVideoUrl(recording.url)} type="video/webm" />
                 Your browser does not support HTML5 WebM video.
@@ -231,7 +243,7 @@ export default function AttemptReviewPage() {
                         position: "absolute", top: "-4px",
                         left: `${Math.min(((f.tSec || 0) / videoDuration) * 100, 98)}%`,
                         width: "3px", height: "12px",
-                        backgroundColor: f.severity === "HIGH" ? "#E04F4F" : f.severity === "MEDIUM" ? "#F2A93B" : "#4a6a9e",
+                        backgroundColor: "#E04F4F",
                         borderRadius: "1px", cursor: "pointer",
                         transform: "translateX(-50%)"
                       }}
@@ -371,7 +383,7 @@ export default function AttemptReviewPage() {
         </div>
 
         {/* ─ Right: Score + Decision ─ */}
-        <div style={{
+        <div className="review-right-panel" style={{
           borderLeft: "1px solid rgba(255,255,255,0.06)",
           display: "flex", flexDirection: "column", gap: "16px",
           padding: "24px 20px 24px 20px",
@@ -459,7 +471,7 @@ export default function AttemptReviewPage() {
           <div style={{ backgroundColor: "#0a1628", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", padding: "18px" }}>
             <h2 style={{ fontSize: "13px", fontWeight: "700", color: "#e8eefb", margin: "0 0 8px" }}>Decision</h2>
             <p style={{ fontSize: "12px", color: "#4a6a9e", lineHeight: "1.6", margin: "0 0 16px" }}>
-              Confirm the auto result, or escalate for a second reviewer when flags are ambiguous.
+              Accept the auto result, or reject the result if the proctoring integrity was breached.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <button
@@ -476,7 +488,23 @@ export default function AttemptReviewPage() {
                 onMouseEnter={e => { if (!decision.done) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 8px 20px rgba(47,107,255,0.45)"; } }}
                 onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = decision.done ? "none" : "0 4px 14px rgba(47,107,255,0.35)"; }}
               >
-                Confirm Result
+                Accept Result
+              </button>
+              <button
+                disabled={!!decision.done}
+                onClick={() => setDecision(d => ({ ...d, open: "reject" }))}
+                style={{
+                  padding: "11px", borderRadius: "10px",
+                  background: decision.done ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg, #EF4444, #B91C1C)",
+                  border: "none", color: decision.done ? "#3d5470" : "#ffffff",
+                  fontWeight: "700", fontSize: "13px", cursor: decision.done ? "not-allowed" : "pointer",
+                  transition: "all 0.18s ease",
+                  boxShadow: decision.done ? "none" : "0 4px 14px rgba(239,68,68,0.35)"
+                }}
+                onMouseEnter={e => { if (!decision.done) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 8px 20px rgba(239,68,68,0.45)"; } }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = decision.done ? "none" : "0 4px 14px rgba(239,68,68,0.35)"; }}
+              >
+                Reject Result
               </button>
             </div>
           </div>
@@ -486,7 +514,7 @@ export default function AttemptReviewPage() {
       {/* ── Decision Modal ── */}
       {decision.open && (
         <div
-          onClick={() => setDecision(d => ({ ...d, open: null }))}
+          onClick={() => setDecision(d => ({ ...d, open: null, note: "" }))}
           style={{
             position: "fixed", inset: 0, zIndex: 9999,
             backgroundColor: "rgba(4,10,22,0.88)", backdropFilter: "blur(8px)",
@@ -502,28 +530,32 @@ export default function AttemptReviewPage() {
             }}
           >
             <h3 style={{ fontSize: "18px", fontWeight: "700", color: "#ffffff", margin: "0 0 10px", letterSpacing: "-0.2px" }}>
-              Confirm result for this attempt?
+              {decision.open === "confirm" ? "Accept result for this attempt?" : "Reject result for this attempt?"}
             </h3>
             <p style={{ fontSize: "13px", color: "#6a8ab0", lineHeight: "1.6", margin: "0 0 20px" }}>
-              This finalises the result and is written to the audit log.
+              {decision.open === "confirm" 
+                ? "This accepts and finalises the result and writes it to the audit log." 
+                : "This marks the candidate as FAILED. A rejection reason is mandatory."}
             </p>
-            <textarea
-              placeholder="Reviewer note (optional)"
-              value={decision.note}
-              onChange={e => setDecision(d => ({ ...d, note: e.target.value }))}
-              rows={3}
-              style={{
-                width: "100%", padding: "12px 14px", borderRadius: "10px",
-                backgroundColor: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                color: "#c5d8ef", fontSize: "13px", resize: "vertical",
-                outline: "none", boxSizing: "border-box", fontFamily: "inherit", lineHeight: "1.5",
-                marginBottom: "20px"
-              }}
-            />
+            {decision.open === "reject" && (
+              <textarea
+                placeholder="Rejection reason (required)"
+                value={decision.note}
+                onChange={e => setDecision(d => ({ ...d, note: e.target.value }))}
+                rows={3}
+                style={{
+                  width: "100%", padding: "12px 14px", borderRadius: "10px",
+                  backgroundColor: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  color: "#c5d8ef", fontSize: "13px", resize: "vertical",
+                  outline: "none", boxSizing: "border-box", fontFamily: "inherit", lineHeight: "1.5",
+                  marginBottom: "20px"
+                }}
+              />
+            )}
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
               <button
-                onClick={() => setDecision(d => ({ ...d, open: null }))}
+                onClick={() => setDecision(d => ({ ...d, open: null, note: "" }))}
                 style={{
                   padding: "10px 20px", borderRadius: "10px",
                   backgroundColor: "transparent", border: "1px solid rgba(255,255,255,0.1)",
@@ -533,18 +565,18 @@ export default function AttemptReviewPage() {
                 Cancel
               </button>
               <button
-                disabled={decision.busy}
+                disabled={decision.busy || (decision.open === "reject" && !decision.note.trim())}
                 onClick={submitDecision}
                 style={{
                   padding: "10px 24px", borderRadius: "10px", border: "none",
-                  background: "linear-gradient(135deg, #2F6BFF, #1D4ED8)",
+                  background: decision.open === "reject" ? "linear-gradient(135deg, #EF4444, #B91C1C)" : "linear-gradient(135deg, #2F6BFF, #1D4ED8)",
                   color: "#ffffff", fontWeight: "700", fontSize: "13px",
-                  cursor: decision.busy ? "not-allowed" : "pointer",
-                  opacity: decision.busy ? 0.6 : 1,
-                  boxShadow: "0 4px 14px rgba(47,107,255,0.3)"
+                  cursor: (decision.busy || (decision.open === "reject" && !decision.note.trim())) ? "not-allowed" : "pointer",
+                  opacity: (decision.busy || (decision.open === "reject" && !decision.note.trim())) ? 0.6 : 1,
+                  boxShadow: decision.open === "reject" ? "0 4px 14px rgba(239,68,68,0.3)" : "0 4px 14px rgba(47,107,255,0.3)"
                 }}
               >
-                {decision.busy ? "Saving…" : "Confirm Result"}
+                {decision.busy ? "Saving…" : decision.open === "confirm" ? "Accept Result" : "Reject Result"}
               </button>
             </div>
           </div>

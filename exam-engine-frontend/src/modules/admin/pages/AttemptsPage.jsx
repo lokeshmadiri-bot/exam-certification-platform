@@ -109,7 +109,7 @@ export default function AttemptsPage() {
               {isReviewPage ? (
                 <tr>
                   <th>Exam</th><th>Candidate</th><th>Stack</th>
-                  <th>Status</th><th>Flags</th><th>Submitted</th>
+                  <th>Status</th><th>Submitted</th>
                 </tr>
               ) : (
                 <tr>
@@ -131,14 +131,14 @@ export default function AttemptsPage() {
                     {!isReviewPage && <td><span className={`a2-pill a2-lvl-${r.level}`}>{r.level}</span></td>}
                     <td><ResultPill result={r.result} /></td>
                     {!isReviewPage && <td>{r.score}</td>}
-                    <td>{r.flagCount > 0 ? <span className="a2-pill a2-pill-amber">{r.flagCount}</span> : "—"}</td>
+                    {!isReviewPage && <td>{r.flagCount > 0 ? <span className="a2-pill a2-pill-amber">{r.flagCount}</span> : "—"}</td>}
                     <td>{new Date(r.submittedAt).toLocaleString()}</td>
                   </tr>
 
                   {/* Row drill-down - Only available on Review & Flags page */}
                   {isReviewPage && expanded === r.id && (
                     <tr className="a2-drill">
-                      <td colSpan={6}>
+                      <td colSpan={5}>
                         <div className="a2-drill-body">
                           <div className="a2-drill-facts">
                             <Fact label="Duration" value={`${r.durationMin || 60} min`} />

@@ -14,6 +14,11 @@ import com.oryfolks.certify.repository.UserRepository;
 import com.oryfolks.certify.repository.AttemptAnswerRepository;
 import com.oryfolks.certify.repository.IntegrityViolationRepository;
 import com.oryfolks.certify.repository.CompetencyBandRepository;
+import com.oryfolks.certify.repository.ApprovalRequestRepository;
+import com.oryfolks.certify.repository.ExamRepository;
+import com.oryfolks.certify.entity.ApprovalRequest;
+import com.oryfolks.certify.entity.Exam;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.oryfolks.certify.dto.ResultResponseDTO;
 import com.oryfolks.certify.dto.AttemptHistoryResponseDTO;
@@ -30,6 +35,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Optional;
 
 import lombok.RequiredArgsConstructor;
 
@@ -53,6 +59,15 @@ public class CandidateService {
         private final IntegrityViolationRepository integrityViolationRepository;
 
         private final CompetencyBandRepository competencyBandRepository;
+
+        private final ApprovalRequestRepository approvalRepository;
+        private final ExamRepository examRepository;
+
+        @Value("${app.retry-lock-duration-days:30}")
+        private int retryLockDurationDays;
+
+        @Value("${app.override-lock-duration-days:7}")
+        private int overrideLockDurationDays;
 
         public CandidateDashboardResponseDTO getDashboard(String username) {
 
@@ -162,9 +177,29 @@ public class CandidateService {
                             .filter(cb -> cb.getLevelName() == attempt.getAssignedLevel())
                             .findFirst().orElse(null);
                 }
+                boolean isDecided = attempt.getAdminDecision() != null &&
+                        (attempt.getAdminDecision().equals("CONFIRMED") || attempt.getAdminDecision().equals("REJECTED"));
 
-                String levelStr = attempt.getAssignedLevel() != null ? attempt.getAssignedLevel().name() : "L3";
-                String levelTitle = band != null ? band.getTitle() : getDefaultLevelTitle(attempt.getAssignedLevel());
+                Integer finalScore = null;
+                ResultStatus status = null;
+                String levelStr = null;
+                String levelTitle = null;
+                List<AttemptAnswerResponseDTO> answersList = null;
+
+                if (isDecided) {
+                        if (attempt.getAdminDecision().equals("CONFIRMED")) {
+                                finalScore = attempt.getScore();
+                                status = attempt.getResultStatus();
+                                levelStr = attempt.getAssignedLevel() != null ? attempt.getAssignedLevel().name() : "L3";
+                                levelTitle = band != null ? band.getTitle() : getDefaultLevelTitle(attempt.getAssignedLevel());
+                                answersList = answers;
+                        } else if (attempt.getAdminDecision().equals("REJECTED")) {
+                                status = ResultStatus.FAILED;
+                                levelTitle = "Rejected";
+                        }
+                } else {
+                        levelTitle = "Pending Review";
+                }
 
                 return AttemptDetailsResponseDTO.builder()
                                 .attemptId(attempt.getId())
@@ -173,78 +208,115 @@ public class CandidateService {
                                 .stack(attempt.getExam().getStack())
                                 .startedAt(attempt.getStartTime())
                                 .submittedAt(attempt.getEndTime())
-                                .score(attempt.getScore())
-                                .resultStatus(attempt.getResultStatus())
+                                .score(finalScore)
+                                .totalMarks(attempt.getExam() != null ? attempt.getExam().getTotalMarks() : 100)
+                                .resultStatus(status)
                                 .resultPublishStatus(attempt.getResultPublishStatus() != null ? attempt.getResultPublishStatus() : ResultPublishStatus.PENDING)
                                 .assignedLevel(levelStr)
                                 .assignedLevelTitle(levelTitle)
-                                .answers(answers)
+                                .answers(answersList)
                                 .integrityViolations(violations)
+                                .adminDecision(attempt.getAdminDecision())
+                                .rejectionReason(attempt.getRejectionReason())
                                 .build();
         }
 
         public List<ResultResponseDTO> getMyResults(String username) {
-
-                // Find logged-in candidate
                 User candidate = userRepository.findByUsername(username)
                                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found."));
 
-                // Fetch candidate attempts ordered by latest submission
                 List<ExamAttempt> attempts = attemptRepository.findByCandidateIdOrderByEndTimeDesc(candidate.getId());
 
                 return attempts.stream()
+                                .filter(a -> a.getResultStatus() != ResultStatus.IN_PROGRESS)
                                 .map(attempt -> {
+                                        boolean isDecided = attempt.getAdminDecision() != null &&
+                                                (attempt.getAdminDecision().equals("CONFIRMED") || attempt.getAdminDecision().equals("REJECTED"));
+                                        
+                                        ResultStatus finalStatus = null;
+                                        if (isDecided) {
+                                                if (attempt.getAdminDecision().equals("REJECTED")) {
+                                                        finalStatus = ResultStatus.FAILED;
+                                                } else {
+                                                        finalStatus = attempt.getResultStatus();
+                                                }
+                                        }
 
                                         ResultResponseDTO.ResultResponseDTOBuilder builder = ResultResponseDTO.builder()
-                                                        .attemptId(attempt.getId())
-                                                        .examId(attempt.getExam().getId())
-                                                        .examTitle(attempt.getExam().getTitle())
-                                                        .stack(attempt.getExam().getStack())
-                                                        .resultStatus(attempt.getResultStatus())
-                                                        .resultPublishStatus(attempt.getResultPublishStatus());
+                                                         .attemptId(attempt.getId())
+                                                         .examId(attempt.getExam().getId())
+                                                         .examTitle(attempt.getExam().getTitle())
+                                                         .stack(attempt.getExam().getStack())
+                                                         .resultStatus(finalStatus)
+                                                         .resultPublishStatus(attempt.getResultPublishStatus())
+                                                         .adminDecision(attempt.getAdminDecision());
 
-                                        // Only expose final evaluation after admin publishes
-                                        if (attempt.getResultPublishStatus() == ResultPublishStatus.PUBLISHED) {
-
-                                                builder
-                                                                .competencyLevel(attempt.getCompetencyLevel())
-                                                                .publishedAt(attempt.getPublishedAt());
-
+                                        if (isDecided && attempt.getAdminDecision().equals("CONFIRMED") && attempt.getResultPublishStatus() == ResultPublishStatus.PUBLISHED) {
+                                                builder.competencyLevel(attempt.getCompetencyLevel())
+                                                       .publishedAt(attempt.getPublishedAt());
+                                        } else if (isDecided && attempt.getAdminDecision().equals("REJECTED")) {
+                                                builder.rejectionReason(attempt.getRejectionReason())
+                                                       .publishedAt(attempt.getPublishedAt());
                                         } else {
-
-                                                builder
-                                                                .competencyLevel(null)
-                                                                .publishedAt(null);
+                                                builder.competencyLevel(null).publishedAt(null);
                                         }
 
                                         return builder.build();
-
-                                })
-                                .toList();
+                                 })
+                                 .toList();
         }
 
         private AttemptHistoryResponseDTO mapAttemptHistory(ExamAttempt attempt) {
  
                 boolean canAttempt = true;
                 int retryDaysLeft = 0;
- 
+
+                boolean overrideExpired = false;
+                boolean overrideActive = false;
+
                 if (Boolean.TRUE.equals(attempt.getRetryOverrideApproved())) {
- 
+                        String targetKey = attempt.getCandidate().getId().toString();
+                        if (attempt.getExam() != null) {
+                                targetKey = attempt.getCandidate().getId().toString() + ":" + attempt.getExam().getId().toString();
+                        }
+                        Optional<ApprovalRequest> approvalOpt = approvalRepository.findFirstByTypeAndTargetIdAndStatusOrderByResolvedAtDesc(
+                                "CANDIDATE_UNLOCK", targetKey, "APPROVED"
+                        );
+                        if (!approvalOpt.isPresent()) {
+                                approvalOpt = approvalRepository.findFirstByTypeAndTargetIdAndStatusOrderByResolvedAtDesc(
+                                        "CANDIDATE_UNLOCK", attempt.getCandidate().getId().toString(), "APPROVED"
+                                );
+                        }
+                        if (approvalOpt.isPresent()) {
+                                ApprovalRequest req = approvalOpt.get();
+                                LocalDateTime approvedAt = req.getResolvedAt();
+                                if (approvedAt != null) {
+                                        LocalDateTime expiresAt = approvedAt.plusDays(overrideLockDurationDays);
+                                        if (LocalDateTime.now().isAfter(expiresAt)) {
+                                                overrideExpired = true;
+                                        } else {
+                                                overrideActive = true;
+                                        }
+                                } else {
+                                        overrideActive = true;
+                                }
+                        } else {
+                                overrideActive = true;
+                        }
+                }
+
+                if (overrideActive) {
                         canAttempt = true;
                         retryDaysLeft = 0;
- 
-                } else if (attempt.getEndTime() != null) {
- 
-                        LocalDateTime retryDate = attempt.getEndTime().plusDays(30);
- 
-                        canAttempt = !LocalDateTime.now().isBefore(retryDate);
- 
-                        if (!canAttempt) {
- 
-                                retryDaysLeft = (int) ChronoUnit.DAYS.between(
-                                                LocalDate.now(),
-                                                retryDate.toLocalDate());
- 
+                } else {
+                        if (attempt.getEndTime() != null) {
+                                LocalDateTime retryDate = attempt.getEndTime().plusDays(retryLockDurationDays);
+                                canAttempt = !LocalDateTime.now().isBefore(retryDate);
+                                if (!canAttempt) {
+                                        retryDaysLeft = (int) ChronoUnit.DAYS.between(
+                                                        LocalDate.now(),
+                                                        retryDate.toLocalDate());
+                                }
                         }
                 }
  
@@ -257,6 +329,26 @@ public class CandidateService {
                             .orElse(null);
                 }
  
+                boolean isDecided = attempt.getAdminDecision() != null &&
+                        (attempt.getAdminDecision().equals("CONFIRMED") || attempt.getAdminDecision().equals("REJECTED"));
+
+                ResultStatus finalStatus = null;
+                String finalLevel = null;
+                String finalLevelTitle = null;
+
+                if (isDecided) {
+                        if (attempt.getAdminDecision().equals("CONFIRMED")) {
+                                finalStatus = attempt.getResultStatus();
+                                finalLevel = attempt.getAssignedLevel() != null ? attempt.getAssignedLevel().name() : null;
+                                finalLevelTitle = band != null ? band.getTitle() : getDefaultLevelTitle(attempt.getAssignedLevel());
+                        } else if (attempt.getAdminDecision().equals("REJECTED")) {
+                                finalStatus = ResultStatus.FAILED;
+                                finalLevelTitle = "Rejected";
+                        }
+                } else {
+                        finalLevelTitle = "Pending Review";
+                }
+
                 return AttemptHistoryResponseDTO.builder()
                                 .attemptId(attempt.getId())
                                 .examId(attempt.getExam().getId())
@@ -264,30 +356,64 @@ public class CandidateService {
                                 .stack(attempt.getExam().getStack())
                                 .startedAt(attempt.getStartTime())
                                 .submittedAt(attempt.getEndTime())
-                                .resultStatus(attempt.getResultStatus())
+                                .resultStatus(finalStatus)
                                 .resultPublishStatus(attempt.getResultPublishStatus())
-                                .assignedLevel(
-                                                attempt.getAssignedLevel() != null
-                                                                ? attempt.getAssignedLevel().name()
-                                                                : null)
-                                .assignedLevelTitle(
-                                                 band != null
-                                                                 ? band.getTitle()
-                                                                 : getDefaultLevelTitle(attempt.getAssignedLevel()))
+                                .assignedLevel(finalLevel)
+                                .assignedLevelTitle(finalLevelTitle)
                                 .canAttempt(canAttempt)
- 
                                 .retryDaysLeft(retryDaysLeft)
                                 .build();
         }
-
-
+ 
+ 
         public List<Map<String, Object>> getNotifications(String username) {
                 User candidate = userRepository.findByUsername(username)
                                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found."));
-
+ 
                 List<ExamAttempt> attempts = attemptRepository.findByCandidateIdOrderByEndTimeDesc(candidate.getId());
-
+ 
                 List<Map<String, Object>> notifs = new ArrayList<>();
+                
+                // Add override notifications (if any) first so they come top
+                List<ApprovalRequest> approvedUnlocks = approvalRepository.findByTypeAndTargetIdStartingWithAndStatus(
+                        "CANDIDATE_UNLOCK", candidate.getId().toString(), "APPROVED"
+                );
+                for (ApprovalRequest req : approvedUnlocks) {
+                        LocalDateTime approvedAt = req.getResolvedAt() != null ? req.getResolvedAt() : (req.getRequestedAt() != null ? req.getRequestedAt() : req.getCreatedAt());
+                        if (approvedAt != null) {
+                                LocalDateTime expiresAt = approvedAt.plusDays(overrideLockDurationDays);
+                                String examTitle = "";
+                                String[] parts = req.getTargetId().split(":");
+                                if (parts.length > 1) {
+                                        try {
+                                                Optional<Exam> examOpt = examRepository.findById(UUID.fromString(parts[1]));
+                                                if (examOpt.isPresent()) {
+                                                        examTitle = " for " + examOpt.get().getTitle();
+                                                }
+                                        } catch (Exception e) {}
+                                }
+                                if (LocalDateTime.now().isAfter(expiresAt)) {
+                                        Map<String, Object> notif = new HashMap<>();
+                                        notif.put("id", req.getId() + "-expired");
+                                        notif.put("title", "Override Lock Expired");
+                                        notif.put("desc", "Your retry lock override period has expired" + examTitle + ". You are now locked from retrying.");
+                                        notif.put("time", expiresAt.toString());
+                                        notif.put("read", false);
+                                        notif.put("unread", true);
+                                        notifs.add(notif);
+                                } else {
+                                        Map<String, Object> notif = new HashMap<>();
+                                        notif.put("id", req.getId() + "-approved");
+                                        notif.put("title", "Retry Approved");
+                                        notif.put("desc", "Your retry lock override request has been approved" + examTitle + ". Please retry before expiration.");
+                                        notif.put("time", approvedAt.toString());
+                                        notif.put("read", false);
+                                        notif.put("unread", true);
+                                        notifs.add(notif);
+                                }
+                        }
+                }
+ 
                 for (ExamAttempt attempt : attempts) {
                         // 1. Result published notification
                         if (attempt.getResultPublishStatus() == ResultPublishStatus.PUBLISHED) {
@@ -306,7 +432,21 @@ public class CandidateService {
                                 notif.put("unread", true);
                                 notifs.add(notif);
                         }
-
+ 
+                        // 1.5. Attempt completed / submitted notification (prior to result publish)
+                        if (attempt.getResultStatus() != ResultStatus.IN_PROGRESS && 
+                            attempt.getResultStatus() != ResultStatus.TERMINATED && 
+                            attempt.getResultPublishStatus() != ResultPublishStatus.PUBLISHED) {
+                                Map<String, Object> notif = new HashMap<>();
+                                notif.put("id", attempt.getId().toString() + "-submitted");
+                                notif.put("title", "Exam Completed");
+                                notif.put("desc", "Your exam attempt for " + attempt.getExam().getTitle() + " has been successfully completed.");
+                                notif.put("time", attempt.getEndTime() != null ? attempt.getEndTime().toString() : LocalDateTime.now().toString());
+                                notif.put("read", false);
+                                notif.put("unread", true);
+                                notifs.add(notif);
+                        }
+ 
                         // 2. Terminated notification
                         if (attempt.getResultStatus() == ResultStatus.TERMINATED) {
                                 Map<String, Object> notif = new HashMap<>();
@@ -318,20 +458,23 @@ public class CandidateService {
                                 notif.put("unread", true);
                                 notifs.add(notif);
                         }
-
-                        // 3. Retry override approved notification
-                        if (Boolean.TRUE.equals(attempt.getRetryOverrideApproved())) {
-                                Map<String, Object> notif = new HashMap<>();
-                                notif.put("id", attempt.getId().toString() + "-override");
-                                notif.put("title", "Retry Approved");
-                                notif.put("desc", "Your retry request for " + attempt.getExam().getTitle() + " has been approved.");
-                                notif.put("time", attempt.getEndTime() != null ? attempt.getEndTime().plusMinutes(5).toString() : LocalDateTime.now().toString());
-                                notif.put("read", false);
-                                notif.put("unread", true);
-                                notifs.add(notif);
+ 
+                        // 3. Attempt time expired / deadline reached notification (for active / in-progress attempts)
+                        if (attempt.getResultStatus() == ResultStatus.IN_PROGRESS) {
+                                LocalDateTime startTime = attempt.getStartTime();
+                                int duration = attempt.getExam().getDurationMinutes();
+                                if (startTime != null && LocalDateTime.now().isAfter(startTime.plusMinutes(duration))) {
+                                        Map<String, Object> notif = new HashMap<>();
+                                        notif.put("id", attempt.getId().toString() + "-expired");
+                                        notif.put("title", "Exam Deadline Reached");
+                                        notif.put("desc", "The time limit for your " + attempt.getExam().getTitle() + " exam has been reached.");
+                                        notif.put("time", startTime.plusMinutes(duration).toString());
+                                        notif.put("read", false);
+                                        notif.put("unread", true);
+                                        notifs.add(notif);
+                                }
                         }
                 }
-
                 return notifs;
         }
 

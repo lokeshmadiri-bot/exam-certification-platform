@@ -6,36 +6,43 @@ export default function SectionStepper() {
 
   if (questions.length === 0) return null;
 
-  // Determine sections present in the questions list (custom sectionName or difficulty fallback)
-  const availableSections = [];
-  questions.forEach(q => {
-    const name = q.sectionName || q.difficulty?.toUpperCase();
-    if (name && !availableSections.includes(name)) {
-      availableSections.push(name);
-    }
+  const easyQs = questions.filter(q => {
+    const d = q.difficulty ? q.difficulty.trim().toUpperCase() : 'EASY';
+    return d !== 'MEDIUM' && d !== 'HARD';
   });
+  const mediumQs = questions.filter(q => q.difficulty?.trim().toUpperCase() === 'MEDIUM');
+  const hardQs = questions.filter(q => q.difficulty?.trim().toUpperCase() === 'HARD');
+
+  const availableSections = [];
+  if (easyQs.length > 0) availableSections.push({ key: 'EASY', label: 'Section 1' });
+  if (mediumQs.length > 0) availableSections.push({ key: 'MEDIUM', label: 'Section 2' });
+  if (hardQs.length > 0) availableSections.push({ key: 'HARD', label: 'Section 3' });
 
   const currentQuestion = questions[currentIdx];
-  const activeSection = currentQuestion?.sectionName || currentQuestion?.difficulty?.toUpperCase() || 'General';
+  const qDiff = currentQuestion?.difficulty ? currentQuestion.difficulty.trim().toUpperCase() : 'EASY';
+  const activeSection = qDiff === 'HARD' ? 'HARD' : (qDiff === 'MEDIUM' ? 'MEDIUM' : 'EASY');
 
-  const handleSectionClick = (section) => {
-    // Find the first question index belonging to the selected section
-    const targetIdx = questions.findIndex(q => (q.sectionName || q.difficulty?.toUpperCase()) === section);
+  const handleSectionClick = (secKey) => {
+    const targetIdx = questions.findIndex(q => {
+      const d = q.difficulty ? q.difficulty.trim().toUpperCase() : 'EASY';
+      if (secKey === 'EASY') return d !== 'MEDIUM' && d !== 'HARD';
+      return d === secKey;
+    });
     if (targetIdx !== -1) {
       setCurrentIdx(targetIdx);
     }
   };
 
   return (
-    <div className="section-stepper flex items-center justify-center gap-6 mb-6 font-mono text-xs w-full max-w-[760px] mx-auto border-b border-white/10 pb-4">
+    <div className="section-stepper flex flex-wrap items-center justify-center gap-3 sm:gap-6 mb-6 font-mono text-xs w-full max-w-[760px] mx-auto border-b border-white/10 pb-4">
       {availableSections.map((sec, idx) => {
-        const isActive = activeSection === sec;
-        const isPassed = availableSections.indexOf(activeSection) > idx;
+        const isActive = activeSection === sec.key;
+        const isPassed = availableSections.findIndex(s => s.key === activeSection) > idx;
         
         return (
-          <div key={sec} className="flex items-center gap-2">
+          <div key={sec.key} className="flex items-center gap-2">
             <button
-              onClick={() => handleSectionClick(sec)}
+              onClick={() => handleSectionClick(sec.key)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all font-semibold ${
                 isActive
                   ? 'bg-[#2F6BFF] text-white border-[#2F6BFF] shadow-[0_4px_12px_rgba(47,107,255,0.3)]'
@@ -49,7 +56,7 @@ export default function SectionStepper() {
               }`}>
                 {idx + 1}
               </span>
-              <span>{sec}</span>
+              <span>{sec.label}</span>
             </button>
             
             {idx < availableSections.length - 1 && (

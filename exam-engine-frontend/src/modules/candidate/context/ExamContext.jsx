@@ -20,6 +20,7 @@ export function ExamProvider({ children }) {
   const [attemptId, setAttemptId] = useState(null);
   const [saving, setSaving] = useState('Saved');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [examDuration, setExamDuration] = useState(45 * 60);
   
   // Modals & Warnings
   const [warningToast, setWarningToast] = useState('');
@@ -51,6 +52,7 @@ export function ExamProvider({ children }) {
     attemptId, setAttemptId,
     saving, setSaving,
     isSubmitting, setIsSubmitting,
+    examDuration, setExamDuration,
     warningToast, setWarningToast,
     toastMsg, setToastMsg,
     toastShow, setToastShow,

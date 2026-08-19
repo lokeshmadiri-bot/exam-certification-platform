@@ -107,7 +107,7 @@ public class ProctoringController {
                         Files.createDirectories(uploadDir);
                     }
                     Path filePath = uploadDir.resolve(attemptId + "_" + System.currentTimeMillis() + ".webm");
-                    videoFile.transferTo(filePath.toFile());
+                    videoFile.transferTo(filePath.toAbsolutePath().toFile());
                     savedPath = "uploads/recordings/" + filePath.getFileName().toString();
                     System.out.println("[Recording] Local fallback save SUCCESS — path=" + savedPath);
                 } catch (IOException ioEx) {

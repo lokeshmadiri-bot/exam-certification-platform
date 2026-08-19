@@ -15,4 +15,6 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
     Optional<ApprovalRequest> findFirstByTargetIdAndStatus(String targetId, String status);
     Optional<ApprovalRequest> findFirstByTypeAndStatus(String type, String status);
     Optional<ApprovalRequest> findFirstByTypeAndTargetIdAndStatus(String type, String targetId, String status);
+    Optional<ApprovalRequest> findFirstByTypeAndTargetIdAndStatusOrderByResolvedAtDesc(String type, String targetId, String status);
+    List<ApprovalRequest> findByTypeAndTargetIdStartingWithAndStatus(String type, String targetIdPrefix, String status);
 }

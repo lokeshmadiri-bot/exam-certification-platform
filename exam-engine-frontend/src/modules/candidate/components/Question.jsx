@@ -12,7 +12,31 @@ export default function Question() {
   }
 
   const currentQuestion = questions[currentIdx];
-  const progressPercent = ((currentIdx + 1) / questions.length) * 100;
+
+  // Group and count section relative indexes
+  const getSectionInfo = () => {
+    if (!currentQuestion) return { sectionNum: 1, localIdx: 0, totalInSection: 0 };
+    const diff = currentQuestion.difficulty ? currentQuestion.difficulty.trim().toUpperCase() : 'EASY';
+    
+    const sameDiffQs = questions.filter(q => {
+      const qDiff = q.difficulty ? q.difficulty.trim().toUpperCase() : 'EASY';
+      if (diff === 'HARD') return qDiff === 'HARD';
+      if (diff === 'MEDIUM') return qDiff === 'MEDIUM';
+      return qDiff !== 'MEDIUM' && qDiff !== 'HARD';
+    });
+
+    const localIndex = sameDiffQs.findIndex(q => q.id === currentQuestion.id);
+    const sectionNum = diff === 'HARD' ? 3 : (diff === 'MEDIUM' ? 2 : 1);
+    
+    return {
+      sectionNum,
+      localIdx: localIndex !== -1 ? localIndex + 1 : 1,
+      totalInSection: sameDiffQs.length
+    };
+  };
+
+  const { sectionNum, localIdx, totalInSection } = getSectionInfo();
+  const progressPercent = totalInSection > 0 ? (localIdx / totalInSection) * 100 : 0;
 
   // Track visited questions
   useEffect(() => {
@@ -40,11 +64,11 @@ export default function Question() {
   };
 
   return (
-    <div className="run-q max-w-[760px] mx-auto">
+    <div className="run-q max-w-[760px] mx-auto px-2 sm:px-4">
       {/* Progress stepper */}
       <div className="qmeta flex items-center justify-between text-[#8fa9d0] text-[12.5px] font-mono mb-4">
         <div className="flex items-center gap-3 flex-1">
-          <span>Q {String(currentIdx + 1).padStart(2, '0')} / {questions.length}</span>
+          <span>Section {sectionNum} - Q {String(localIdx).padStart(2, '0')} / {totalInSection}</span>
           <div className="bar flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
             <i
               className="block h-full bg-gradient-to-r from-[#2F6BFF] to-[#6e9bff] transition-all"
@@ -85,7 +109,7 @@ export default function Question() {
       </h2>
 
       {currentQuestion.codeSnippet && (
-        <div className="code font-mono text-[13px] bg-[#0c2138] border border-white/10 rounded-lg p-[13px_15px] text-[#bcd0ee] my-[14px] whitespace-pre">
+        <div className="code font-mono text-[13px] bg-[#0c2138] border border-white/10 rounded-lg p-[13px_15px] text-[#bcd0ee] my-[14px] whitespace-pre-wrap break-all">
           {currentQuestion.codeSnippet}
         </div>
       )}
