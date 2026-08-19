@@ -12,11 +12,8 @@ export function useFullscreen(onExitViolation) {
     const handleFullscreenChange = () => {
       const active = isFullscreenActive();
       setIsFullscreen(active);
-      if (!active && !loading) {
-        if (onExitViolation) {
-          onExitViolation('FULLSCREEN_EXIT', 'Exited fullscreen mode');
-        }
-      }
+      // NOTE: Fullscreen exit violations are handled by useFullscreenMonitor
+      // with proper debouncing and startup grace period. Do NOT trigger here.
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -28,7 +25,7 @@ export function useFullscreen(onExitViolation) {
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
       document.removeEventListener('msfullscreenchange', handleFullscreenChange);
     };
-  }, [loading, onExitViolation]);
+  }, [loading]);
 
   const enterFullscreenMode = () => {
     if (runnerRef.current) {

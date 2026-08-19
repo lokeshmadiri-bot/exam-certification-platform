@@ -41,6 +41,7 @@ import com.oryfolks.certify.entity.RecordingSession;
 import com.oryfolks.certify.enums.ResultPublishStatus;
 import com.oryfolks.certify.enums.ResultStatus;
 import com.oryfolks.certify.enums.CompetencyLevel;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.security.Principal;
 import java.time.LocalDateTime;
@@ -95,6 +96,12 @@ public class AdminController {
 
     @Autowired
     private ExamAttemptQuestionRepository examAttemptQuestionRepository;
+
+    @Value("${app.retry-lock-duration-days:30}")
+    private int retryLockDurationDays;
+
+    @Value("${app.override-lock-duration-days:7}")
+    private int overrideLockDurationDays;
 
     @GetMapping("/candidates")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getCandidates(
@@ -156,13 +163,43 @@ public class AdminController {
                         }
                         map.put("statusLabel", statusLabel);
                         boolean isLocked = false;
-                        if (attempt.getEndTime() != null && !Boolean.TRUE.equals(attempt.getRetryOverrideApproved())) {
-                            isLocked = LocalDateTime.now().isBefore(attempt.getEndTime().plusDays(30));
+                        if (attempt.getEndTime() != null) {
+                            isLocked = LocalDateTime.now().isBefore(attempt.getEndTime().plusDays(retryLockDurationDays));
                         }
-                        map.put("locked", isLocked);
-                        map.put("overrideLockStatus", Boolean.TRUE.equals(attempt.getRetryOverrideApproved())
+                        boolean overrideActive = false;
+                        String targetKey = c.getId().toString();
+                        if (attempt.getExam() != null) {
+                            targetKey = c.getId().toString() + ":" + attempt.getExam().getId().toString();
+                        }
+                        Optional<ApprovalRequest> approvalOpt = approvalRepository.findFirstByTypeAndTargetIdAndStatusOrderByResolvedAtDesc(
+                                "CANDIDATE_UNLOCK", targetKey, "APPROVED"
+                        );
+                        if (!approvalOpt.isPresent()) {
+                            approvalOpt = approvalRepository.findFirstByTypeAndTargetIdAndStatusOrderByResolvedAtDesc(
+                                    "CANDIDATE_UNLOCK", c.getId().toString(), "APPROVED"
+                            );
+                        }
+                        if (approvalOpt.isPresent()) {
+                            ApprovalRequest req = approvalOpt.get();
+                            LocalDateTime approvedAt = req.getResolvedAt();
+                            if (approvedAt != null) {
+                                LocalDateTime expiresAt = approvedAt.plusDays(overrideLockDurationDays);
+                                if (!LocalDateTime.now().isAfter(expiresAt)) {
+                                    // Check if this latest attempt was started AFTER the override approval was resolved
+                                    LocalDateTime attemptTime = attempt.getCreatedAt();
+                                    if (attemptTime == null) {
+                                        attemptTime = attempt.getStartTime();
+                                    }
+                                    if (attemptTime == null || !attemptTime.isAfter(approvedAt)) {
+                                        overrideActive = true;
+                                    }
+                                }
+                            }
+                        }
+                        map.put("locked", isLocked && !overrideActive);
+                        map.put("overrideLockStatus", overrideActive
                                 ? "OVERRIDE_APPROVED" : (isLocked ? "LOCKED" : "UNLOCKED"));
-                        map.put("retryOverrideApproved", attempt.getRetryOverrideApproved());
+                        map.put("retryOverrideApproved", overrideActive);
                         map.put("lastAttempt", attempt.getEndTime() != null ? attempt.getEndTime() : attempt.getCreatedAt());
                         map.put("startTime", attempt.getStartTime());
                         map.put("endTime", attempt.getEndTime());
@@ -215,13 +252,43 @@ public class AdminController {
                         }
                         map.put("statusLabel", statusLabel);
                         boolean isLocked = false;
-                        if (attempt.getEndTime() != null && !Boolean.TRUE.equals(attempt.getRetryOverrideApproved())) {
-                            isLocked = LocalDateTime.now().isBefore(attempt.getEndTime().plusDays(30));
+                        if (attempt.getEndTime() != null) {
+                            isLocked = LocalDateTime.now().isBefore(attempt.getEndTime().plusDays(retryLockDurationDays));
                         }
-                        map.put("locked", isLocked);
-                        map.put("overrideLockStatus", Boolean.TRUE.equals(attempt.getRetryOverrideApproved())
+                        boolean overrideActive = false;
+                        String targetKey2 = c.getId().toString();
+                        if (attempt.getExam() != null) {
+                            targetKey2 = c.getId().toString() + ":" + attempt.getExam().getId().toString();
+                        }
+                        Optional<ApprovalRequest> approvalOpt2 = approvalRepository.findFirstByTypeAndTargetIdAndStatusOrderByResolvedAtDesc(
+                                "CANDIDATE_UNLOCK", targetKey2, "APPROVED"
+                        );
+                        if (!approvalOpt2.isPresent()) {
+                            approvalOpt2 = approvalRepository.findFirstByTypeAndTargetIdAndStatusOrderByResolvedAtDesc(
+                                    "CANDIDATE_UNLOCK", c.getId().toString(), "APPROVED"
+                            );
+                        }
+                        if (approvalOpt2.isPresent()) {
+                            ApprovalRequest req = approvalOpt2.get();
+                            LocalDateTime approvedAt = req.getResolvedAt();
+                            if (approvedAt != null) {
+                                LocalDateTime expiresAt = approvedAt.plusDays(overrideLockDurationDays);
+                                if (!LocalDateTime.now().isAfter(expiresAt)) {
+                                    // Check if this latest attempt was started AFTER the override approval was resolved
+                                    LocalDateTime attemptTime = attempt.getCreatedAt();
+                                    if (attemptTime == null) {
+                                        attemptTime = attempt.getStartTime();
+                                    }
+                                    if (attemptTime == null || !attemptTime.isAfter(approvedAt)) {
+                                        overrideActive = true;
+                                    }
+                                }
+                            }
+                        }
+                        map.put("locked", isLocked && !overrideActive);
+                        map.put("overrideLockStatus", overrideActive
                                 ? "OVERRIDE_APPROVED" : (isLocked ? "LOCKED" : "UNLOCKED"));
-                        map.put("retryOverrideApproved", attempt.getRetryOverrideApproved());
+                        map.put("retryOverrideApproved", overrideActive);
                         map.put("lastAttempt", attempt.getEndTime() != null ? attempt.getEndTime() : attempt.getCreatedAt());
                         map.put("startTime", attempt.getStartTime());
                         map.put("endTime", attempt.getEndTime());
@@ -272,7 +339,13 @@ public class AdminController {
         User candidate = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Candidate not found: " + id));
 
-        if (approvalRepository.findFirstByTargetIdAndStatus(id.toString(), "PENDING").isPresent()) {
+        String examId = body != null ? body.get("examId") : null;
+        String targetId = id.toString();
+        if (examId != null && !examId.trim().isEmpty()) {
+            targetId = id.toString() + ":" + examId.trim();
+        }
+
+        if (approvalRepository.findFirstByTargetIdAndStatus(targetId, "PENDING").isPresent()) {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error("An unlock approval request is already pending for this candidate."));
         }
@@ -283,7 +356,7 @@ public class AdminController {
                 .id(UUID.randomUUID().toString())
                 .type("CANDIDATE_UNLOCK")
                 .label("Unlock candidate · " + (candidate.getFullName() != null ? candidate.getFullName() : candidate.getUsername()))
-                .targetId(id.toString())
+                .targetId(targetId)
                 .requestedBy(principal != null ? principal.getName() : "Admin User")
                 .note(note)
                 .status("PENDING")
@@ -320,6 +393,38 @@ public class AdminController {
 
         latestAttempt.setRetryOverrideApproved(true);
         attemptRepository.save(latestAttempt);
+
+        // Record approved CANDIDATE_UNLOCK request to establish the validity timeline
+        Optional<ApprovalRequest> pendingOpt = approvalRepository.findFirstByTypeAndTargetIdAndStatus(
+                "CANDIDATE_UNLOCK", candidateId.toString() + ":" + examId.toString(), "PENDING"
+        );
+        if (!pendingOpt.isPresent()) {
+            pendingOpt = approvalRepository.findFirstByTypeAndTargetIdAndStatus(
+                    "CANDIDATE_UNLOCK", candidateId.toString(), "PENDING"
+            );
+        }
+        if (pendingOpt.isPresent()) {
+            ApprovalRequest pending = pendingOpt.get();
+            pending.setStatus("APPROVED");
+            pending.setTargetId(candidateId.toString() + ":" + examId.toString());
+            pending.setResolvedBy(principal != null ? principal.getName() : "Admin");
+            pending.setResolvedAt(LocalDateTime.now());
+            approvalRepository.save(pending);
+        } else {
+            ApprovalRequest req = ApprovalRequest.builder()
+                    .id(UUID.randomUUID().toString())
+                    .type("CANDIDATE_UNLOCK")
+                    .label("Unlock candidate · " + (candidate.getFullName() != null ? candidate.getFullName() : candidate.getUsername()))
+                    .targetId(candidateId.toString() + ":" + examId.toString())
+                    .requestedBy(principal != null ? principal.getName() : "Admin")
+                    .status("APPROVED")
+                    .requestedAt(LocalDateTime.now())
+                    .resolvedAt(LocalDateTime.now())
+                    .resolvedBy(principal != null ? principal.getName() : "Admin")
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            approvalRepository.save(req);
+        }
 
         auditLogRepository.save(
                 AccessAuditLog.builder()
@@ -757,54 +862,64 @@ public class AdminController {
                 }
             }
 
+            Exam exam = attempt.getExam();
+            Integer totMarksVal = (exam != null && exam.getTotalMarks() != null) ? exam.getTotalMarks() : 100;
+
             if (examSections == null || examSections.isEmpty()) {
-                int sectionScore = 0;
-                int sectionMax = 0;
+                double sectionScoreDouble = 0;
+                double sectionMaxDouble = 0;
                 for (Question q : questions) {
-                    sectionMax++;
+                    double qMarks = (exam != null) ? exam.getQuestionMarks(q.getDifficulty(), questions) : 1.0;
+                    sectionMaxDouble += qMarks;
                     Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
                             .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
                             .findFirst();
                     if (ansOpt.isPresent() && ansOpt.get().getSelectedOption() != null && q.getCorrectOption() != null && q.getCorrectOption().trim().equalsIgnoreCase(ansOpt.get().getSelectedOption().trim())) {
-                        sectionScore++;
+                        sectionScoreDouble += qMarks;
                     }
                 }
                 Map<String, Object> secMap = new HashMap<>();
                 secMap.put("name", "General");
-                secMap.put("score", sectionScore);
-                secMap.put("max", sectionMax);
+                secMap.put("score", (int) Math.round(sectionScoreDouble));
+                secMap.put("max", (int) Math.round(sectionMaxDouble));
                 sectionScores.add(secMap);
 
-                totalScore = sectionScore;
-                maxTotal = sectionMax;
+                totalScore = (int) Math.round(sectionScoreDouble);
+                maxTotal = totMarksVal;
             } else {
+                double totalScoreDouble = 0;
                 for (Section section : examSections) {
-                    int sectionScore = 0;
-                    int sectionMax = 0;
+                    double sectionScoreDouble = 0;
+                    double sectionMaxDouble = 0;
                     for (Question q : questions) {
                         if (q.getSection() != null && q.getSection().getId().equals(section.getId())) {
-                            sectionMax++;
+                            double qMarks = (exam != null) ? exam.getQuestionMarks(q.getDifficulty(), questions) : 1.0;
+                            sectionMaxDouble += qMarks;
                             Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
                                     .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
                                     .findFirst();
                             if (ansOpt.isPresent() && ansOpt.get().getSelectedOption() != null && q.getCorrectOption() != null && q.getCorrectOption().trim().equalsIgnoreCase(ansOpt.get().getSelectedOption().trim())) {
-                                sectionScore++;
+                                sectionScoreDouble += qMarks;
                             }
                         }
                     }
                     Map<String, Object> secMap = new HashMap<>();
                     secMap.put("name", section.getName());
-                    secMap.put("score", sectionScore);
-                    secMap.put("max", sectionMax);
+                    secMap.put("score", (int) Math.round(sectionScoreDouble));
+                    secMap.put("max", (int) Math.round(sectionMaxDouble));
                     sectionScores.add(secMap);
 
-                    totalScore += sectionScore;
-                    maxTotal += sectionMax;
+                    totalScoreDouble += sectionScoreDouble;
                 }
+                totalScore = (int) Math.round(totalScoreDouble);
+                maxTotal = totMarksVal;
             }
 
-            int passMark = attempt.getExam() != null ? attempt.getExam().getPassMark() : 70;
+            totalScore = Math.min(totalScore, maxTotal);
+
+            int passMark = exam != null ? exam.getPassMark() : 70;
             int finalScorePercent = maxTotal > 0 ? (int) Math.round(((double) totalScore / maxTotal) * 100) : 0;
+            finalScorePercent = Math.min(finalScorePercent, 100);
             String autoResult = finalScorePercent >= passMark ? "PASS" : "FAIL";
 
             CompetencyLevel level = CompetencyLevel.L5;
@@ -854,59 +969,11 @@ public class AdminController {
         String finalResultStr = "NEEDS_REVIEW";
         if (attempt != null) {
             try {
-                List<AttemptAnswer> savedAnswers = attemptAnswerRepository != null ? attemptAnswerRepository.findByAttemptId(id) : List.of();
-                List<Section> examSections = (attempt.getExam() != null && sectionRepository != null) ? sectionRepository.findByExamId(attempt.getExam().getId()) : List.of();
-                int totalScore = 0;
-                int maxTotal = 0;
+                int finalScore = calculateAttemptScore(attempt);
+                attempt.setScore(finalScore);
 
-                List<Question> questions = new ArrayList<>();
-                List<ExamAttemptQuestion> attemptQuestions = examAttemptQuestionRepository != null
-                        ? examAttemptQuestionRepository.findByAttemptIdOrderByQuestionOrderAsc(id)
-                        : List.of();
-                if (attemptQuestions != null && !attemptQuestions.isEmpty()) {
-                    for (ExamAttemptQuestion eq : attemptQuestions) {
-                        if (eq.getQuestion() != null) questions.add(eq.getQuestion());
-                    }
-                } else if (attempt.getExam() != null && questionRepository != null) {
-                    questions = questionRepository.findByExamId(attempt.getExam().getId());
-                    if (questions.isEmpty() && attempt.getExam().getStack() != null) {
-                        questions = questionRepository.findByStackIgnoreCase(attempt.getExam().getStack());
-                    }
-                    if (questions.isEmpty()) {
-                        questions = questionRepository.findByIsActiveTrue();
-                    }
-                }
-
-                if (examSections == null || examSections.isEmpty()) {
-                    for (Question q : questions) {
-                        int qMarks = (q.getMarks() != null && q.getMarks() > 0) ? q.getMarks() : 1;
-                        maxTotal += qMarks;
-                        Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
-                                .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
-                                .findFirst();
-                        if (ansOpt.isPresent() && ansOpt.get().getSelectedOption() != null && q.getCorrectOption() != null && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption().trim())) {
-                            totalScore += qMarks;
-                        }
-                    }
-                } else {
-                    for (Section section : examSections) {
-                        for (Question q : questions) {
-                            if (q.getSection() != null && q.getSection().getId().equals(section.getId())) {
-                                int qMarks = (q.getMarks() != null && q.getMarks() > 0) ? q.getMarks() : 1;
-                                maxTotal += qMarks;
-                                Optional<AttemptAnswer> ansOpt = savedAnswers.stream()
-                                        .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
-                                        .findFirst();
-                                if (ansOpt.isPresent() && ansOpt.get().getSelectedOption() != null && q.getCorrectOption() != null && q.getCorrectOption().equalsIgnoreCase(ansOpt.get().getSelectedOption().trim())) {
-                                    totalScore += qMarks;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                int finalScorePercent = maxTotal > 0 ? (int) Math.round(((double) totalScore / maxTotal) * 100) : 0;
-                attempt.setScore(finalScorePercent);
+                int totMarksVal = attempt.getExam().getTotalMarks() != null ? attempt.getExam().getTotalMarks() : 100;
+                int finalScorePercent = totMarksVal > 0 ? (int) Math.round(((double) finalScore / totMarksVal) * 100) : 0;
 
                 CompetencyLevel level = CompetencyLevel.L5;
                 List<CompetencyBand> bands = attempt.getExam() != null ? attempt.getExam().getCompetencyBands() : null;
@@ -934,6 +1001,7 @@ public class AdminController {
                 }
                 finalResultStr = attempt.getResultStatus().name();
 
+                attempt.setAdminDecision("CONFIRMED");
                 attempt.setResultPublishStatus(ResultPublishStatus.PUBLISHED);
                 attempt.setPublishedAt(LocalDateTime.now());
                 attemptRepository.save(attempt);
@@ -952,6 +1020,39 @@ public class AdminController {
 
         Map<String, Object> res = Map.of("ok", true, "status", "CONFIRMED");
         return ResponseEntity.ok(ApiResponse.success("Result decision confirmed", res));
+    }
+
+    @PostMapping("/attempts/{id}/decision/reject")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> rejectDecision(
+            @PathVariable UUID id,
+            @RequestBody Map<String, Object> payload,
+            Principal principal) {
+
+        ExamAttempt attempt = attemptRepository.findById(id).orElse(null);
+        if (attempt != null) {
+            String reason = payload != null ? payload.getOrDefault("note", payload.getOrDefault("reason", "")).toString() : "";
+            if (reason == null || reason.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("Rejection reason is mandatory"));
+            }
+
+            attempt.setAdminDecision("REJECTED");
+            attempt.setRejectionReason(reason.trim());
+            attempt.setResultStatus(com.oryfolks.certify.enums.ResultStatus.FAILED);
+            attempt.setResultPublishStatus(ResultPublishStatus.PUBLISHED);
+            attempt.setPublishedAt(LocalDateTime.now());
+            attemptRepository.save(attempt);
+
+            auditLogRepository.save(AccessAuditLog.builder()
+                    .userName(principal != null ? principal.getName() : "Admin User")
+                    .action("REJECT_ATTEMPT_RESULT")
+                    .module("Integrity Review")
+                    .oldValue("NEEDS_REVIEW")
+                    .newValue("FAILED (Rejected by Admin)")
+                    .build());
+        }
+
+        Map<String, Object> res = Map.of("ok", true, "status", "REJECTED");
+        return ResponseEntity.ok(ApiResponse.success("Result decision rejected", res));
     }
 
     @PostMapping("/attempts/{id}/decision/escalate")
@@ -1113,7 +1214,14 @@ public class AdminController {
                 } catch (Exception ignored) {}
             }
 
-            long totalFlags = violationCount + aiFlagCount;
+            long examViolationCount = 0;
+            if (examViolationRepository != null && a.getId() != null) {
+                try {
+                    examViolationCount = examViolationRepository.countByAttemptId(a.getId());
+                } catch (Exception ignored) {}
+            }
+
+            long totalFlags = violationCount + aiFlagCount + examViolationCount;
 
             map.put("flagCount", totalFlags);
             map.put("flaggedAt", a.getSubmittedAt() != null ? a.getSubmittedAt().toString()
@@ -1149,10 +1257,8 @@ public class AdminController {
         }
         if (questions.isEmpty()) return 0;
 
-        int totalQuestions = 0;
-        int correctCount = 0;
+        double correctMarksSum = 0;
         for (Question q : questions) {
-            totalQuestions++; // 1 question = 1 point
             String correct = q.getCorrectOption() != null ? q.getCorrectOption().trim() : "";
 
             String userSelected = null;
@@ -1174,10 +1280,12 @@ public class AdminController {
             }
 
             if (userSelected != null && !correct.isEmpty() && correct.equalsIgnoreCase(userSelected)) {
-                correctCount++;
+                correctMarksSum += attempt.getExam().getQuestionMarks(q.getDifficulty(), questions);
             }
         }
-        return correctCount;
+        int finalScore = (int) Math.round(correctMarksSum);
+        Integer totMarksVal = attempt.getExam().getTotalMarks() != null ? attempt.getExam().getTotalMarks() : 100;
+        return Math.min(finalScore, totMarksVal);
     }
 
     private int calculateOffsetSeconds(LocalDateTime eventTime, UUID attemptId) {
@@ -1225,10 +1333,15 @@ public class AdminController {
                 return "Multiple Faces Detected";
             case "FACE_NOT_DETECTED":
                 return "Candidate Not Visible / Out of Camera";
+            case "FACE_NOT_DETECTED_TIMEOUT":
+                return "No face/candidate detected for 60 seconds.";
             case "GAZE_AWAY":
                 return "Candidate Gaze Away from Screen";
             case "SECOND_DEVICE":
+            case "MOBILE_PHONE":
                 return "Mobile Phone / Second Device Detected";
+            case "MOBILE_PHONE_TIMEOUT":
+                return "Mobile phone/second device continuously detected for 60 seconds.";
             case "VOICE_DETECTED":
                 return "Voice Detected";
             default:

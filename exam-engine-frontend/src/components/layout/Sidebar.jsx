@@ -145,24 +145,11 @@ export default function Sidebar({ user, onNavClose }) {
         )}
       </div>
 
-      {/* Footer / User Profile */}
+      {/* Footer / Sign out */}
       <div className="sb-foot border-t border-[#ffffff14] pt-3 mt-auto">
-        {user?.role !== 'ROLE_CANDIDATE' && (
-          <div className="sb-user flex items-center gap-3">
-            <div className="av w-9 h-9 rounded-lg bg-[#26456f] text-[#cfe0f7] font-semibold text-[13px] flex items-center justify-center uppercase">
-              {user?.fullName?.split(' ').map(n => n[0]).join('') || 'U'}
-            </div>
-            <div className="overflow-hidden">
-              <b className="text-white text-[13px] font-semibold block truncate">{user?.fullName || 'User'}</b>
-              <span className="text-[#7e93b4] text-[11px] block truncate">
-                {user?.title || (user?.role === 'ROLE_ADMIN' ? 'Administrator' : 'Candidate')}
-              </span>
-            </div>
-          </div>
-        )}
         <button
           onClick={handleSignout}
-          className="signout mt-2.5 text-[#8fa3c4] hover:text-white text-[12px] flex items-center gap-2 py-1.5 px-1.5 rounded-lg w-full transition-all"
+          className="signout mt-1 text-[#8fa3c4] hover:text-white text-[12px] flex items-center gap-2 py-1.5 px-1.5 rounded-lg w-full transition-all"
         >
           <LogOut className="w-4 h-4" />
           <span>Sign out</span>

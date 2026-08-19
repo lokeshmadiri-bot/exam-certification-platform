@@ -44,7 +44,7 @@ const emptyQuestion = {
 export default function QuestionBankPage() {
     const [rows, setRows] = useState(null);
     const [exams, setExams] = useState([]);
-    const [filters, setFilters] = useState({ q: "", examId: "", stack: "", type: "", level: "", status: "" });
+    const [filters, setFilters] = useState({ examId: "", stack: "", type: "", difficulty: "", status: "" });
     const [page, setPage] = useState(1);
     const [selected, setSelected] = useState(new Set());
     const [editing, setEditing] = useState(null); // question object or {} for new
@@ -55,7 +55,16 @@ export default function QuestionBankPage() {
 
     const load = () => {
         fetchQuestions(filters).then((res) => setRows(res?.rows || (Array.isArray(res) ? res : [])));
-        fetchExams().then((res) => setExams(res?.rows || (Array.isArray(res) ? res : [])));
+        fetchExams().then((res) => {
+            const list = res?.rows || (Array.isArray(res) ? res : []);
+            const filtered = list.filter((ex) => {
+                if (!ex.id) return false;
+                const idStr = ex.id.toString();
+                const titleStr = (ex.title || "").toString();
+                return !idStr.startsWith("17") && !titleStr.includes("17");
+            });
+            setExams(filtered);
+        });
     };
 
     useEffect(() => {
@@ -67,13 +76,6 @@ export default function QuestionBankPage() {
     const filteredRows = useMemo(() => {
         if (!rows) return [];
         let result = rows;
-        if (filters.q) {
-            const query = filters.q.toLowerCase();
-            result = result.filter((q) =>
-                (q.questionText || q.title || "").toLowerCase().includes(query) ||
-                (q.topic || "").toLowerCase().includes(query)
-            );
-        }
         if (filters.examId) {
             const selectedExam = exams.find((e) => String(e.id || e.examId) === String(filters.examId));
             result = result.filter((q) => {
@@ -89,7 +91,7 @@ export default function QuestionBankPage() {
         }
         if (filters.stack) result = result.filter((q) => q.stack === filters.stack);
         if (filters.type) result = result.filter((q) => q.type === filters.type);
-        if (filters.level) result = result.filter((q) => q.level === filters.level);
+        if (filters.difficulty) result = result.filter((q) => (q.difficulty || "").toUpperCase() === filters.difficulty.toUpperCase());
         if (filters.status) result = result.filter((q) => q.status === filters.status);
         return result;
     }, [rows, filters, exams]);
@@ -161,7 +163,6 @@ export default function QuestionBankPage() {
                     <p className="a1-sub">Create, author, and manage the question pool that certification exams draw from.</p>
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <button className="a1-btn a1-btn-ghost" onClick={load}>↻ Refresh</button>
                     <button className="a1-btn a1-btn-ghost" onClick={exportSelectedQuestions}>
                         ⤓ Export JSON
                     </button>
@@ -193,14 +194,6 @@ export default function QuestionBankPage() {
             {/* Filter bar */}
             <div className="a1-filterbar" style={{ marginTop: 18 }}>
                 <div className="a1-field">
-                    <label>Search</label>
-                    <input
-                        placeholder="Search question text or topic"
-                        value={filters.q}
-                        onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, q: e.target.value })); }}
-                    />
-                </div>
-                <div className="a1-field">
                     <label>Assigned Exam</label>
                     <select value={filters.examId} onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, examId: e.target.value })); }}>
                         <option value="">All Exams</option>
@@ -225,9 +218,11 @@ export default function QuestionBankPage() {
                 </div>
                 <div className="a1-field">
                     <label>Difficulty</label>
-                    <select value={filters.level} onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, level: e.target.value })); }}>
-                        <option value="">All levels</option>
-                        {META.LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+                    <select value={filters.difficulty} onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, difficulty: e.target.value })); }}>
+                        <option value="">All</option>
+                        <option value="EASY">Easy</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="HARD">Hard</option>
                     </select>
                 </div>
                 <div className="a1-field">
@@ -249,17 +244,17 @@ export default function QuestionBankPage() {
                 <table className="a1-table a1-table-hover">
                     <thead>
                         <tr>
-                            <th className="a1-checkbox-col">
+                            <th className="a1-checkbox-col" style={{ textAlign: "center" }}>
                                 <input type="checkbox" checked={pageRows.length > 0 && pageRows.every((q) => selected.has(q.id))} onChange={toggleSelectAllPage} />
                             </th>
-                            <th>Question</th>
-                            <th>Assigned Exam</th>
-                            <th>Stack</th>
-                            <th>Type</th>
-                            <th>Difficulty</th>
-                            <th>Source</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th style={{ textAlign: "center" }}>Question</th>
+                            <th style={{ textAlign: "center" }}>Assigned Exam</th>
+                            <th style={{ textAlign: "center" }}>Stack</th>
+                            <th style={{ textAlign: "center" }}>Type</th>
+                            <th style={{ textAlign: "center" }}>Difficulty</th>
+                            <th style={{ textAlign: "center" }}>Source</th>
+                            <th style={{ textAlign: "center" }}>Status</th>
+                            <th style={{ textAlign: "center" }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -270,41 +265,53 @@ export default function QuestionBankPage() {
                                 q.examName ||
                                 (typeof q.exam === "string" && q.exam.trim() ? q.exam : null) ||
                                 (exams.find((e) => String(e.id || e.examId) === String(q.examId || q.exam?.id || q.exam_id) || e.title === q.exam || e.title === q.examTitle)?.title) ||
-                                (exams.find((e) => e.stack === q.stack)?.title) ||
-                                (q.stack ? `${q.stack} Certification Exam` : "General Certification Pool");
+                                "Unassigned";
+                            const displayDiff = q.difficulty ? (q.difficulty.charAt(0).toUpperCase() + q.difficulty.slice(1).toLowerCase()) : "Medium";
                             return (
                                 <tr key={q.id}>
-                                    <td className="a1-checkbox-col">
+                                    <td className="a1-checkbox-col" style={{ textAlign: "center" }}>
                                         <input type="checkbox" checked={selected.has(q.id)} onChange={() => toggleSelect(q.id)} />
                                     </td>
-                                    <td>
-                                        <div style={{ fontWeight: 600, color: "var(--a1-navy)", fontSize: 13.5 }}>
-                                            {q.questionText || q.title}
-                                        </div>
-                                        {q.topic && <span className="a1-sub" style={{ fontSize: 11, color: "var(--a1-mut)" }}>Topic: {q.topic} · Marks: {q.marks || 1}</span>}
+                                    <td style={{ textAlign: "center" }}>
+                                        <button 
+                                            className="a1-btn" 
+                                            style={{ 
+                                                background: "none", 
+                                                border: "none", 
+                                                color: "var(--a1-navy)", 
+                                                fontWeight: 600, 
+                                                textDecoration: "underline", 
+                                                cursor: "pointer", 
+                                                padding: 0,
+                                                fontSize: "13px"
+                                            }}
+                                            onClick={() => setViewing(q)}
+                                        >
+                                            View Question
+                                        </button>
                                     </td>
-                                    <td>
+                                    <td style={{ textAlign: "center" }}>
                                         <span className="a1-pill a1-pill-navy" style={{ fontWeight: 600 }}>
                                             {assignedExamTitle}
                                         </span>
                                     </td>
-                                    <td>{q.stack}</td>
-                                    <td><span className="a1-pill a1-pill-navy">{TYPE_LABEL[q.type] || q.type}</span></td>
-                                    <td>
-                                        <span className={`a1-pill a1-lvl-${q.level}`}>{q.level || "L1"}</span>
-                                        {q.difficulty && <span className="a1-pill a1-pill-amber" style={{ marginLeft: 4 }}>{q.difficulty}</span>}
+                                    <td style={{ textAlign: "center" }}>{q.stack}</td>
+                                    <td style={{ textAlign: "center" }}><span className="a1-pill a1-pill-navy">{TYPE_LABEL[q.type] || q.type}</span></td>
+                                    <td style={{ textAlign: "center" }}>
+                                        <span className="a1-pill a1-pill-amber">
+                                            {displayDiff}
+                                        </span>
                                     </td>
-                                    <td>
+                                    <td style={{ textAlign: "center" }}>
                                         <span className={`a1-pill ${q.source === "AI" ? "a1-pill-green" : "a1-pill"}`}>
                                             {q.source || "MANUAL"}
                                         </span>
                                     </td>
-                                    <td>
+                                    <td style={{ textAlign: "center" }}>
                                         <span className={`a1-pill ${q.status === "ACTIVE" ? "a1-pill-green" : ""}`}>{q.status}</span>
                                     </td>
-                                    <td>
-                                        <div style={{ display: "flex", gap: 6 }}>
-                                            <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => setViewing(q)}>View</button>
+                                    <td style={{ textAlign: "center" }}>
+                                        <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
                                             <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => setEditing(q)}>Edit</button>
                                             <button className="a1-btn a1-btn-red a1-btn-sm" onClick={() => setConfirmDelete(q)}>Delete</button>
                                         </div>
@@ -461,7 +468,7 @@ function QuestionModal({ question, exams = [], onCancel, onSave }) {
                                 <option value="">-- Select Exam --</option>
                                 {exams.map((ex) => (
                                     <option key={ex.id} value={ex.id}>
-                                        {ex.title} ({ex.stack})
+                                        {ex.title}
                                     </option>
                                 ))}
                             </select>
@@ -701,7 +708,6 @@ function ViewQuestionModal({ question, onClose }) {
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
                     <span className="a1-pill">{question.stack}</span>
                     {question.topic && <span className="a1-pill a1-pill-navy">{question.topic}</span>}
-                    <span className={`a1-pill a1-lvl-${question.level || "L1"}`}>{question.level || "L1"}</span>
                     <span className="a1-pill a1-pill-amber">{question.difficulty || "MEDIUM"}</span>
                     <span className="a1-pill">{TYPE_LABEL[question.type] || question.type}</span>
                     <span className="a1-pill a1-pill-navy">{question.marks || 1} Mark{(question.marks || 1) > 1 ? "s" : ""}</span>

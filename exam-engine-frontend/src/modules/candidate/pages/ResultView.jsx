@@ -8,20 +8,42 @@ export default function CandidateResultView() {
   const navigate = useNavigate();
   const [attempt, setAttempt] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const pollRef = React.useRef(null);
+
+  const fetchAttempt = React.useCallback(async () => {
+    try {
+      const res = await candidateService.getAttemptDetails(attemptId);
+      const data = res.data.data || res.data;
+      setAttempt(data);
+      // If result is still pending, keep polling every 5s
+      // Stop once a definitive status is reached
+      if (
+        data &&
+        (data.resultPublishStatus === 'PUBLISHED' ||
+          data.adminDecision === 'REJECTED' ||
+          data.resultStatus === 'TERMINATED')
+      ) {
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [attemptId]);
 
   useEffect(() => {
-    async function loadAttempt() {
-      try {
-        const res = await candidateService.getAttemptDetails(attemptId);
-        setAttempt(res.data.data || res.data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadAttempt();
-  }, [attemptId]);
+    fetchAttempt();
+    // Poll every 5 seconds for result updates (stops once result is final)
+    pollRef.current = setInterval(fetchAttempt, 5000);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [fetchAttempt]);
 
   const getTierColor = (lvl) => {
     const colors = {
@@ -36,12 +58,28 @@ export default function CandidateResultView() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 gap-3 text-[#5c6b82] font-semibold">
-        <div className="w-8 h-8 border-4 border-[#e4eaf2] border-t-[#2F6BFF] rounded-full animate-spin"></div>
-        <span className="font-mono text-xs">Loading exam result report...</span>
+      <div className="max-w-7xl mx-auto pb-12" style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginTop: '40px' }}>
+        {/* Skeleton hero card */}
+        <div style={{ borderRadius: '28px', padding: '48px 40px', background: 'linear-gradient(135deg, #0a192f 0%, #0f2a4a 50%, #1a3d6c 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: '88px', height: '88px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+          <div style={{ width: '220px', height: '20px', borderRadius: '8px', background: 'rgba(255,255,255,0.08)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+          <div style={{ width: '160px', height: '14px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+        </div>
+        {/* Skeleton stat cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+          {[1, 2].map(i => (
+            <div key={i} style={{ borderRadius: '16px', padding: '24px', background: '#fff', border: '1px solid #E4EAF2', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ width: '100px', height: '10px', borderRadius: '4px', background: '#f0f3f8', animation: 'pulse 1.5s ease-in-out infinite' }} />
+              <div style={{ width: '160px', height: '20px', borderRadius: '6px', background: '#e8edf5', animation: 'pulse 1.5s ease-in-out infinite' }} />
+              <div style={{ width: '100%', height: '12px', borderRadius: '4px', background: '#f5f7fb', animation: 'pulse 1.5s ease-in-out infinite' }} />
+            </div>
+          ))}
+        </div>
+        <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }`}</style>
       </div>
     );
   }
+
 
   if (!attempt) {
     return (
@@ -60,6 +98,7 @@ export default function CandidateResultView() {
   }
 
   const isPublished = attempt.resultPublishStatus === 'PUBLISHED';
+  const isRejected = attempt.adminDecision === 'REJECTED';
   const isPassed = attempt.resultStatus === 'PASSED';
   const isTerminated = attempt.resultStatus === 'TERMINATED';
 
@@ -79,7 +118,34 @@ export default function CandidateResultView() {
         {/* Decorative background glow */}
         <div className="absolute right-[-80px] bottom-[-80px] w-[280px] h-[280px] rounded-full blur-[100px] pointer-events-none" style={{ backgroundColor: 'rgba(47, 107, 255, 0.15)' }}></div>
 
-        {!isPublished ? (
+        {isRejected ? (
+          /* Rejected by Admin State */
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div 
+              className="seal w-22 h-22 rounded-full mx-auto flex items-center justify-center border-2 shadow-lg"
+              style={{
+                width: '88px',
+                height: '88px',
+                marginBottom: '24px',
+                borderColor: '#E04F4F',
+                backgroundColor: 'rgba(224, 79, 79, 0.08)',
+                color: '#E04F4F',
+                boxShadow: '0 0 20px rgba(224, 79, 79, 0.2)'
+              }}
+            >
+              <ShieldAlert className="w-11 h-11" />
+            </div>
+            <span className="font-mono text-[11px] tracking-[2.5px] uppercase font-bold" style={{ color: '#ff8a8a', marginBottom: '12px' }}>
+              ATTEMPT REJECTED · REVIEW DECISION
+            </span>
+            <h1 className="font-display font-extrabold text-3xl md:text-4xl text-white tracking-tight" style={{ margin: '8px 0 12px', fontSize: '32px', fontWeight: '800' }}>
+              Attempt Rejected
+            </h1>
+            <div className="exam text-[15px] font-medium" style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '15px', marginBottom: '24px' }}>
+              {attempt.examTitle}
+            </div>
+          </div>
+        ) : !isPublished ? (
           /* Under Review / Pending Admin Approval State */
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div 
@@ -161,7 +227,7 @@ export default function CandidateResultView() {
                 <div className="txt text-left">
                   <b className="font-display font-bold text-lg text-white block">{attempt.assignedLevelTitle || `${attempt.assignedLevel} Competency Level`}</b>
                   {attempt.score !== null && attempt.score !== undefined && (
-                    <span className="text-xs font-mono" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Exam Score: {attempt.score} / {attempt.answers?.length || 10}</span>
+                    <span className="text-xs font-mono" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Exam Score: {attempt.score} / {attempt.totalMarks || attempt.answers?.length || 10}</span>
                   )}
                 </div>
               </div>
@@ -170,54 +236,68 @@ export default function CandidateResultView() {
         )}
       </div>
 
-      {/* Outcome / Approval Status Card */}
-      <div className="grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
-        <div 
-          className="bg-white border border-[#E4EAF2] rounded-2xl flex flex-col shadow-sm"
-          style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px' }}
-        >
-          <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#5C6B82] mb-2" style={{ fontSize: '11px' }}>Admin Approval Status</span>
-          <div className="font-display text-lg font-bold text-[#0E1B2E]" style={{ fontSize: '18px', fontWeight: '700' }}>
-            {isPublished ? (
-              <span className="text-[#0E9F6E] flex items-center gap-1.5" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0E9F6E' }}>
-                <CheckCircle2 className="w-5 h-5 text-[#0E9F6E]" />
-                Approved & Published
-              </span>
-            ) : (
-              <span className="text-[#D97706] flex items-center gap-1.5" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#D97706' }}>
-                <Clock className="w-5 h-5 text-[#D97706]" />
-                Pending Admin Approval
-              </span>
-            )}
-          </div>
-          <p className="text-[13px] text-[#5C6B82] leading-relaxed mt-3" style={{ color: '#5C6B82', fontSize: '13px', lineHeight: '1.6', marginTop: '12px' }}>
-            {isPublished
-              ? 'Your written exam score and proctoring audit logs have been approved by the admin.'
-              : 'Your exam submission is currently undergoing administrative review. Results will update automatically once approved.'}
-          </p>
-        </div>
 
+
+      {/* Outcome / Approval Status Cards or Rejection Reason */}
+      {isRejected ? (
         <div 
           className="bg-white border border-[#E4EAF2] rounded-2xl flex flex-col shadow-sm"
-          style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px' }}
+          style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px', maxWidth: '640px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}
         >
-          <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#5C6B82] mb-2" style={{ fontSize: '11px' }}>Attempt Outcome</span>
-          <div className="font-display text-lg font-bold text-[#0E1B2E] capitalize" style={{ fontSize: '18px', fontWeight: '700' }}>
-            {!isPublished ? (
-              <span className="text-[#D97706]" style={{ color: '#D97706' }}>Under Review</span>
-            ) : (
-              <span className={isPassed ? 'text-[#0E9F6E]' : 'text-[#E04F4F]'} style={{ color: isPassed ? '#0E9F6E' : '#E04F4F' }}>
-                {attempt.resultStatus ? attempt.resultStatus.replace('_', ' ').toLowerCase() : 'Submitted'}
-              </span>
-            )}
-          </div>
-          <p className="text-[13px] text-[#5C6B82] leading-relaxed mt-3" style={{ color: '#5C6B82', fontSize: '13px', lineHeight: '1.6', marginTop: '12px' }}>
-            {isPublished
-              ? 'Official level certification and badge have been added to your profile.'
-              : 'Detailed score breakdown and level badge will be unlocked upon admin approval.'}
+          <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#E04F4F] mb-3" style={{ fontSize: '11px', color: '#E04F4F', letterSpacing: '0.8px' }}>Rejection Reason</span>
+          <p style={{ color: '#0E1B2E', fontSize: '14.5px', lineHeight: '1.6', margin: 0, fontWeight: '500' }}>
+            {attempt.rejectionReason || 'No reason specified by administrator.'}
           </p>
         </div>
-      </div>
+      ) : (
+        <div className="grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+          <div 
+            className="bg-white border border-[#E4EAF2] rounded-2xl flex flex-col shadow-sm"
+            style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px' }}
+          >
+            <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#5C6B82] mb-2" style={{ fontSize: '11px' }}>Admin Approval Status</span>
+            <div className="font-display text-lg font-bold text-[#0E1B2E]" style={{ fontSize: '18px', fontWeight: '700' }}>
+              {isPublished ? (
+                <span className="text-[#0E9F6E] flex items-center gap-1.5" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0E9F6E' }}>
+                  <CheckCircle2 className="w-5 h-5 text-[#0E9F6E]" />
+                  Approved & Published
+                </span>
+              ) : (
+                <span className="text-[#D97706] flex items-center gap-1.5" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#D97706' }}>
+                  <Clock className="w-5 h-5 text-[#D97706]" />
+                  Pending Admin Approval
+                </span>
+              )}
+            </div>
+            <p className="text-[13px] text-[#5C6B82] leading-relaxed mt-3" style={{ color: '#5C6B82', fontSize: '13px', lineHeight: '1.6', marginTop: '12px' }}>
+              {isPublished
+                ? 'Your written exam score and proctoring audit logs have been approved by the admin.'
+                : 'Your exam submission is currently undergoing administrative review. Results will update automatically once approved.'}
+            </p>
+          </div>
+
+          <div 
+            className="bg-white border border-[#E4EAF2] rounded-2xl flex flex-col shadow-sm"
+            style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px' }}
+          >
+            <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#5C6B82] mb-2" style={{ fontSize: '11px' }}>Attempt Outcome</span>
+            <div className="font-display text-lg font-bold text-[#0E1B2E] capitalize" style={{ fontSize: '18px', fontWeight: '700' }}>
+              {!isPublished ? (
+                <span className="text-[#D97706]" style={{ color: '#D97706' }}>Under Review</span>
+              ) : (
+                <span className={isPassed ? 'text-[#0E9F6E]' : 'text-[#E04F4F]'} style={{ color: isPassed ? '#0E9F6E' : '#E04F4F' }}>
+                  {attempt.resultStatus ? attempt.resultStatus.replace('_', ' ').toLowerCase() : 'Submitted'}
+                </span>
+              )}
+            </div>
+            <p className="text-[13px] text-[#5C6B82] leading-relaxed mt-3" style={{ color: '#5C6B82', fontSize: '13px', lineHeight: '1.6', marginTop: '12px' }}>
+              {isPublished
+                ? 'Official level certification and badge have been added to your profile.'
+                : 'Detailed score breakdown and level badge will be unlocked upon admin approval.'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Navigation Actions */}
       <div className="flex flex-wrap gap-4 justify-center" style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '16px' }}>

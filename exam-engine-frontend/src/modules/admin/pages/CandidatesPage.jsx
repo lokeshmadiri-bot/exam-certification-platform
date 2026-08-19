@@ -1,4 +1,4 @@
-﻿// // A1 · Task 5 — Candidates
+// // A1 · Task 5 — Candidates
 // // Table (name/email/exam/status/locked/last attempt) · filters ·
 // // 30-day lock override, gated behind four-eyes approval.
 
@@ -191,9 +191,9 @@ const STATUS_PILL = {
 };
 
 const LOCK_PILL = {
-    LOCKED:            { label: "🔒 Locked",          cls: "a1-pill-red" },
-    UNLOCKED:          { label: "🔓 Unlocked",         cls: "a1-pill-green" },
-    OVERRIDE_APPROVED: { label: "✔ Override Approved", cls: "a1-pill-amber" },
+    LOCKED:            { icon: "🔒", label: "Locked",           cls: "a1-pill-red" },
+    UNLOCKED:          { icon: "🔓", label: "Unlocked",          cls: "a1-pill-green" },
+    OVERRIDE_APPROVED: { icon: "🔓",  label: "Override Unlocked", cls: "a1-pill-green" },
 };
 
 function fmtDate(dt) {
@@ -252,7 +252,6 @@ export default function CandidatesPage() {
                     <h1>Candidates</h1>
                     <p className="a1-sub">Review all exam attempts, candidate responses, and lock status in real time.</p>
                 </div>
-                <button className="a1-btn a1-btn-ghost" onClick={load}>↻ Refresh</button>
             </header>
 
             <div className="a1-filterbar">
@@ -302,16 +301,14 @@ export default function CandidatesPage() {
                     <table className="a1-table a1-table-hover">
                         <thead>
                             <tr>
-                                <th>Candidate</th>
-                                <th>Email</th>
-                                <th>Exam</th>
-                                <th>Status</th>
-                                <th>Override Lock</th>
-                                <th>Questions</th>
-                                <th>Start Time</th>
-                                <th>End Time</th>
-                                <th>Duration</th>
-                                <th />
+                                <th style={{ textAlign: "center" }}>Candidate</th>
+                                <th style={{ textAlign: "center" }}>Email</th>
+                                <th style={{ textAlign: "center" }}>Exam</th>
+                                <th style={{ textAlign: "center" }}>Status</th>
+                                <th style={{ textAlign: "center" }}>Start Time</th>
+                                <th style={{ textAlign: "center" }}>End Time</th>
+                                <th style={{ textAlign: "center" }}>Duration</th>
+                                <th style={{ textAlign: "center" }}>Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -320,35 +317,37 @@ export default function CandidatesPage() {
                                 const lockInfo   = LOCK_PILL[c.overrideLockStatus] || LOCK_PILL["UNLOCKED"];
                                 return (
                                     <tr key={`${c.candidateId}-${c.attemptId || i}`}>
-                                        <td style={{ fontWeight: 600 }}>{c.candidateName}</td>
-                                        <td className="a1-mono" style={{ fontSize: 12 }}>{c.email}</td>
-                                        <td>{c.examTitle}</td>
-                                        <td>
-                                            <span className={`a1-pill ${statusInfo.cls}`}>
-                                                {c.statusLabel || statusInfo.label}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span className={`a1-pill ${lockInfo.cls}`}>
-                                                {lockInfo.label}
-                                            </span>
-                                        </td>
+                                        <td style={{ fontWeight: 600, textAlign: "center" }}>{c.candidateName}</td>
+                                        <td className="a1-mono" style={{ fontSize: 12, textAlign: "center" }}>{c.email}</td>
+                                        <td style={{ textAlign: "center" }}>{c.examTitle}</td>
                                         <td style={{ textAlign: "center" }}>
-                                            {c.questionCount > 0 ? c.questionCount : "—"}
+                                            <span
+                                                className={`a1-pill ${lockInfo.cls}`}
+                                                style={{
+                                                    justifyContent: "center",
+                                                    whiteSpace: "nowrap",
+                                                    gap: "4px",
+                                                }}
+                                            >
+                                                <span style={{ fontSize: 13, lineHeight: 1 }}>{lockInfo.icon}</span>
+                                                <span>{lockInfo.label}</span>
+                                            </span>
                                         </td>
-                                        <td style={{ fontSize: 12 }}>{fmtDate(c.startTime)}</td>
-                                        <td style={{ fontSize: 12 }}>{fmtDate(c.endTime)}</td>
+                                        <td style={{ fontSize: 12, textAlign: "center" }}>{fmtDate(c.startTime)}</td>
+                                        <td style={{ fontSize: 12, textAlign: "center" }}>{fmtDate(c.endTime)}</td>
                                         <td style={{ textAlign: "center" }}>
                                             {c.durationMinutes ? `${c.durationMinutes} min` : "—"}
                                         </td>
-                                        <td>
-                                            {c.locked && (
+                                        <td style={{ textAlign: "center" }}>
+                                            {c.locked ? (
                                                 <button
                                                     className="a1-btn a1-btn-amber a1-btn-sm"
                                                     onClick={() => setOverrideFor(c)}
                                                 >
                                                     Override Lock
                                                 </button>
+                                            ) : (
+                                                <span style={{ color: "var(--a1-mut)", fontSize: 14 }}>—</span>
                                             )}
                                         </td>
                                     </tr>

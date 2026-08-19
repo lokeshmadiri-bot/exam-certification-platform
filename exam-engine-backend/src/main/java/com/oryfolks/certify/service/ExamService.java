@@ -47,6 +47,7 @@
                             .passMark(exam.getPassMark() != null ? exam.getPassMark() : 60)
                             .version(exam.getVersion() != null ? exam.getVersion() : "1")
                             .status(exam.getStatus() != null ? exam.getStatus() : ExamStatus.ACTIVE)
+                            .totalMarks(exam.getTotalMarks() != null ? exam.getTotalMarks() : 100)
                             .build())
                     .toList();
         }
@@ -75,6 +76,7 @@
                     .version(exam.getVersion())
                     .status(exam.getStatus())
                     .competencyBands(competencyBands)
+                    .totalMarks(exam.getTotalMarks() != null ? exam.getTotalMarks() : 100)
                     .build();
         }
 

@@ -116,4 +116,10 @@ public class ExamAttempt {
 
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
+
+    @Column(name = "admin_decision", length = 30)
+    private String adminDecision;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
 }

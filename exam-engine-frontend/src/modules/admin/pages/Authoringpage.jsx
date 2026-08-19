@@ -17,6 +17,7 @@ const emptyForm = {
     passMark: 60,
     questionPoolSize: 100,
     questionsPerAttempt: 25,
+    totalMarks: 100,
     instructions: "",
 };
 
@@ -69,6 +70,7 @@ export default function AuthoringPage() {
                     passMark: exam.passMark,
                     questionPoolSize: exam.questionPoolSize,
                     questionsPerAttempt: exam.questionsPerAttempt,
+                    totalMarks: exam.totalMarks || 100,
                     instructions: exam.instructions || "",
                 });
             }
@@ -93,6 +95,7 @@ export default function AuthoringPage() {
             passMark: Number(form.passMark),
             questionPoolSize: Number(form.questionPoolSize),
             questionsPerAttempt: Number(form.questionsPerAttempt),
+            totalMarks: Number(form.totalMarks),
         };
         if (examId) {
             wasCreated.current = false;
@@ -181,6 +184,10 @@ export default function AuthoringPage() {
                             <div className="a1-field">
                                 <label>Questions Per Attempt</label>
                                 <input type="number" min="1" required value={form.questionsPerAttempt} onChange={(e) => setField("questionsPerAttempt", e.target.value)} />
+                            </div>
+                            <div className="a1-field">
+                                <label>Total Marks</label>
+                                <input type="number" min="1" required value={form.totalMarks} onChange={(e) => setField("totalMarks", e.target.value)} />
                             </div>
                         </div>
                         <div className="a1-field" style={{ marginTop: 14 }}>

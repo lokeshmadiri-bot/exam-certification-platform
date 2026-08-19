@@ -347,6 +347,12 @@ export const confirmResult = (attemptId, payload) =>
         status: "CONFIRMED",
     });
 
+export const rejectResult = (attemptId, payload) =>
+    withFallback(() => post(`/attempts/${attemptId}/decision/reject`, payload), {
+        ok: true,
+        status: "REJECTED",
+    });
+
 export const escalateForSecondReview = (attemptId, payload) =>
     withFallback(() => post(`/attempts/${attemptId}/decision/escalate`, payload), {
         ok: true,

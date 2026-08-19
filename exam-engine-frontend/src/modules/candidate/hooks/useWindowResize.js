@@ -8,7 +8,7 @@ export function useWindowResize(active, onViolation) {
       // Avoid triggering WINDOW_RESIZE if it's actually minimization (handled by visibilitychange)
       const isMinimized = window.innerWidth === 0 || window.innerHeight === 0 ||
                           window.outerWidth === 0 || window.outerHeight === 0;
-      if (!isMinimized) {
+      if (!isMinimized && document.hasFocus()) {
         onViolation('WINDOW_RESIZE');
       }
     };
