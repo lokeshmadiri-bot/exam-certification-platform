@@ -31,6 +31,8 @@ public class AttemptDetailsResponseDTO {
 
     private Integer score;
 
+    private Integer totalMarks;
+
     private ResultStatus resultStatus;
 
     private ResultPublishStatus resultPublishStatus;
@@ -42,4 +44,8 @@ public class AttemptDetailsResponseDTO {
     private List<AttemptAnswerResponseDTO> answers;
 
     private List<IntegrityViolationResponseDTO> integrityViolations;
+
+    private String adminDecision;
+
+    private String rejectionReason;
 }

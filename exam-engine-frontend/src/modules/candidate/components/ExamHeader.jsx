@@ -2,6 +2,7 @@ import React from 'react';
 import { Monitor } from 'lucide-react';
 import { useExam } from '../context/ExamContext';
 import RecordingIndicator from './RecordingIndicator';
+import Timer from './ExamTimer';
 
 export default function Header({ examTitle }) {
   const { strikes } = useExam();
@@ -18,7 +19,6 @@ export default function Header({ examTitle }) {
       </div>
 
       <div className="flex items-center gap-5 ml-auto">
-        <RecordingIndicator isRecording={true} />
         <div className="run-strikes flex items-center gap-1.5 text-xs text-[#c7d6ee]" title="Tab switch warnings">
           <span>Strikes</span>
           <span className={`s w-2.5 h-2.5 rounded-full border border-white/25 ${strikes >= 1 ? 'used bg-[#F2A93B] border-none' : 'bg-white/10'}`} />

@@ -32,4 +32,6 @@ public class ExamDetailsResponseDTO {
 
     private List<CompetencyBandDTO> competencyBands;
 
+    private Integer totalMarks;
+
 }

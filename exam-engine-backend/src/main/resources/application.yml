@@ -28,6 +28,8 @@ app:
   jwt:
     secret: ${JWT_SECRET}
     expiration-ms: 86400000 # 24 hours
+  retry-lock-duration-days: 30
+  override-lock-duration-days: 7
   storage:
     provider: ${STORAGE_PROVIDER}
     local:

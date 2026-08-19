@@ -200,7 +200,7 @@ export default function CandidateResults() {
             <div key={h} style={{
               padding: '14px 20px', fontSize: '10.5px', fontWeight: '700', fontFamily: 'monospace',
               color: '#5C6B82', textTransform: 'uppercase', letterSpacing: '0.6px',
-              textAlign: i === 4 ? 'right' : 'left'
+              textAlign: 'center'
             }}>
               {h}
             </div>
@@ -223,8 +223,8 @@ export default function CandidateResults() {
               onMouseLeave={e => e.currentTarget.style.backgroundColor = '#fff'}
             >
               {/* Certification */}
-              <div style={{ padding: '18px 20px' }}>
-                <div style={{ fontWeight: '700', fontSize: '13.5px', color: '#0E1B2E', marginBottom: '4px' }}>
+              <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ fontWeight: '700', fontSize: '13.5px', color: '#0E1B2E', marginBottom: '4px', textAlign: 'center' }}>
                   {attempt.examTitle}
                 </div>
                 <span style={{
@@ -237,7 +237,7 @@ export default function CandidateResults() {
               </div>
 
               {/* Date */}
-              <div style={{ padding: '18px 20px' }}>
+              <div style={{ padding: '18px 20px', display: 'flex', justifyContent: 'center' }}>
                 {isInProgress ? (
                   <span style={{ fontSize: '11px', color: '#2F6BFF', fontWeight: '700', fontFamily: 'monospace' }}>In Progress</span>
                 ) : (
@@ -249,17 +249,17 @@ export default function CandidateResults() {
               </div>
 
               {/* Level */}
-              <div style={{ padding: '18px 20px' }}>
+              <div style={{ padding: '18px 20px', display: 'flex', justifyContent: 'center' }}>
                 {getLevelBadge(attempt)}
               </div>
 
               {/* Status */}
-              <div style={{ padding: '18px 20px' }}>
+              <div style={{ padding: '18px 20px', display: 'flex', justifyContent: 'center' }}>
                 {getStatusChip(attempt)}
               </div>
 
               {/* Action */}
-              <div style={{ padding: '18px 20px', textAlign: 'right' }}>
+              <div style={{ padding: '18px 20px', display: 'flex', justifyContent: 'center' }}>
                 <button
                   onClick={() => navigate(`/candidate/result-view/${attempt.attemptId}`)}
                   style={{

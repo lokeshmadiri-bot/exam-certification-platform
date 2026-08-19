@@ -124,9 +124,60 @@ public class AttemptService {
 
                 List<Question> selectedQuestions = new ArrayList<>();
                 if (required > 0 && !activeQuestions.isEmpty()) {
-                        List<Question> poolCopy = new ArrayList<>(activeQuestions);
-                        Collections.shuffle(poolCopy);
-                        selectedQuestions = poolCopy.subList(0, required);
+                        int easyTarget = (int) Math.round(required * 0.50);
+                        int mediumTarget = (int) Math.round(required * 0.30);
+                        int hardTarget = required - easyTarget - mediumTarget;
+
+                        List<Question> easyPool = new ArrayList<>();
+                        List<Question> mediumPool = new ArrayList<>();
+                        List<Question> hardPool = new ArrayList<>();
+
+                        for (Question q : activeQuestions) {
+                                String diff = q.getDifficulty() != null ? q.getDifficulty().trim().toUpperCase() : "EASY";
+                                if ("HARD".equals(diff)) {
+                                        hardPool.add(q);
+                                } else if ("MEDIUM".equals(diff)) {
+                                        mediumPool.add(q);
+                                } else {
+                                        easyPool.add(q);
+                                }
+                        }
+
+                        Collections.shuffle(easyPool);
+                        Collections.shuffle(mediumPool);
+                        Collections.shuffle(hardPool);
+
+                        List<Question> selected = new ArrayList<>();
+
+                        // Select Easy
+                        int easySelectedCount = Math.min(easyTarget, easyPool.size());
+                        selected.addAll(easyPool.subList(0, easySelectedCount));
+                        List<Question> unusedEasy = new ArrayList<>(easyPool.subList(easySelectedCount, easyPool.size()));
+
+                        // Select Medium
+                        int mediumSelectedCount = Math.min(mediumTarget, mediumPool.size());
+                        selected.addAll(mediumPool.subList(0, mediumSelectedCount));
+                        List<Question> unusedMedium = new ArrayList<>(mediumPool.subList(mediumSelectedCount, mediumPool.size()));
+
+                        // Select Hard
+                        int hardSelectedCount = Math.min(hardTarget, hardPool.size());
+                        selected.addAll(hardPool.subList(0, hardSelectedCount));
+                        List<Question> unusedHard = new ArrayList<>(hardPool.subList(hardSelectedCount, hardPool.size()));
+
+                        // Fallback: if we haven't selected enough questions, fill from unused pools
+                        int selectedSize = selected.size();
+                        if (selectedSize < required) {
+                                List<Question> allUnused = new ArrayList<>();
+                                allUnused.addAll(unusedEasy);
+                                allUnused.addAll(unusedMedium);
+                                allUnused.addAll(unusedHard);
+                                Collections.shuffle(allUnused);
+                                int remainingNeeded = required - selectedSize;
+                                int toAdd = Math.min(remainingNeeded, allUnused.size());
+                                selected.addAll(allUnused.subList(0, toAdd));
+                        }
+
+                        selectedQuestions = selected;
                 }
 
                 ExamAttempt attempt = ExamAttempt.builder()
@@ -351,14 +402,40 @@ public class AttemptService {
                         }
                 }
 
-                // Score = number of correct answers (1 per question)
-                int finalScore = correctCount;
+                // Sum correct question marks dynamically based on difficulty weighting
+                double correctMarksSum = 0;
+                for (Question q : questions) {
+                        String correct = q.getCorrectOption() != null ? q.getCorrectOption().trim() : "";
+                        String userSelected = null;
+
+                        Optional<AttemptAnswer> ansOpt = savedAttemptAnswers.stream()
+                                        .filter(ans -> ans.getQuestion() != null && ans.getQuestion().getId().equals(q.getId()))
+                                        .findFirst();
+
+                        if (ansOpt.isPresent() && ansOpt.get().getSelectedOption() != null) {
+                                userSelected = ansOpt.get().getSelectedOption().trim();
+                        } else {
+                                Optional<Answer> aOpt = answerRepository.findByAttemptIdAndQuestionId(attempt.getId(), q.getId());
+                                if (aOpt.isPresent() && aOpt.get().getSelectedOption() != null) {
+                                        userSelected = aOpt.get().getSelectedOption().trim();
+                                }
+                        }
+
+                        if (userSelected != null && !correct.isEmpty() && correct.equalsIgnoreCase(userSelected)) {
+                                correctMarksSum += exam.getQuestionMarks(q.getDifficulty(), questions);
+                        }
+                }
+
+                int finalScore = (int) Math.round(correctMarksSum);
+                Integer totMarksVal = exam.getTotalMarks() != null ? exam.getTotalMarks() : 100;
+                finalScore = Math.min(finalScore, totMarksVal);
                 attempt.setScore(finalScore);
                 LocalDateTime now = LocalDateTime.now();
                 attempt.setEndTime(now);
                 attempt.setSubmittedAt(now);
 
-                int percentScore = totalQuestions > 0 ? (int) Math.round(((double) correctCount / totalQuestions) * 100) : 0;
+                int percentScore = totMarksVal > 0 ? (int) Math.round((correctMarksSum / totMarksVal) * 100) : 0;
+                percentScore = Math.min(percentScore, 100);
 
                 CompetencyLevel level = CompetencyLevel.L5;
                 List<CompetencyBand> bands = competencyBandRepository.findByExamId(exam.getId());
