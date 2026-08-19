@@ -53,8 +53,8 @@ export default function QuestionBankPage() {
     const [showAIGenerator, setShowAIGenerator] = useState(false);
     const [aiSavedToast, setAiSavedToast] = useState(null);
 
-    const load = () => {
-        fetchQuestions(filters).then((res) => setRows(res?.rows || (Array.isArray(res) ? res : [])));
+        const load = (currentFilters = filters) => {
+        fetchQuestions(currentFilters).then((res) => setRows(res?.rows || (Array.isArray(res) ? res : [])));
         fetchExams().then((res) => {
             const list = res?.rows || (Array.isArray(res) ? res : []);
             const filtered = list.filter((ex) => {

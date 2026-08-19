@@ -186,7 +186,7 @@ public class AdminQuestionController {
         return ResponseEntity.ok(ApiResponse.success("Question deleted", res));
     }
 
-    @PostMapping("/bulk")
+    @RequestMapping(value = "/bulk", method = {RequestMethod.POST, RequestMethod.PUT})
     public ResponseEntity<ApiResponse<Map<String, Object>>> bulkUpdate(
             @RequestBody Map<String, Object> body,
             Principal principal) {
