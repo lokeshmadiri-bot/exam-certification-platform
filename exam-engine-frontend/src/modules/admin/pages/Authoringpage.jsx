@@ -5,7 +5,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { fetchExam, createExam, updateExam, fetchBands, saveBands, META } from "../services/api";
+import { fetchExam, fetchExams, createExam, updateExam, fetchBands, saveBands, fetchQuestions, bulkUpdateQuestions, bulkDeleteQuestions, META } from "../services/api";
 import "../components/a1.css";
 
 const LEVELS = META.LEVELS;
@@ -38,6 +38,9 @@ export default function AuthoringPage() {
 
     const [form, setForm] = useState(emptyForm);
     const [bands, setBands] = useState(defaultBands);
+    const [availableStacks, setAvailableStacks] = useState(META.STACKS);
+    const [isOtherStack, setIsOtherStack] = useState(false);
+    const [customStackInput, setCustomStackInput] = useState("");
     const [loading, setLoading] = useState(!!examId);
     const [savingForm, setSavingForm] = useState(false);
     const [savingBands, setSavingBands] = useState(false);
@@ -45,6 +48,15 @@ export default function AuthoringPage() {
     const [bandsModified, setBandsModified] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const wasCreated = useRef(false); // tracks whether last save was a create vs update
+
+    // Load unique stacks from all existing exams on mount
+    useEffect(() => {
+        fetchExams().then((res) => {
+            const list = res?.rows || (Array.isArray(res) ? res : []);
+            const customStacks = list.map(e => e.stack).filter(Boolean);
+            setAvailableStacks(Array.from(new Set([...META.STACKS, ...customStacks])));
+        }).catch(() => {});
+    }, []);
 
     useEffect(() => {
         // Always reset the success modal when examId changes (e.g. navigating from
@@ -57,6 +69,8 @@ export default function AuthoringPage() {
             setForm(emptyForm);
             setBands(defaultBands);
             setBandsModified(false);
+            setIsOtherStack(false);
+            setCustomStackInput("");
             setLoading(false);
             return;
         }
@@ -73,6 +87,14 @@ export default function AuthoringPage() {
                     totalMarks: exam.totalMarks || 100,
                     instructions: exam.instructions || "",
                 });
+                if (exam.stack && !META.STACKS.includes(exam.stack)) {
+                    setIsOtherStack(true);
+                    setCustomStackInput(exam.stack);
+                } else {
+                    setIsOtherStack(false);
+                    setCustomStackInput("");
+                }
+                setAvailableStacks((prev) => Array.from(new Set([...prev, exam.stack].filter(Boolean))));
             }
             setBands(b && Object.keys(b).length > 0 ? b : defaultBands);
             setBandsModified(false);
@@ -155,7 +177,7 @@ export default function AuthoringPage() {
                     <form onSubmit={submitFormatForm}>
                         <div className="a1-form-grid">
                             <div className="a1-field">
-                                <label>Exam Title</label>
+                                <label>Exam Title *</label>
                                 <input
                                     required
                                     placeholder="e.g. Java Backend Developer"
@@ -164,41 +186,58 @@ export default function AuthoringPage() {
                                 />
                             </div>
                             <div className="a1-field">
-                                <label>Technology Stack</label>
-                                <select value={form.stack} onChange={(e) => setField("stack", e.target.value)}>
-                                    {META.STACKS.map((s) => <option key={s} value={s}>{s}</option>)}
+                                <label>Technology Stack *</label>
+                                <select 
+                                    value={isOtherStack ? "__other__" : form.stack} 
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === "__other__") {
+                                            setIsOtherStack(true);
+                                            setField("stack", customStackInput);
+                                        } else {
+                                            setIsOtherStack(false);
+                                            setField("stack", val);
+                                        }
+                                    }}
+                                >
+                                    {availableStacks.map((s) => <option key={s} value={s}>{s}</option>)}
+                                    <option value="__other__">Other / Add Manually...</option>
                                 </select>
+
+                                {isOtherStack && (
+                                    <input
+                                        required
+                                        style={{ marginTop: "8px" }}
+                                        placeholder="Enter custom stack name (e.g. Go)"
+                                        value={customStackInput}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setCustomStackInput(val);
+                                            setField("stack", val);
+                                        }}
+                                    />
+                                )}
                             </div>
                             <div className="a1-field">
-                                <label>Duration (minutes)</label>
+                                <label>Duration (minutes) *</label>
                                 <input type="number" min="1" required value={form.durationMin} onChange={(e) => setField("durationMin", e.target.value)} />
                             </div>
                             <div className="a1-field">
-                                <label>Pass Mark (%)</label>
+                                <label>Pass Mark (%) *</label>
                                 <input type="number" min="0" max="100" required value={form.passMark} onChange={(e) => setField("passMark", e.target.value)} />
                             </div>
                             <div className="a1-field">
-                                <label>Question Pool Size</label>
+                                <label>Question Pool Size *</label>
                                 <input type="number" min="1" required value={form.questionPoolSize} onChange={(e) => setField("questionPoolSize", e.target.value)} />
                             </div>
                             <div className="a1-field">
-                                <label>Questions Per Attempt</label>
+                                <label>Questions Per Attempt *</label>
                                 <input type="number" min="1" required value={form.questionsPerAttempt} onChange={(e) => setField("questionsPerAttempt", e.target.value)} />
                             </div>
                             <div className="a1-field">
-                                <label>Total Marks</label>
+                                <label>Total Marks *</label>
                                 <input type="number" min="1" required value={form.totalMarks} onChange={(e) => setField("totalMarks", e.target.value)} />
                             </div>
-                        </div>
-                        <div className="a1-field" style={{ marginTop: 14 }}>
-                            <label>Instructions</label>
-                            <textarea
-                                className="a1-textarea"
-                                style={{ marginTop: 0 }}
-                                placeholder="Shown to the candidate before the exam starts…"
-                                value={form.instructions}
-                                onChange={(e) => setField("instructions", e.target.value)}
-                            />
                         </div>
 
                         <div className={`a1-pool-note ${poolTooSmall ? "a1-pool-warn" : ""}`}>
@@ -337,6 +376,7 @@ export default function AuthoringPage() {
                     </div>
                 </div>
             )}
+
         </div>
     );
 }

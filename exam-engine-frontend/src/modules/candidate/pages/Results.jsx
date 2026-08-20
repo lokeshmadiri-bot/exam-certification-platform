@@ -103,7 +103,17 @@ export default function CandidateResults() {
     const isPublished = attempt.resultPublishStatus === 'PUBLISHED';
     const isInProgress = attempt.resultStatus === 'IN_PROGRESS' || !attempt.submittedAt;
 
-    if (isInProgress || attempt.resultStatus === 'TERMINATED') return <span style={{ color: '#9ca3af', fontSize: '13px' }}>—</span>;
+    if (
+      isInProgress ||
+      attempt.resultStatus === 'TERMINATED' ||
+      attempt.resultStatus === 'FAILED' ||
+      !attempt.assignedLevel ||
+      attempt.assignedLevel === '—' ||
+      attempt.assignedLevel === '--' ||
+      !['L1', 'L2', 'L3', 'L4', 'L5'].includes(attempt.assignedLevel)
+    ) {
+      return <span style={{ color: '#9ca3af', fontSize: '13px' }}>—</span>;
+    }
     if (!isPublished) return (
       <span style={{ fontSize: '12px', color: '#9c7400', fontWeight: '600', fontFamily: 'monospace' }}>Under Review</span>
     );

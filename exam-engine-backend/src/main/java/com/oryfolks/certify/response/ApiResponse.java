@@ -24,6 +24,8 @@ public class ApiResponse<T> {
 
     private LocalDateTime timestamp;
 
+    private Integer duplicatesRemoved;
+
     /**
      * Creates a successful API response.
      */

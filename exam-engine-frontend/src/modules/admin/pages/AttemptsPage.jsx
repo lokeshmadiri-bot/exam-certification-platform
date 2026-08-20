@@ -4,7 +4,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { fetchAttempts, fetchReviewAttempts, META } from "../services/api";
+import { fetchAttempts, fetchReviewAttempts, fetchExams, META } from "../services/api";
 import "../components/a2.css";
 
 export default function AttemptsPage() {
@@ -23,6 +23,15 @@ export default function AttemptsPage() {
   const [data, setData] = useState({ rows: [], total: 0 });
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
+  const [availableStacks, setAvailableStacks] = useState(META.STACKS);
+
+  useEffect(() => {
+    fetchExams().then((res) => {
+      const list = res?.rows || (Array.isArray(res) ? res : []);
+      const customStacks = list.map(e => e.stack).filter(Boolean);
+      setAvailableStacks(Array.from(new Set([...META.STACKS, ...customStacks])));
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -67,7 +76,7 @@ export default function AttemptsPage() {
 
       {/* Filter bar */}
       <div className="a2-filterbar">
-        <Select label="Stack" value={filters.stack} options={META.STACKS} onChange={(v) => setFilter("stack", v)} />
+        <Select label="Stack" value={filters.stack} options={availableStacks} onChange={(v) => setFilter("stack", v)} />
         {!isReviewPage && (
           <Select label="Level" value={filters.level} options={META.LEVELS} onChange={(v) => setFilter("level", v)} />
         )}
@@ -104,63 +113,73 @@ export default function AttemptsPage() {
               : "No attempts match these filters. Adjust or clear the filters to see results."}
           </div>
         ) : (
-          <table className="a2-table a2-table-hover">
-            <thead>
-              {isReviewPage ? (
-                <tr>
-                  <th>Exam</th><th>Candidate</th><th>Stack</th>
-                  <th>Status</th><th>Submitted</th>
-                </tr>
-              ) : (
-                <tr>
-                  <th>Exam</th><th>Candidate</th><th>Stack</th><th>Level</th>
-                  <th>Status</th><th>Score</th><th>Flags</th><th>Submitted</th>
-                </tr>
-              )}
-            </thead>
-            <tbody>
-              {data.rows.map((r) => (
-                <React.Fragment key={r.id}>
-                  <tr
-                    className={isReviewPage ? "a2-clickable" : ""}
-                    onClick={() => isReviewPage && setExpanded(expanded === r.id ? null : r.id)}
-                  >
-                    <td>{r.exam}</td>
-                    <td>{r.candidate}</td>
-                    <td>{r.stack}</td>
-                    {!isReviewPage && <td><span className={`a2-pill a2-lvl-${r.level}`}>{r.level}</span></td>}
-                    <td><ResultPill result={r.result} /></td>
-                    {!isReviewPage && <td>{r.score}</td>}
-                    {!isReviewPage && <td>{r.flagCount > 0 ? <span className="a2-pill a2-pill-amber">{r.flagCount}</span> : "—"}</td>}
-                    <td>{new Date(r.submittedAt).toLocaleString()}</td>
+          <div className="a2-table-container">
+            <table className="a2-table a2-table-hover">
+              <thead>
+                {isReviewPage ? (
+                  <tr>
+                    <th>Exam</th><th>Candidate</th><th>Stack</th>
+                    <th style={{ textAlign: "center" }}>Status</th><th>Submitted</th>
                   </tr>
-
-                  {/* Row drill-down - Only available on Review & Flags page */}
-                  {isReviewPage && expanded === r.id && (
-                    <tr className="a2-drill">
-                      <td colSpan={5}>
-                        <div className="a2-drill-body">
-                          <div className="a2-drill-facts">
-                            <Fact label="Duration" value={`${r.durationMin || 60} min`} />
-                            <Fact label="Integrity flags" value={r.flagCount} />
-                            <Fact label="Status" value={(r.result || "").replace("_", " ")} />
-                          </div>
-                          <div className="a2-drill-actions">
-                            <button
-                              className="a2-btn a2-btn-primary"
-                              onClick={(e) => { e.stopPropagation(); navigate(`/admin/attempts/${r.id}/review`); }}
-                            >
-                              Open full review
-                            </button>
-                          </div>
-                        </div>
-                      </td>
+                ) : (
+                  <tr>
+                    <th>Exam</th><th>Candidate</th><th>Stack</th><th style={{ textAlign: "center" }}>Level</th>
+                    <th style={{ textAlign: "center" }}>Status</th><th style={{ textAlign: "center" }}>Score</th><th style={{ textAlign: "center" }}>Flags</th><th>Submitted</th>
+                  </tr>
+                )}
+              </thead>
+              <tbody>
+                {data.rows.map((r) => (
+                  <React.Fragment key={r.id}>
+                    <tr
+                      className={isReviewPage ? "a2-clickable" : ""}
+                      onClick={() => isReviewPage && setExpanded(expanded === r.id ? null : r.id)}
+                    >
+                      <td>{r.exam}</td>
+                      <td>{r.candidate}</td>
+                      <td>{r.stack}</td>
+                      {!isReviewPage && (
+                        <td style={{ textAlign: "center" }}>
+                          {["L1", "L2", "L3", "L4", "L5"].includes(r.level) ? (
+                            <span className={`a2-pill a2-lvl-${r.level}`}>{r.level}</span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      )}
+                      <td style={{ textAlign: "center" }}><ResultPill result={r.result} /></td>
+                      {!isReviewPage && <td style={{ textAlign: "center" }}>{r.score}</td>}
+                      {!isReviewPage && <td style={{ textAlign: "center" }}>{r.flagCount > 0 ? <span className="a2-pill a2-pill-amber">{r.flagCount}</span> : "—"}</td>}
+                      <td>{new Date(r.submittedAt).toLocaleString()}</td>
                     </tr>
-                  )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+
+                    {/* Row drill-down - Only available on Review & Flags page */}
+                    {isReviewPage && expanded === r.id && (
+                      <tr className="a2-drill">
+                        <td colSpan={5}>
+                          <div className="a2-drill-body">
+                            <div className="a2-drill-facts">
+                              <Fact label="Duration" value={`${r.durationMin || 60} min`} />
+                              <Fact label="Integrity flags" value={r.flagCount} />
+                              <Fact label="Status" value={(r.result || "").replace("_", " ")} />
+                            </div>
+                            <div className="a2-drill-actions">
+                              <button
+                                className="a2-btn a2-btn-primary"
+                                onClick={(e) => { e.stopPropagation(); navigate(`/admin/attempts/${r.id}/review`); }}
+                              >
+                                Open full review
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

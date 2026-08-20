@@ -274,6 +274,42 @@ public class AttemptService {
                 }
         }
 
+        public static CompetencyLevel calculateLevel(int percentScore, int passMark, List<CompetencyBand> bands) {
+                if (percentScore < passMark) {
+                        return null;
+                }
+                if (bands == null || bands.isEmpty()) {
+                        return CompetencyLevel.L3;
+                }
+                CompetencyBand l5 = bands.stream().filter(b -> b.getLevelName() == CompetencyLevel.L5).findFirst().orElse(null);
+                CompetencyBand l4 = bands.stream().filter(b -> b.getLevelName() == CompetencyLevel.L4).findFirst().orElse(null);
+                CompetencyBand l3 = bands.stream().filter(b -> b.getLevelName() == CompetencyLevel.L3).findFirst().orElse(null);
+                CompetencyBand l2 = bands.stream().filter(b -> b.getLevelName() == CompetencyLevel.L2).findFirst().orElse(null);
+                CompetencyBand l1 = bands.stream().filter(b -> b.getLevelName() == CompetencyLevel.L1).findFirst().orElse(null);
+
+                int maxL5 = (l5 != null) ? l5.getMaxScore() : 19;
+                int maxL4 = (l4 != null) ? l4.getMaxScore() : 39;
+                int maxL3 = (l3 != null) ? l3.getMaxScore() : 59;
+                int maxL2 = (l2 != null) ? l2.getMaxScore() : 79;
+
+                int range = 100 - passMark;
+                int upperL5 = passMark + (int) Math.round((double) maxL5 / 100.0 * range);
+                int upperL4 = passMark + (int) Math.round((double) maxL4 / 100.0 * range);
+                int upperL3 = passMark + (int) Math.round((double) maxL3 / 100.0 * range);
+                int upperL2 = passMark + (int) Math.round((double) maxL2 / 100.0 * range);
+
+                upperL5 = Math.max(passMark, Math.min(upperL5, 100));
+                upperL4 = Math.max(upperL5, Math.min(upperL4, 100));
+                upperL3 = Math.max(upperL4, Math.min(upperL3, 100));
+                upperL2 = Math.max(upperL3, Math.min(upperL2, 100));
+
+                if (percentScore <= upperL5) return CompetencyLevel.L5;
+                if (percentScore <= upperL4) return CompetencyLevel.L4;
+                if (percentScore <= upperL3) return CompetencyLevel.L3;
+                if (percentScore <= upperL2) return CompetencyLevel.L2;
+                return CompetencyLevel.L1;
+        }
+
         public SubmitExamResponseDTO submitExam(
                         SubmitExamRequestDTO request,
                         String username) {
@@ -437,30 +473,21 @@ public class AttemptService {
                 int percentScore = totMarksVal > 0 ? (int) Math.round((correctMarksSum / totMarksVal) * 100) : 0;
                 percentScore = Math.min(percentScore, 100);
 
-                CompetencyLevel level = CompetencyLevel.L5;
-                List<CompetencyBand> bands = competencyBandRepository.findByExamId(exam.getId());
-                if (bands == null || bands.isEmpty()) {
-                        bands = new ArrayList<>();
-                        bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
-                        bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L2).minScore(75).maxScore(89).title("Advanced").build());
-                        bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L3).minScore(60).maxScore(74).title("Intermediate").build());
-                        bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L4).minScore(40).maxScore(59).title("Beginner").build());
-                        bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
-                }
-                for (CompetencyBand band : bands) {
-                        if (percentScore >= band.getMinScore() && percentScore <= band.getMaxScore()) {
-                                level = band.getLevelName();
-                                break;
-                        }
-                }
-                attempt.setAssignedLevel(level);
-
-                // Pass/fail: compare percentage of correct answers against passMark threshold
-                // passMark is stored as a percentage (e.g. 60 = 60%) for backward compatibility
                 if (percentScore >= exam.getPassMark()) {
                         attempt.setResultStatus(ResultStatus.PASSED);
+                        List<CompetencyBand> bands = competencyBandRepository.findByExamId(exam.getId());
+                        if (bands == null || bands.isEmpty()) {
+                                bands = new ArrayList<>();
+                                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
+                                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L2).minScore(75).maxScore(89).title("Advanced").build());
+                                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L3).minScore(60).maxScore(74).title("Intermediate").build());
+                                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L4).minScore(40).maxScore(59).title("Beginner").build());
+                                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
+                        }
+                        attempt.setAssignedLevel(calculateLevel(percentScore, exam.getPassMark(), bands));
                 } else {
                         attempt.setResultStatus(ResultStatus.FAILED);
+                        attempt.setAssignedLevel(null);
                 }
 
                 attemptRepository.save(attempt);
@@ -520,20 +547,11 @@ public class AttemptService {
 
         private List<Question> fetchQuestionsForExam(Exam exam) {
                 List<Question> questions = questionRepository.findByExamIdAndIsActiveTrue(exam.getId());
-                if (questions.isEmpty()) {
-                        questions = questionRepository.findByExamId(exam.getId());
-                }
                 if (questions.isEmpty() && exam.getStack() != null && !exam.getStack().isBlank()) {
                         questions = questionRepository.findByStackIgnoreCaseAndIsActiveTrue(exam.getStack());
-                        if (questions.isEmpty()) {
-                                questions = questionRepository.findByStackIgnoreCase(exam.getStack());
-                        }
                 }
                 if (questions.isEmpty()) {
                         questions = questionRepository.findByIsActiveTrue();
-                }
-                if (questions.isEmpty()) {
-                        questions = questionRepository.findAll();
                 }
                 if (questions.isEmpty()) {
                         questions = seedStarterQuestions(exam);

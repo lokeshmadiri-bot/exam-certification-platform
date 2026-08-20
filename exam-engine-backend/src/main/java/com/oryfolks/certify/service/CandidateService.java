@@ -190,14 +190,21 @@ public class CandidateService {
                         if (attempt.getAdminDecision().equals("CONFIRMED")) {
                                 finalScore = attempt.getScore();
                                 status = attempt.getResultStatus();
-                                levelStr = attempt.getAssignedLevel() != null ? attempt.getAssignedLevel().name() : "L3";
-                                levelTitle = band != null ? band.getTitle() : getDefaultLevelTitle(attempt.getAssignedLevel());
+                                if (status == ResultStatus.PASSED) {
+                                        levelStr = attempt.getAssignedLevel() != null ? attempt.getAssignedLevel().name() : "—";
+                                        levelTitle = band != null ? band.getTitle() : getDefaultLevelTitle(attempt.getAssignedLevel());
+                                } else {
+                                        levelStr = "—";
+                                        levelTitle = "Failed";
+                                }
                                 answersList = answers;
                         } else if (attempt.getAdminDecision().equals("REJECTED")) {
                                 status = ResultStatus.FAILED;
+                                levelStr = "—";
                                 levelTitle = "Rejected";
                         }
                 } else {
+                        levelStr = "—";
                         levelTitle = "Pending Review";
                 }
 
@@ -339,13 +346,20 @@ public class CandidateService {
                 if (isDecided) {
                         if (attempt.getAdminDecision().equals("CONFIRMED")) {
                                 finalStatus = attempt.getResultStatus();
-                                finalLevel = attempt.getAssignedLevel() != null ? attempt.getAssignedLevel().name() : null;
-                                finalLevelTitle = band != null ? band.getTitle() : getDefaultLevelTitle(attempt.getAssignedLevel());
+                                if (finalStatus == ResultStatus.PASSED) {
+                                        finalLevel = attempt.getAssignedLevel() != null ? attempt.getAssignedLevel().name() : "—";
+                                        finalLevelTitle = band != null ? band.getTitle() : getDefaultLevelTitle(attempt.getAssignedLevel());
+                                } else {
+                                        finalLevel = "—";
+                                        finalLevelTitle = "Failed";
+                                }
                         } else if (attempt.getAdminDecision().equals("REJECTED")) {
                                 finalStatus = ResultStatus.FAILED;
+                                finalLevel = "—";
                                 finalLevelTitle = "Rejected";
                         }
                 } else {
+                        finalLevel = "—";
                         finalLevelTitle = "Pending Review";
                 }
 
