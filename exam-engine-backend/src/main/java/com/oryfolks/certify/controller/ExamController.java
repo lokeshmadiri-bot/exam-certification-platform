@@ -406,29 +406,21 @@ public class ExamController {
         int percentScore = totMarksVal > 0 ? (int) Math.round((correctMarksSum / totMarksVal) * 100) : 0;
         percentScore = Math.min(percentScore, 100);
 
-        CompetencyLevel level = CompetencyLevel.L5;
-        List<CompetencyBand> bands = competencyBandRepository.findByExamId(exam.getId());
-        if (bands == null || bands.isEmpty()) {
-            bands = new ArrayList<>();
-            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
-            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L2).minScore(75).maxScore(89).title("Advanced").build());
-            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L3).minScore(60).maxScore(74).title("Intermediate").build());
-            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L4).minScore(40).maxScore(59).title("Beginner").build());
-            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
-        }
-        for (CompetencyBand band : bands) {
-            if (percentScore >= band.getMinScore() && percentScore <= band.getMaxScore()) {
-                level = band.getLevelName();
-                break;
-            }
-        }
-        attempt.setAssignedLevel(level);
-
-        // Pass/fail: compare percentage against passMark (backward compatible)
         if (percentScore >= exam.getPassMark()) {
             attempt.setResultStatus(ResultStatus.PASSED);
+            List<CompetencyBand> bands = competencyBandRepository.findByExamId(exam.getId());
+            if (bands == null || bands.isEmpty()) {
+                bands = new ArrayList<>();
+                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
+                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L2).minScore(75).maxScore(89).title("Advanced").build());
+                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L3).minScore(60).maxScore(74).title("Intermediate").build());
+                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L4).minScore(40).maxScore(59).title("Beginner").build());
+                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
+            }
+            attempt.setAssignedLevel(com.oryfolks.certify.service.AttemptService.calculateLevel(percentScore, exam.getPassMark(), bands));
         } else {
             attempt.setResultStatus(ResultStatus.FAILED);
+            attempt.setAssignedLevel(null);
         }
 
         // Archive answers to attempt_answers table for permanent admin audit trail
@@ -589,23 +581,7 @@ public class ExamController {
         int percentScore2 = totMarksVal > 0 ? (int) Math.round((correctMarksSum / totMarksVal) * 100) : 0;
         percentScore2 = Math.min(percentScore2, 100);
 
-        CompetencyLevel level = CompetencyLevel.L5;
-        List<CompetencyBand> bands = competencyBandRepository.findByExamId(exam.getId());
-        if (bands == null || bands.isEmpty()) {
-            bands = new ArrayList<>();
-            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
-            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L2).minScore(75).maxScore(89).title("Advanced").build());
-            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L3).minScore(60).maxScore(74).title("Intermediate").build());
-            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L4).minScore(40).maxScore(59).title("Beginner").build());
-            bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
-        }
-        for (CompetencyBand band : bands) {
-            if (percentScore2 >= band.getMinScore() && percentScore2 <= band.getMaxScore()) {
-                level = band.getLevelName();
-                break;
-            }
-        }
-        attempt.setAssignedLevel(level);
+        attempt.setAssignedLevel(null);
         attempt.setResultStatus(ResultStatus.TERMINATED);
 
         examAttemptRepository.save(attempt);
@@ -757,20 +733,11 @@ public class ExamController {
 
     private List<Question> fetchQuestionsForExam(Exam exam) {
         List<Question> questions = questionRepository.findByExamIdAndIsActiveTrue(exam.getId());
-        if (questions.isEmpty()) {
-            questions = questionRepository.findByExamId(exam.getId());
-        }
         if (questions.isEmpty() && exam.getStack() != null && !exam.getStack().isBlank()) {
             questions = questionRepository.findByStackIgnoreCaseAndIsActiveTrue(exam.getStack());
-            if (questions.isEmpty()) {
-                questions = questionRepository.findByStackIgnoreCase(exam.getStack());
-            }
         }
         if (questions.isEmpty()) {
             questions = questionRepository.findByIsActiveTrue();
-        }
-        if (questions.isEmpty()) {
-            questions = questionRepository.findAll();
         }
         if (questions.isEmpty()) {
             questions = seedStarterQuestions(exam);
