@@ -9,11 +9,17 @@ import com.oryfolks.certify.entity.Question;
 import com.oryfolks.certify.exception.ResourceNotFoundException;
 import com.oryfolks.certify.repository.ExamRepository;
 import com.oryfolks.certify.repository.QuestionRepository;
+import com.oryfolks.certify.service.QuestionDuplicateDetectionService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -25,13 +31,77 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class QuestionService {
 
+    private static final Logger log = LoggerFactory.getLogger(QuestionService.class);
+
     private final QuestionRepository questionRepository;
     private final ExamRepository examRepository;
     private final GeminiService geminiService;
+    private final QuestionDuplicateDetectionService duplicateDetectionService;
 
-    /** Generate questions via Gemini (no DB write). */
+    public static class UniqueQuestionList extends ArrayList<GeneratedQuestionDTO> {
+        private final int duplicatesRemoved;
+
+        public UniqueQuestionList(List<GeneratedQuestionDTO> list, int duplicatesRemoved) {
+            super(list);
+            this.duplicatesRemoved = duplicatesRemoved;
+        }
+
+        public int getDuplicatesRemoved() {
+            return duplicatesRemoved;
+        }
+    }
+
+    /** Generate questions via Gemini (no DB write) with duplicate detection and replacement generation. */
     public List<GeneratedQuestionDTO> generateQuestions(GenerateQuestionRequest req) {
-        return geminiService.generate(req);
+        int targetCount = req.getCount() != null ? req.getCount() : 10;
+        String stack = req.getStack() != null ? req.getStack() : "Java";
+
+        // Load existing normalized question texts for this tech stack
+        Set<String> existingNormalizedTexts = duplicateDetectionService.getExistingNormalizedTexts(stack);
+
+        // Generate initial batch
+        List<GeneratedQuestionDTO> initialBatch = geminiService.generate(req);
+
+        // Filter duplicates in the initial batch
+        QuestionDuplicateDetectionService.DuplicateFilterResult filterResult =
+                duplicateDetectionService.filterDuplicates(initialBatch, stack, existingNormalizedTexts);
+
+        List<GeneratedQuestionDTO> uniqueQuestions = new ArrayList<>(filterResult.getUniqueQuestions());
+        int totalDuplicatesRemoved = filterResult.getDuplicatesRemoved();
+
+        int attempts = 0;
+        int maxAttempts = 5;
+
+        // Loop to generate replacements for any filtered duplicates
+        while (uniqueQuestions.size() < targetCount && attempts < maxAttempts) {
+            attempts++;
+            int shortage = targetCount - uniqueQuestions.size();
+            log.info("Shortage of {} questions detected due to duplicate filtering. Generating replacement batch (attempt {}/{})...",
+                    shortage, attempts, maxAttempts);
+
+            GenerateQuestionRequest replacementReq = GenerateQuestionRequest.builder()
+                    .stack(req.getStack())
+                    .level(req.getLevel())
+                    .difficulty(req.getDifficulty())
+                    .type(req.getType())
+                    .count(shortage)
+                    .topic(req.getTopic())
+                    .examId(req.getExamId())
+                    .build();
+
+            List<GeneratedQuestionDTO> replacementBatch = geminiService.generate(replacementReq);
+
+            QuestionDuplicateDetectionService.DuplicateFilterResult replacementFilterResult =
+                    duplicateDetectionService.filterDuplicates(replacementBatch, stack, existingNormalizedTexts);
+
+            uniqueQuestions.addAll(replacementFilterResult.getUniqueQuestions());
+            totalDuplicatesRemoved += replacementFilterResult.getDuplicatesRemoved();
+        }
+
+        log.info("Finished question generation. Total unique generated questions: {}. Total duplicates removed: {}.",
+                uniqueQuestions.size(), totalDuplicatesRemoved);
+
+        return new UniqueQuestionList(uniqueQuestions, totalDuplicatesRemoved);
     }
 
     /** Re-generate a single question via Gemini (no DB write). */
@@ -39,7 +109,7 @@ public class QuestionService {
         return geminiService.regenerate(original);
     }
 
-    /** Persist the approved/edited AI-generated questions to the DB. */
+    /** Persist the approved/edited AI-generated questions to the DB, filtering any final duplicates. */
     @Transactional
     public List<Question> saveGeneratedQuestions(SaveGeneratedQuestionsRequest req) {
         if (req == null || req.getQuestions() == null || req.getQuestions().isEmpty()) {
@@ -62,7 +132,25 @@ public class QuestionService {
         }
 
         Exam finalExam = exam;
+
+        // Fetch existing normalized questions to filter out any late duplicates
+        String techStack = req.getQuestions().stream()
+                .map(GeneratedQuestionDTO::getStack)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(finalExam != null ? finalExam.getStack() : "Java");
+        Set<String> existingNormalizedTexts = duplicateDetectionService.getExistingNormalizedTexts(techStack);
+
         List<Question> questions = req.getQuestions().stream()
+                .filter(dto -> {
+                    String norm = duplicateDetectionService.normalize(dto.getQuestionText());
+                    if (existingNormalizedTexts.contains(norm)) {
+                        log.warn("Filtering out duplicate question text during save persistence: {}", dto.getQuestionText());
+                        return false;
+                    }
+                    existingNormalizedTexts.add(norm); // prevent duplicates within save payload
+                    return true;
+                })
                 .map(dto -> {
                     String rawOpt = dto.getCorrectOption();
                     String cleanOpt = "A";

@@ -472,7 +472,12 @@ public class AdminController {
     // ------------------------------------------------------------------ //
 
     @GetMapping("/analytics/dashboard")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getDashboardAnalytics() {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getDashboardAnalytics(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String startMonth,
+            @RequestParam(required = false) String endMonth,
+            @RequestParam(required = false) String month) {
         try {
             List<ExamAttempt> attempts;
             try {
@@ -486,13 +491,84 @@ public class AdminController {
             }
             if (attempts == null) attempts = new ArrayList<>();
 
-            int totalAttempts = attempts.size();
-            long passCount = attempts.stream()
-                    .filter(a -> a != null && (a.getResultStatus() == ResultStatus.PASSED || "PASS".equalsIgnoreCase(String.valueOf(a.getResultStatus())) || "PASSED".equalsIgnoreCase(String.valueOf(a.getResultStatus())))).count();
-            long needsReviewCount = attempts.stream()
-                    .filter(a -> a != null && (a.getResultPublishStatus() == ResultPublishStatus.PENDING || "NEEDS_REVIEW".equalsIgnoreCase(String.valueOf(a.getResultStatus()))))
-                    .count();
-            double passRate = totalAttempts > 0 ? Math.round((double) passCount / totalAttempts * 1000.0) / 10.0 : 84.5;
+            LocalDateTime startDateTime = null;
+            LocalDateTime endDateTime = null;
+
+            if (startDate != null && !startDate.isBlank()) {
+                try {
+                    startDateTime = java.time.LocalDate.parse(startDate).atStartOfDay();
+                } catch (Exception ignored) {}
+            }
+            if (endDate != null && !endDate.isBlank()) {
+                try {
+                    endDateTime = java.time.LocalDate.parse(endDate).atTime(23, 59, 59, 999999999);
+                } catch (Exception ignored) {}
+            }
+
+            if (startMonth != null && !startMonth.isBlank()) {
+                try {
+                    startDateTime = java.time.YearMonth.parse(startMonth).atDay(1).atStartOfDay();
+                } catch (Exception ignored) {}
+            }
+            if (endMonth != null && !endMonth.isBlank()) {
+                try {
+                    endDateTime = java.time.YearMonth.parse(endMonth).atEndOfMonth().atTime(23, 59, 59, 999999999);
+                } catch (Exception ignored) {}
+            }
+
+            // Fallback for monthly filter if not provided yet
+            if (startDateTime == null && endDateTime == null && month != null && !month.isBlank()) {
+                try {
+                    String[] parts = month.split("-");
+                    int year = Integer.parseInt(parts[0]);
+                    int mVal = Integer.parseInt(parts[1]);
+                    java.time.YearMonth ym = java.time.YearMonth.of(year, mVal);
+                    startDateTime = ym.atDay(1).atStartOfDay();
+                    endDateTime = ym.atEndOfMonth().atTime(23, 59, 59, 999999999);
+                } catch (Exception ignored) {}
+            }
+
+            // Default to CURRENT MONTH boundaries if no filter is active
+            if (startDateTime == null && endDateTime == null) {
+                java.time.YearMonth currentYM = java.time.YearMonth.now();
+                startDateTime = currentYM.atDay(1).atStartOfDay();
+                endDateTime = currentYM.atEndOfMonth().atTime(23, 59, 59, 999999999);
+            }
+
+            final LocalDateTime finalStart = startDateTime;
+            final LocalDateTime finalEnd = endDateTime;
+
+            List<ExamAttempt> filteredAttempts = new ArrayList<>();
+            for (ExamAttempt a : attempts) {
+                if (a == null) continue;
+                LocalDateTime time = a.getCreatedAt() != null ? a.getCreatedAt() : a.getStartTime();
+                if (time == null) continue;
+                if (finalStart != null && time.isBefore(finalStart)) continue;
+                if (finalEnd != null && time.isAfter(finalEnd)) continue;
+                filteredAttempts.add(a);
+            }
+
+            int totalAttempts = filteredAttempts.size();
+            long passCount = 0;
+            long failCount = 0;
+            long needsReviewCount = 0;
+
+            for (ExamAttempt a : filteredAttempts) {
+                String decision = a.getAdminDecision();
+                if ("CONFIRMED".equals(decision)) {
+                    if (a.getResultStatus() == ResultStatus.PASSED) {
+                        passCount++;
+                    } else {
+                        failCount++;
+                    }
+                } else if ("REJECTED".equals(decision)) {
+                    failCount++;
+                } else {
+                    needsReviewCount++;
+                }
+            }
+
+            double passRate = totalAttempts > 0 ? Math.round((double) passCount / totalAttempts * 1000.0) / 10.0 : 0.0;
 
             Map<String, Object> kpis = new HashMap<>();
             kpis.put("totalAttempts", totalAttempts);
@@ -500,27 +576,125 @@ public class AdminController {
             kpis.put("needsReview", needsReviewCount);
             kpis.put("avgDurationMin", 42);
 
+            Map<String, Integer> levelCounts = new HashMap<>();
+            levelCounts.put("L1", 0);
+            levelCounts.put("L2", 0);
+            levelCounts.put("L3", 0);
+            levelCounts.put("L4", 0);
+            levelCounts.put("L5", 0);
+
+            for (ExamAttempt a : filteredAttempts) {
+                String decision = a.getAdminDecision();
+                if ("CONFIRMED".equals(decision) && a.getResultStatus() == ResultStatus.PASSED) {
+                    String lvl = a.getAssignedLevel() != null ? a.getAssignedLevel().name()
+                            : (a.getCompetencyLevel() != null ? a.getCompetencyLevel().name() : null);
+                    if (lvl != null && levelCounts.containsKey(lvl)) {
+                        levelCounts.put(lvl, levelCounts.get(lvl) + 1);
+                    }
+                }
+            }
+
             List<Map<String, Object>> levelDistribution = List.of(
-                    Map.of("level", "L1", "count", 12),
-                    Map.of("level", "L2", "count", 25),
-                    Map.of("level", "L3", "count", 45),
-                    Map.of("level", "L4", "count", 18),
-                    Map.of("level", "L5", "count", 8));
+                    Map.of("level", "L1", "count", levelCounts.get("L1")),
+                    Map.of("level", "L2", "count", levelCounts.get("L2")),
+                    Map.of("level", "L3", "count", levelCounts.get("L3")),
+                    Map.of("level", "L4", "count", levelCounts.get("L4")),
+                    Map.of("level", "L5", "count", levelCounts.get("L5")));
 
             List<Map<String, Object>> passRateSplit = List.of(
                     Map.of("name", "Pass", "value", (int) passCount),
-                    Map.of("name", "Fail", "value", Math.max(0, totalAttempts - (int) passCount - (int) needsReviewCount)),
+                    Map.of("name", "Fail", "value", (int) failCount),
                     Map.of("name", "Needs Review", "value", (int) needsReviewCount));
 
-            List<Map<String, Object>> attemptsByStack = List.of(
-                    Map.of("stack", "Java", "attempts", 48),
-                    Map.of("stack", "React", "attempts", 32),
-                    Map.of("stack", "Python", "attempts", 24),
-                    Map.of("stack", "Node", "attempts", 16),
-                    Map.of("stack", "SQL", "attempts", 12));
+            // Dynamically calculate attemptsByStack (pass/fail count for each stack)
+            Set<String> allStacks = new LinkedHashSet<>(List.of("Java", "React", "Python", "Node", "SQL"));
+            if (examRepository != null) {
+                examRepository.findAll().forEach(e -> {
+                    if (e != null && e.getStack() != null && !e.getStack().isBlank()) {
+                        String stackName = e.getStack().trim();
+                        boolean found = false;
+                        for (String existing : allStacks) {
+                            if (existing.equalsIgnoreCase(stackName)) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            allStacks.add(stackName);
+                        }
+                    }
+                });
+            }
+            for (ExamAttempt a : filteredAttempts) {
+                if (a != null && a.getExam() != null && a.getExam().getStack() != null && !a.getExam().getStack().isBlank()) {
+                    String stackName = a.getExam().getStack().trim();
+                    boolean found = false;
+                    for (String existing : allStacks) {
+                        if (existing.equalsIgnoreCase(stackName)) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        allStacks.add(stackName);
+                    }
+                }
+            }
+
+            Map<String, Map<String, Integer>> stackStats = new LinkedHashMap<>();
+            for (String s : allStacks) {
+                Map<String, Integer> stats = new HashMap<>();
+                stats.put("pass", 0);
+                stats.put("fail", 0);
+                stackStats.put(s, stats);
+            }
+
+            for (ExamAttempt a : filteredAttempts) {
+                if (a == null || a.getExam() == null || a.getExam().getStack() == null || a.getExam().getStack().isBlank()) {
+                    continue;
+                }
+                String sName = a.getExam().getStack().trim();
+                String matchedKey = sName;
+                for (String key : stackStats.keySet()) {
+                    if (key.equalsIgnoreCase(sName)) {
+                        matchedKey = key;
+                        break;
+                    }
+                }
+                stackStats.putIfAbsent(matchedKey, new HashMap<>(Map.of("pass", 0, "fail", 0)));
+                Map<String, Integer> stats = stackStats.get(matchedKey);
+
+                String decision = a.getAdminDecision();
+                if ("CONFIRMED".equals(decision)) {
+                    if (a.getResultStatus() == ResultStatus.PASSED) {
+                        stats.put("pass", stats.get("pass") + 1);
+                    } else {
+                        stats.put("fail", stats.get("fail") + 1);
+                    }
+                } else if ("REJECTED".equals(decision)) {
+                    stats.put("fail", stats.get("fail") + 1);
+                }
+            }
+
+            List<Map<String, Object>> attemptsByStack = new ArrayList<>();
+            for (Map.Entry<String, Map<String, Integer>> entry : stackStats.entrySet()) {
+                attemptsByStack.add(Map.of(
+                        "stack", entry.getKey(),
+                        "pass", entry.getValue().get("pass"),
+                        "fail", entry.getValue().get("fail")
+                ));
+            }
+            if (attemptsByStack.isEmpty()) {
+                attemptsByStack = List.of(
+                        Map.of("stack", "Java", "pass", 0, "fail", 0),
+                        Map.of("stack", "React", "pass", 0, "fail", 0),
+                        Map.of("stack", "Python", "pass", 0, "fail", 0),
+                        Map.of("stack", "Node", "pass", 0, "fail", 0),
+                        Map.of("stack", "SQL", "pass", 0, "fail", 0));
+            }
 
             List<Map<String, Object>> needsReviewQueue = new ArrayList<>();
-            for (ExamAttempt a : attempts) {
+            for (ExamAttempt a : filteredAttempts) {
                 if (a != null) {
                     try {
                         Map<String, Object> summary = mapAttemptSummary(a);
@@ -536,6 +710,11 @@ public class AdminController {
             Map<String, Object> data = new HashMap<>();
             data.put("kpis", kpis);
             data.put("levelDistribution", levelDistribution);
+            data.put("startDate", startDate);
+            data.put("endDate", endDate);
+            data.put("startMonth", startDateTime != null ? startDateTime.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM")) : null);
+            data.put("endMonth", endDateTime != null ? endDateTime.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM")) : null);
+            data.put("levelMonth", month != null ? month : (startDate != null && startDate.length() >= 7 ? startDate.substring(0, 7) : java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"))));
             data.put("passRateSplit", passRateSplit);
             data.put("attemptsByStack", attemptsByStack);
             data.put("needsReviewQueue", needsReviewQueue);
@@ -546,6 +725,9 @@ public class AdminController {
             Map<String, Object> fallback = new HashMap<>();
             fallback.put("kpis", Map.of("totalAttempts", 0, "passRate", 0, "needsReview", 0, "avgDurationMin", 0));
             fallback.put("levelDistribution", List.of());
+            fallback.put("startDate", startDate);
+            fallback.put("endDate", endDate);
+            fallback.put("levelMonth", java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM")));
             fallback.put("passRateSplit", List.of());
             fallback.put("attemptsByStack", List.of());
             fallback.put("needsReviewQueue", List.of());
@@ -922,20 +1104,20 @@ public class AdminController {
             finalScorePercent = Math.min(finalScorePercent, 100);
             String autoResult = finalScorePercent >= passMark ? "PASS" : "FAIL";
 
-            CompetencyLevel level = CompetencyLevel.L5;
-            List<CompetencyBand> bands = attempt.getExam() != null ? attempt.getExam().getCompetencyBands() : null;
-            if (bands == null || bands.isEmpty()) {
-                bands = new ArrayList<>();
-                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
-                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L2).minScore(75).maxScore(89).title("Advanced").build());
-                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L3).minScore(60).maxScore(74).title("Intermediate").build());
-                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L4).minScore(40).maxScore(59).title("Beginner").build());
-                bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
-            }
-            for (CompetencyBand band : bands) {
-                if (finalScorePercent >= band.getMinScore() && finalScorePercent <= band.getMaxScore()) {
-                    level = band.getLevelName();
-                    break;
+            String levelStr = "—";
+            if (finalScorePercent >= passMark && !"REJECTED".equals(attempt.getAdminDecision())) {
+                List<CompetencyBand> bands = attempt.getExam() != null ? attempt.getExam().getCompetencyBands() : null;
+                if (bands == null || bands.isEmpty()) {
+                    bands = new ArrayList<>();
+                    bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
+                    bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L2).minScore(75).maxScore(89).title("Advanced").build());
+                    bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L3).minScore(60).maxScore(74).title("Intermediate").build());
+                    bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L4).minScore(40).maxScore(59).title("Beginner").build());
+                    bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
+                }
+                CompetencyLevel calculatedLevel = com.oryfolks.certify.service.AttemptService.calculateLevel(finalScorePercent, passMark, bands);
+                if (calculatedLevel != null) {
+                    levelStr = calculatedLevel.name();
                 }
             }
 
@@ -943,7 +1125,7 @@ public class AdminController {
             scoreMap.put("total", totalScore);
             scoreMap.put("maxTotal", maxTotal);
             scoreMap.put("autoResult", autoResult);
-            scoreMap.put("level", level.name());
+            scoreMap.put("level", levelStr);
             scoreMap.put("integrityPenaltyApplied", false);
             scoreMap.put("sections", sectionScores);
 
@@ -975,29 +1157,22 @@ public class AdminController {
                 int totMarksVal = attempt.getExam().getTotalMarks() != null ? attempt.getExam().getTotalMarks() : 100;
                 int finalScorePercent = totMarksVal > 0 ? (int) Math.round(((double) finalScore / totMarksVal) * 100) : 0;
 
-                CompetencyLevel level = CompetencyLevel.L5;
-                List<CompetencyBand> bands = attempt.getExam() != null ? attempt.getExam().getCompetencyBands() : null;
-                if (bands == null || bands.isEmpty()) {
-                    bands = new ArrayList<>();
-                    bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
-                    bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L2).minScore(75).maxScore(89).title("Advanced").build());
-                    bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L3).minScore(60).maxScore(74).title("Intermediate").build());
-                    bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L4).minScore(40).maxScore(59).title("Beginner").build());
-                    bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
-                }
-                for (CompetencyBand band : bands) {
-                    if (finalScorePercent >= band.getMinScore() && finalScorePercent <= band.getMaxScore()) {
-                        level = band.getLevelName();
-                        break;
-                    }
-                }
-                attempt.setAssignedLevel(level);
-
                 int passMark = attempt.getExam() != null ? attempt.getExam().getPassMark() : 70;
                 if (finalScorePercent >= passMark) {
                     attempt.setResultStatus(com.oryfolks.certify.enums.ResultStatus.PASSED);
+                    List<CompetencyBand> bands = attempt.getExam() != null ? attempt.getExam().getCompetencyBands() : null;
+                    if (bands == null || bands.isEmpty()) {
+                        bands = new ArrayList<>();
+                        bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L1).minScore(90).maxScore(100).title("Expert").build());
+                        bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L2).minScore(75).maxScore(89).title("Advanced").build());
+                        bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L3).minScore(60).maxScore(74).title("Intermediate").build());
+                        bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L4).minScore(40).maxScore(59).title("Beginner").build());
+                        bands.add(CompetencyBand.builder().levelName(CompetencyLevel.L5).minScore(0).maxScore(39).title("Needs Improvement").build());
+                    }
+                    attempt.setAssignedLevel(com.oryfolks.certify.service.AttemptService.calculateLevel(finalScorePercent, passMark, bands));
                 } else {
                     attempt.setResultStatus(com.oryfolks.certify.enums.ResultStatus.FAILED);
+                    attempt.setAssignedLevel(null);
                 }
                 finalResultStr = attempt.getResultStatus().name();
 
@@ -1156,7 +1331,8 @@ public class AdminController {
             boolean isPublished = (a.getResultPublishStatus() == ResultPublishStatus.PUBLISHED);
 
             String level = "—";
-            if (isPublished) {
+            boolean isPass = (a.getResultStatus() == ResultStatus.PASSED) && !"REJECTED".equals(a.getAdminDecision());
+            if (isPublished && isPass) {
                 level = a.getAssignedLevel() != null ? a.getAssignedLevel().name()
                         : (a.getCompetencyLevel() != null ? a.getCompetencyLevel().name() : "—");
             }

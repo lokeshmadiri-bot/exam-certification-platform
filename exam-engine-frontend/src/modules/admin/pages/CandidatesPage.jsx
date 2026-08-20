@@ -297,17 +297,17 @@ export default function CandidatesPage() {
             ) : rows.length === 0 ? (
                 <div className="a1-empty">No candidates match your filters.</div>
             ) : (
-                <div style={{ overflowX: "auto" }}>
+                <div className="a1-table-container">
                     <table className="a1-table a1-table-hover">
                         <thead>
                             <tr>
-                                <th style={{ textAlign: "center" }}>Candidate</th>
-                                <th style={{ textAlign: "center" }}>Email</th>
-                                <th style={{ textAlign: "center" }}>Exam</th>
+                                <th>Candidate</th>
+                                <th>Email</th>
+                                <th>Exam</th>
                                 <th style={{ textAlign: "center" }}>Status</th>
-                                <th style={{ textAlign: "center" }}>Start Time</th>
-                                <th style={{ textAlign: "center" }}>End Time</th>
-                                <th style={{ textAlign: "center" }}>Duration</th>
+                                <th>Start Time</th>
+                                <th>End Time</th>
+                                <th>Duration</th>
                                 <th style={{ textAlign: "center" }}>Action</th>
                             </tr>
                         </thead>
@@ -317,9 +317,9 @@ export default function CandidatesPage() {
                                 const lockInfo   = LOCK_PILL[c.overrideLockStatus] || LOCK_PILL["UNLOCKED"];
                                 return (
                                     <tr key={`${c.candidateId}-${c.attemptId || i}`}>
-                                        <td style={{ fontWeight: 600, textAlign: "center" }}>{c.candidateName}</td>
-                                        <td className="a1-mono" style={{ fontSize: 12, textAlign: "center" }}>{c.email}</td>
-                                        <td style={{ textAlign: "center" }}>{c.examTitle}</td>
+                                        <td style={{ fontWeight: 600 }}>{c.candidateName}</td>
+                                        <td className="a1-mono" style={{ fontSize: 12 }}>{c.email}</td>
+                                        <td>{c.examTitle}</td>
                                         <td style={{ textAlign: "center" }}>
                                             <span
                                                 className={`a1-pill ${lockInfo.cls}`}
@@ -333,9 +333,9 @@ export default function CandidatesPage() {
                                                 <span>{lockInfo.label}</span>
                                             </span>
                                         </td>
-                                        <td style={{ fontSize: 12, textAlign: "center" }}>{fmtDate(c.startTime)}</td>
-                                        <td style={{ fontSize: 12, textAlign: "center" }}>{fmtDate(c.endTime)}</td>
-                                        <td style={{ textAlign: "center" }}>
+                                        <td style={{ fontSize: 12 }}>{fmtDate(c.startTime)}</td>
+                                        <td style={{ fontSize: 12 }}>{fmtDate(c.endTime)}</td>
+                                        <td>
                                             {c.durationMinutes ? `${c.durationMinutes} min` : "—"}
                                         </td>
                                         <td style={{ textAlign: "center" }}>

@@ -7,7 +7,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    fetchQuestions, fetchExams, createQuestion, updateQuestion, deleteQuestion, bulkUpdateQuestions, META,
+    fetchQuestions, fetchExams, createQuestion, updateQuestion, deleteQuestion, bulkUpdateQuestions, bulkDeleteQuestions, META,
 } from "../services/api";
 import AIQuestionGenerator from "../components/AIQuestionGenerator";
 import "../components/a1.css";
@@ -52,8 +52,14 @@ export default function QuestionBankPage() {
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [showAIGenerator, setShowAIGenerator] = useState(false);
     const [aiSavedToast, setAiSavedToast] = useState(null);
+    const [showQuestionsManager, setShowQuestionsManager] = useState(false);
 
-        const load = (currentFilters = filters) => {
+    const availableStacks = useMemo(() => {
+        const customStacks = exams.map((e) => e.stack).filter(Boolean);
+        return Array.from(new Set([...META.STACKS, ...customStacks]));
+    }, [exams]);
+
+    const load = (currentFilters = filters) => {
         fetchQuestions(currentFilters).then((res) => setRows(res?.rows || (Array.isArray(res) ? res : [])));
         fetchExams().then((res) => {
             const list = res?.rows || (Array.isArray(res) ? res : []);
@@ -203,13 +209,6 @@ export default function QuestionBankPage() {
                     </select>
                 </div>
                 <div className="a1-field">
-                    <label>Stack</label>
-                    <select value={filters.stack} onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, stack: e.target.value })); }}>
-                        <option value="">All stacks</option>
-                        {META.STACKS.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                </div>
-                <div className="a1-field">
                     <label>Type</label>
                     <select value={filters.type} onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, type: e.target.value })); }}>
                         <option value="">All types</option>
@@ -233,6 +232,20 @@ export default function QuestionBankPage() {
                         <option value="INACTIVE">Inactive</option>
                     </select>
                 </div>
+                <button
+                    type="button"
+                    className="a1-btn a1-btn-view-qa"
+                    style={{ whiteSpace: "nowrap", height: "36px", padding: "0 16px", display: "flex", alignItems: "center" }}
+                    onClick={() => {
+                        if (!filters.examId) {
+                            alert("Please select an Assigned Exam first to view matching questions.");
+                            return;
+                        }
+                        setShowQuestionsManager(true);
+                    }}
+                >
+                    View All QA's
+                </button>
             </div>
 
             {/* Questions Table */}
@@ -241,86 +254,104 @@ export default function QuestionBankPage() {
             ) : filteredRows.length === 0 ? (
                 <div className="a1-empty">No questions match your filters.</div>
             ) : (
-                <table className="a1-table a1-table-hover">
-                    <thead>
-                        <tr>
-                            <th className="a1-checkbox-col" style={{ textAlign: "center" }}>
-                                <input type="checkbox" checked={pageRows.length > 0 && pageRows.every((q) => selected.has(q.id))} onChange={toggleSelectAllPage} />
-                            </th>
-                            <th style={{ textAlign: "center" }}>Question</th>
-                            <th style={{ textAlign: "center" }}>Assigned Exam</th>
-                            <th style={{ textAlign: "center" }}>Stack</th>
-                            <th style={{ textAlign: "center" }}>Type</th>
-                            <th style={{ textAlign: "center" }}>Difficulty</th>
-                            <th style={{ textAlign: "center" }}>Source</th>
-                            <th style={{ textAlign: "center" }}>Status</th>
-                            <th style={{ textAlign: "center" }}>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {pageRows.map((q) => {
-                            const assignedExamTitle =
-                                q.exam?.title ||
-                                q.examTitle ||
-                                q.examName ||
-                                (typeof q.exam === "string" && q.exam.trim() ? q.exam : null) ||
-                                (exams.find((e) => String(e.id || e.examId) === String(q.examId || q.exam?.id || q.exam_id) || e.title === q.exam || e.title === q.examTitle)?.title) ||
-                                "Unassigned";
-                            const displayDiff = q.difficulty ? (q.difficulty.charAt(0).toUpperCase() + q.difficulty.slice(1).toLowerCase()) : "Medium";
-                            return (
-                                <tr key={q.id}>
-                                    <td className="a1-checkbox-col" style={{ textAlign: "center" }}>
-                                        <input type="checkbox" checked={selected.has(q.id)} onChange={() => toggleSelect(q.id)} />
-                                    </td>
-                                    <td style={{ textAlign: "center" }}>
-                                        <button 
-                                            className="a1-btn" 
-                                            style={{ 
-                                                background: "none", 
-                                                border: "none", 
-                                                color: "var(--a1-navy)", 
-                                                fontWeight: 600, 
-                                                textDecoration: "underline", 
-                                                cursor: "pointer", 
-                                                padding: 0,
-                                                fontSize: "13px"
-                                            }}
-                                            onClick={() => setViewing(q)}
-                                        >
-                                            View Question
-                                        </button>
-                                    </td>
-                                    <td style={{ textAlign: "center" }}>
-                                        <span className="a1-pill a1-pill-navy" style={{ fontWeight: 600 }}>
-                                            {assignedExamTitle}
-                                        </span>
-                                    </td>
-                                    <td style={{ textAlign: "center" }}>{q.stack}</td>
-                                    <td style={{ textAlign: "center" }}><span className="a1-pill a1-pill-navy">{TYPE_LABEL[q.type] || q.type}</span></td>
-                                    <td style={{ textAlign: "center" }}>
-                                        <span className="a1-pill a1-pill-amber">
-                                            {displayDiff}
-                                        </span>
-                                    </td>
-                                    <td style={{ textAlign: "center" }}>
-                                        <span className={`a1-pill ${q.source === "AI" ? "a1-pill-green" : "a1-pill"}`}>
-                                            {q.source || "MANUAL"}
-                                        </span>
-                                    </td>
-                                    <td style={{ textAlign: "center" }}>
-                                        <span className={`a1-pill ${q.status === "ACTIVE" ? "a1-pill-green" : ""}`}>{q.status}</span>
-                                    </td>
-                                    <td style={{ textAlign: "center" }}>
-                                        <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-                                            <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => setEditing(q)}>Edit</button>
-                                            <button className="a1-btn a1-btn-red a1-btn-sm" onClick={() => setConfirmDelete(q)}>Delete</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+                <div className="a1-table-container">
+                    <table className="a1-table a1-table-hover">
+                        <thead>
+                            <tr>
+                                <th style={{ textAlign: "center" }}>Question</th>
+                                <th style={{ textAlign: "left" }}>Assigned Exam</th>
+                                <th style={{ textAlign: "left" }}>Stack</th>
+                                <th style={{ textAlign: "center" }}>Type</th>
+                                <th style={{ textAlign: "center" }}>Difficulty</th>
+                                <th style={{ textAlign: "center" }}>Source</th>
+                                <th style={{ textAlign: "center" }}>Status</th>
+                                <th style={{ textAlign: "center" }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {pageRows.map((q) => {
+                                const assignedExamTitle =
+                                    q.exam?.title ||
+                                    q.examTitle ||
+                                    q.examName ||
+                                    (typeof q.exam === "string" && q.exam.trim() ? q.exam : null) ||
+                                    (exams.find((e) => String(e.id || e.examId) === String(q.examId || q.exam?.id || q.exam_id) || e.title === q.exam || e.title === q.examTitle)?.title) ||
+                                    "Unassigned";
+                                const displayDiff = q.difficulty ? (q.difficulty.charAt(0).toUpperCase() + q.difficulty.slice(1).toLowerCase()) : "Medium";
+                                return (
+                                    <tr key={q.id}>
+                                        <td style={{ textAlign: "center" }}>
+                                            <button 
+                                                className="a1-btn" 
+                                                style={{ 
+                                                    background: "none", 
+                                                    border: "none", 
+                                                    color: "var(--a1-navy)", 
+                                                    fontWeight: 600, 
+                                                    textDecoration: "underline", 
+                                                    cursor: "pointer", 
+                                                    padding: 0,
+                                                    fontSize: "13px"
+                                                }}
+                                                onClick={() => setViewing(q)}
+                                            >
+                                                View Question
+                                            </button>
+                                        </td>
+                                        <td style={{ textAlign: "left" }}>
+                                            <span className="a1-pill a1-pill-navy" style={{ fontWeight: 600 }}>
+                                                {assignedExamTitle}
+                                            </span>
+                                        </td>
+                                        <td style={{ textAlign: "left" }}>{q.stack}</td>
+                                        <td style={{ textAlign: "center" }}><span className="a1-pill a1-pill-navy">{TYPE_LABEL[q.type] || q.type}</span></td>
+                                        <td style={{ textAlign: "center" }}>
+                                            <span className="a1-pill a1-pill-amber">
+                                                {displayDiff}
+                                            </span>
+                                        </td>
+                                        <td style={{ textAlign: "center" }}>
+                                            <span className={`a1-pill ${q.source === "AI" ? "a1-pill-green" : "a1-pill"}`}>
+                                                {q.source || "MANUAL"}
+                                            </span>
+                                        </td>
+                                        <td style={{ textAlign: "center" }}>
+                                            <span className={`a1-pill ${q.status === "ACTIVE" ? "a1-pill-green" : ""}`}>{q.status}</span>
+                                        </td>
+                                        <td style={{ textAlign: "center" }}>
+                                            <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
+                                                <button 
+                                                    className="a1-btn a1-btn-ghost a1-btn-sm" 
+                                                    style={{ padding: "6px" }} 
+                                                    onClick={() => setEditing(q)} 
+                                                    title="Edit Question"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+                                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                        <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4z" />
+                                                    </svg>
+                                                </button>
+                                                <button 
+                                                    className="a1-btn a1-btn-ghost a1-btn-sm" 
+                                                    style={{ padding: "6px", color: "var(--a1-red)" }} 
+                                                    onClick={() => setConfirmDelete(q)} 
+                                                    title="Delete Question"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+                                                        <polyline points="3 6 5 6 21 6" />
+                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                                        <line x1="10" y1="11" x2="10" y2="17" />
+                                                        <line x1="14" y1="11" x2="14" y2="17" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             )}
 
             {/* Pagination */}
@@ -332,17 +363,7 @@ export default function QuestionBankPage() {
                 </div>
             )}
 
-            {/* Bulk Action Bar */}
-            {selected.size > 0 && (
-                <div className="a1-bulkbar">
-                    <span>{selected.size} question{selected.size > 1 ? "s" : ""} selected</span>
-                    <div className="a1-bulkbar-actions">
-                        <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => bulkSetStatus("ACTIVE")}>Set Active</button>
-                        <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => bulkSetStatus("INACTIVE")}>Set Inactive</button>
-                        <button className="a1-btn a1-btn-red a1-btn-sm" onClick={bulkDelete}>Delete</button>
-                    </div>
-                </div>
-            )}
+
 
             {/* Create / Edit Question Modal */}
             {editing && (
@@ -376,7 +397,6 @@ export default function QuestionBankPage() {
                 </div>
             )}
 
-            {/* AI Generator Modal */}
             {showAIGenerator && (
                 <AIQuestionGenerator
                     exams={exams}
@@ -386,6 +406,14 @@ export default function QuestionBankPage() {
                         setAiSavedToast(count);
                         load();
                     }}
+                />
+            )}
+            {showQuestionsManager && (
+                <QuestionsManagementModal
+                    filters={filters}
+                    exams={exams}
+                    onClose={() => setShowQuestionsManager(false)}
+                    onRefresh={load}
                 />
             )}
         </div>
@@ -398,16 +426,17 @@ export default function QuestionBankPage() {
 // Coding (Starter Code, Inputs/Outputs), and Descriptive types.
 // ============================================================
 function QuestionModal({ question, exams = [], onCancel, onSave }) {
+    const availableStacks = React.useMemo(() => {
+        const customStacks = exams.map((e) => e.stack).filter(Boolean);
+        return Array.from(new Set([...META.STACKS, ...customStacks]));
+    }, [exams]);
+
     const [form, setForm] = useState({
         examId: question.exam?.id || question.examId || (exams[0]?.id || ""),
         questionText: question.questionText || question.title || "",
         stack: question.stack || META.STACKS[0],
-        topic: question.topic || "",
         type: question.type || "MCQ",
-        level: question.level || "L1",
         difficulty: question.difficulty || "EASY",
-        marks: question.marks || 1,
-        status: question.status || "ACTIVE",
 
         // MCQ
         optionA: question.optionA || "",
@@ -415,17 +444,6 @@ function QuestionModal({ question, exams = [], onCancel, onSave }) {
         optionC: question.optionC || "",
         optionD: question.optionD || "",
         correctOption: question.correctOption || "A",
-
-        // Coding
-        codeSnippet: question.codeSnippet || "",
-        language: question.language || "Java",
-        sampleInput: question.sampleInput || "",
-        sampleOutput: question.sampleOutput || "",
-        expectedOutput: question.expectedOutput || "",
-
-        // Descriptive
-        modelAnswer: question.modelAnswer || "",
-        explanation: question.explanation || "",
     });
     const [busy, setBusy] = useState(false);
 
@@ -437,6 +455,7 @@ function QuestionModal({ question, exams = [], onCancel, onSave }) {
         try {
             const selectedExam = exams.find((e) => String(e.id) === String(form.examId));
             await onSave({
+                ...question,
                 ...form,
                 examId: form.examId || null,
                 examTitle: selectedExam?.title || null,
@@ -459,7 +478,7 @@ function QuestionModal({ question, exams = [], onCancel, onSave }) {
                     {/* Common Header Fields */}
                     <div className="a1-form-grid" style={{ marginBottom: 12 }}>
                         <div className="a1-field" style={{ gridColumn: "span 2" }}>
-                            <label>Exam Association *</label>
+                            <label>Target Exam *</label>
                             <select
                                 required
                                 value={form.examId}
@@ -474,19 +493,10 @@ function QuestionModal({ question, exams = [], onCancel, onSave }) {
                             </select>
                         </div>
                         <div className="a1-field">
-                            <label>Stack *</label>
+                            <label>Technology Stack *</label>
                             <select value={form.stack} onChange={(e) => setField("stack", e.target.value)}>
-                                {META.STACKS.map((s) => <option key={s} value={s}>{s}</option>)}
+                                {availableStacks.map((s) => <option key={s} value={s}>{s}</option>)}
                             </select>
-                        </div>
-                        <div className="a1-field">
-                            <label>Topic *</label>
-                            <input
-                                required
-                                placeholder="e.g. Core Java / OOP / Hooks"
-                                value={form.topic}
-                                onChange={(e) => setField("topic", e.target.value)}
-                            />
                         </div>
                         <div className="a1-field">
                             <label>Question Type *</label>
@@ -495,32 +505,15 @@ function QuestionModal({ question, exams = [], onCancel, onSave }) {
                             </select>
                         </div>
                         <div className="a1-field">
-                            <label>Competency Level *</label>
-                            <select value={form.level} onChange={(e) => setField("level", e.target.value)}>
-                                {META.LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
-                            </select>
-                        </div>
-                        <div className="a1-field">
-                            <label>Difficulty Tag *</label>
+                            <label>Difficulty *</label>
                             <select value={form.difficulty} onChange={(e) => setField("difficulty", e.target.value)}>
                                 {DIFFICULTY_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
                             </select>
                         </div>
-                        <div className="a1-field">
-                            <label>Marks *</label>
-                            <input
-                                type="number"
-                                min={1}
-                                max={10}
-                                required
-                                value={form.marks}
-                                onChange={(e) => setField("marks", Number(e.target.value))}
-                            />
-                        </div>
                     </div>
 
                     {/* Question Text */}
-                    <div className="a1-field" style={{ marginBottom: 14 }}>
+                    <div className="a1-field" style={{ marginBottom: 16 }}>
                         <label>Question Text *</label>
                         <textarea
                             className="a1-textarea"
@@ -528,11 +521,18 @@ function QuestionModal({ question, exams = [], onCancel, onSave }) {
                             placeholder="Enter the full question prompt..."
                             value={form.questionText}
                             onChange={(e) => setField("questionText", e.target.value)}
-                            style={{ minHeight: 80 }}
+                            style={{ 
+                                minHeight: "180px", 
+                                fontSize: "14px", 
+                                lineHeight: "1.6", 
+                                padding: "12px 14px", 
+                                width: "100%", 
+                                boxSizing: "border-box" 
+                            }}
                         />
                     </div>
 
-                    {/* Dynamic Section: MCQ Options + Radio Button for Correct Answer */}
+                    {/* MCQ Options Display */}
                     {form.type === "MCQ" && (
                         <div style={{ background: "#f8fafc", border: "1px solid var(--a1-line)", borderRadius: 10, padding: 14, marginBottom: 14 }}>
                             <div style={{ fontWeight: 600, fontSize: 13, color: "var(--a1-navy)", marginBottom: 10, display: "flex", justifyContent: "space-between" }}>
@@ -591,99 +591,11 @@ function QuestionModal({ question, exams = [], onCancel, onSave }) {
                         </div>
                     )}
 
-                    {/* Dynamic Section: Coding Question */}
-                    {form.type === "CODING" && (
-                        <div style={{ background: "#f8fafc", border: "1px solid var(--a1-line)", borderRadius: 10, padding: 14, marginBottom: 14 }}>
-                            <div className="a1-field" style={{ marginBottom: 10 }}>
-                                <label>Programming Language</label>
-                                <select value={form.language} onChange={(e) => setField("language", e.target.value)}>
-                                    {LANGUAGE_OPTIONS.map((lang) => <option key={lang} value={lang}>{lang}</option>)}
-                                </select>
-                            </div>
-                            <div className="a1-field" style={{ marginBottom: 10 }}>
-                                <label>Starter / Template Code</label>
-                                <textarea
-                                    className="a1-textarea a1-mono"
-                                    placeholder="public class Main {\n  public static void main(String[] args) {\n    // Write solution\n  }\n}"
-                                    value={form.codeSnippet}
-                                    onChange={(e) => setField("codeSnippet", e.target.value)}
-                                    style={{ minHeight: 90, fontSize: 12.5 }}
-                                />
-                            </div>
-                            <div className="a1-form-grid" style={{ marginBottom: 10 }}>
-                                <div className="a1-field">
-                                    <label>Sample Input</label>
-                                    <textarea
-                                        className="a1-textarea a1-mono"
-                                        placeholder="e.g. 5\n1 2 3 4 5"
-                                        value={form.sampleInput}
-                                        onChange={(e) => setField("sampleInput", e.target.value)}
-                                        style={{ minHeight: 60 }}
-                                    />
-                                </div>
-                                <div className="a1-field">
-                                    <label>Sample Output</label>
-                                    <textarea
-                                        className="a1-textarea a1-mono"
-                                        placeholder="e.g. 15"
-                                        value={form.sampleOutput}
-                                        onChange={(e) => setField("sampleOutput", e.target.value)}
-                                        style={{ minHeight: 60 }}
-                                    />
-                                </div>
-                            </div>
-                            <div className="a1-field">
-                                <label>Expected Test Case Output</label>
-                                <textarea
-                                    className="a1-textarea a1-mono"
-                                    placeholder="Expected output for evaluation..."
-                                    value={form.expectedOutput}
-                                    onChange={(e) => setField("expectedOutput", e.target.value)}
-                                    style={{ minHeight: 60 }}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Dynamic Section: Descriptive Question */}
-                    {form.type === "DESCRIPTIVE" && (
-                        <div style={{ background: "#f8fafc", border: "1px solid var(--a1-line)", borderRadius: 10, padding: 14, marginBottom: 14 }}>
-                            <div className="a1-field">
-                                <label>Model Answer / Evaluation Guide</label>
-                                <textarea
-                                    className="a1-textarea"
-                                    placeholder="Provide key concepts, evaluation criteria, or model answer..."
-                                    value={form.modelAnswer}
-                                    onChange={(e) => setField("modelAnswer", e.target.value)}
-                                    style={{ minHeight: 90 }}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Explanation / Notes */}
-                    <div className="a1-field" style={{ marginBottom: 14 }}>
-                        <label>Explanation / Answer Rationale (Optional)</label>
-                        <textarea
-                            className="a1-textarea"
-                            placeholder="Explain why the correct answer is right (shown in candidate result review)..."
-                            value={form.explanation}
-                            onChange={(e) => setField("explanation", e.target.value)}
-                            style={{ minHeight: 60 }}
-                        />
-                    </div>
-
-                    <div className="a1-field" style={{ marginBottom: 14 }}>
-                        <label>Status</label>
-                        <select value={form.status} onChange={(e) => setField("status", e.target.value)}>
-                            <option value="ACTIVE">Active</option>
-                            <option value="INACTIVE">Inactive</option>
-                        </select>
-                    </div>
-
                     <div className="a1-modal-actions">
                         <button type="button" className="a1-btn a1-btn-ghost" onClick={onCancel} disabled={busy}>Cancel</button>
-                        <button className="a1-btn a1-btn-primary" disabled={busy}>{busy ? "Saving…" : "Save Question"}</button>
+                        <button className="a1-btn a1-btn-primary" disabled={busy}>
+                            {busy ? "Saving…" : "Save Question"}
+                        </button>
                     </div>
                 </form>
             </div>
@@ -702,17 +614,6 @@ function ViewQuestionModal({ question, onClose }) {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                     <h3 style={{ margin: 0 }}>Question Details</h3>
                     <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={onClose}>✕</button>
-                </div>
-
-                {/* Metadata Badges */}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-                    <span className="a1-pill">{question.stack}</span>
-                    {question.topic && <span className="a1-pill a1-pill-navy">{question.topic}</span>}
-                    <span className="a1-pill a1-pill-amber">{question.difficulty || "MEDIUM"}</span>
-                    <span className="a1-pill">{TYPE_LABEL[question.type] || question.type}</span>
-                    <span className="a1-pill a1-pill-navy">{question.marks || 1} Mark{(question.marks || 1) > 1 ? "s" : ""}</span>
-                    <span className={`a1-pill ${question.source === "AI" ? "a1-pill-green" : ""}`}>{question.source || "MANUAL"}</span>
-                    <span className={`a1-pill ${question.status === "ACTIVE" ? "a1-pill-green" : ""}`}>{question.status}</span>
                 </div>
 
                 {/* Question Prompt */}
@@ -751,9 +652,10 @@ function ViewQuestionModal({ question, onClose }) {
                                         <span style={{
                                             fontWeight: 700,
                                             color: isCorrect ? "var(--a1-green)" : "var(--a1-mut)",
-                                            width: 24,
+                                            minWidth: "40px",
+                                            whiteSpace: "nowrap",
                                         }}>
-                                            {isCorrect ? "(●)" : "( )"} {opt}
+                                            {isCorrect ? `(● ${opt})` : `(${opt})`}
                                         </span>
                                         <span style={{ flex: 1 }}>{text}</span>
                                         {isCorrect && <span style={{ fontWeight: 700, color: "var(--a1-green)", fontSize: 12 }}>✓ Correct Answer</span>}
@@ -817,6 +719,342 @@ function ViewQuestionModal({ question, onClose }) {
                 <div className="a1-modal-actions">
                     <button className="a1-btn a1-btn-ghost" onClick={onClose}>Close</button>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+function QuestionsManagementModal({ filters, exams = [], onClose, onRefresh }) {
+    const [rows, setRows] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [selected, setSelected] = useState(new Set());
+    const [searchQuery, setSearchQuery] = useState("");
+    const [confirmAction, setConfirmAction] = useState(null); // { type: 'ACTIVE' | 'INACTIVE' | 'DELETE', count: number }
+    const [actionBusy, setActionBusy] = useState(false);
+
+    const loadQuestions = () => {
+        setLoading(true);
+        fetchQuestions().then((res) => {
+            const list = res?.rows || (Array.isArray(res) ? res : []);
+            setRows(list);
+            setLoading(false);
+        }).catch(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        loadQuestions();
+    }, [filters?.examId]);
+
+    const filteredQuestions = useMemo(() => {
+        let result = rows;
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            result = result.filter((item) => 
+                (item.questionText && item.questionText.toLowerCase().includes(q)) ||
+                (item.optionA && item.optionA.toLowerCase().includes(q)) ||
+                (item.optionB && item.optionB.toLowerCase().includes(q)) ||
+                (item.optionC && item.optionC.toLowerCase().includes(q)) ||
+                (item.optionD && item.optionD.toLowerCase().includes(q))
+            );
+        }
+        if (filters) {
+            if (filters.examId) {
+                const selectedExam = exams.find((e) => String(e.id || e.examId) === String(filters.examId));
+                result = result.filter((q) => {
+                    const qExamId = q.examId || q.exam?.id || q.exam_id;
+                    if (qExamId) return String(qExamId) === String(filters.examId);
+                    if (selectedExam) {
+                        const title = q.examTitle || q.examName || (typeof q.exam === "string" ? q.exam : q.exam?.title);
+                        if (title) return title === selectedExam.title;
+                        return q.stack === selectedExam.stack;
+                    }
+                    return false;
+                });
+            }
+            if (filters.type) {
+                result = result.filter((q) => q.type === filters.type);
+            }
+            if (filters.difficulty) {
+                result = result.filter((q) => (q.difficulty || "").toUpperCase() === filters.difficulty.toUpperCase());
+            }
+            if (filters.status) {
+                result = result.filter((q) => q.status === filters.status);
+            }
+        }
+        // Sort: INACTIVE first, then ACTIVE
+        return [...result].sort((a, b) => {
+            const statusA = a.status === "ACTIVE" || a.isActive ? 1 : 0;
+            const statusB = b.status === "ACTIVE" || b.isActive ? 1 : 0;
+            return statusA - statusB;
+        });
+    }, [rows, searchQuery, filters, exams]);
+
+    const activeCount = useMemo(() => {
+        return filteredQuestions.filter(q => q.status === "ACTIVE" || q.isActive).length;
+    }, [filteredQuestions]);
+
+    const inactiveCount = useMemo(() => {
+        return filteredQuestions.filter(q => q.status === "INACTIVE" || !q.status && !q.isActive).length;
+    }, [filteredQuestions]);
+
+    const selectedQuestions = useMemo(() => {
+        return rows.filter(q => selected.has(q.id));
+    }, [rows, selected]);
+
+    const hasActiveSelected = useMemo(() => {
+        return selectedQuestions.some(q => q.status === "ACTIVE" || q.isActive);
+    }, [selectedQuestions]);
+
+    const hasInactiveSelected = useMemo(() => {
+        return selectedQuestions.some(q => q.status === "INACTIVE" || !q.status && !q.isActive);
+    }, [selectedQuestions]);
+
+    const toggleSelect = (id) => {
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        setSelected((prev) => {
+            const allSelected = filteredQuestions.length > 0 && filteredQuestions.every(q => prev.has(q.id));
+            const next = new Set(prev);
+            filteredQuestions.forEach((q) => {
+                if (allSelected) {
+                    next.delete(q.id);
+                } else {
+                    next.add(q.id);
+                }
+            });
+            return next;
+        });
+    };
+
+    const handleActionClick = (type) => {
+        if (selected.size === 0) return;
+        setConfirmAction({ type, count: selected.size });
+    };
+
+    const executeAction = async () => {
+        if (!confirmAction) return;
+        setActionBusy(true);
+        try {
+            const ids = Array.from(selected);
+            if (confirmAction.type === "DELETE") {
+                await bulkDeleteQuestions(ids);
+            } else {
+                await bulkUpdateQuestions(ids, { status: confirmAction.type });
+            }
+            setSelected(new Set());
+            setConfirmAction(null);
+            loadQuestions();
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            alert("Action failed: " + err.message);
+        } finally {
+            setActionBusy(false);
+        }
+    };
+
+    const selectedExam = exams.find((e) => String(e.id || e.examId) === String(filters?.examId));
+    const displayExamTitle = selectedExam ? selectedExam.title : "Exam Questions";
+
+    return (
+        <div className="a1-modal-overlay" onClick={onClose}>
+            <div className="a1-modal" onClick={(e) => e.stopPropagation()} style={{ width: "min(780px, 95vw)", height: "85vh", display: "flex", flexDirection: "column", padding: 0 }}>
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--a1-line)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <h3 style={{ margin: 0 }}>Manage QA's - {displayExamTitle}</h3>
+                        <span className="a1-pill a1-pill-navy" style={{ fontSize: 11 }}>{filteredQuestions.length} matching</span>
+                    </div>
+                    <button type="button" className="a1-btn a1-btn-ghost a1-btn-sm" onClick={onClose} style={{ padding: "4px 8px" }}>✕</button>
+                </div>
+
+                {/* Sticky Actions and Search Toolbar */}
+                <div style={{ 
+                    padding: "12px 20px", 
+                    background: "#f8fafc", 
+                    borderBottom: "1px solid var(--a1-line)", 
+                    position: "sticky", 
+                    top: 0, 
+                    zIndex: 10,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8
+                }}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "space-between" }}>
+                        <div className="a1-field" style={{ flex: 1, maxWidth: 300, marginBottom: 0 }}>
+                            <input
+                                type="text"
+                                style={{ margin: 0, width: "100%", padding: "7px 10px", fontSize: 13 }}
+                                placeholder="Search questions..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            {(!selected.size || hasInactiveSelected) && (
+                                <button
+                                    type="button"
+                                    className="a1-btn a1-btn-active-colored a1-btn-sm"
+                                    disabled={selected.size === 0}
+                                    onClick={() => handleActionClick("ACTIVE")}
+                                    style={{ padding: "6px 12px", fontSize: 12.5 }}
+                                >
+                                    Set Active
+                                </button>
+                            )}
+                            {(!selected.size || hasActiveSelected) && (
+                                <button
+                                    type="button"
+                                    className="a1-btn a1-btn-inactive-colored a1-btn-sm"
+                                    disabled={selected.size === 0}
+                                    onClick={() => handleActionClick("INACTIVE")}
+                                    style={{ padding: "6px 12px", fontSize: 12.5 }}
+                                >
+                                    Set Inactive
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                className="a1-btn a1-btn-delete-colored a1-btn-sm"
+                                disabled={selected.size === 0}
+                                onClick={() => handleActionClick("DELETE")}
+                                style={{ padding: "6px 10px" }}
+                                title="Delete Selected"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+                                    <polyline points="3 6 5 6 21 6" />
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                    <line x1="10" y1="11" x2="10" y2="17" />
+                                    <line x1="14" y1="11" x2="14" y2="17" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "var(--a1-mut)" }}>
+                        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                            <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, cursor: "pointer", userSelect: "none" }}>
+                                <input
+                                    type="checkbox"
+                                    checked={filteredQuestions.length > 0 && filteredQuestions.every(q => selected.has(q.id))}
+                                    onChange={toggleSelectAll}
+                                />
+                                Select All ({filteredQuestions.length})
+                            </label>
+                            <span>Selected: <strong>{selected.size}</strong></span>
+                            <span style={{ margin: "0 4px", color: "var(--a1-line)" }}>|</span>
+                            <span>Active: <strong style={{ color: "var(--a1-green)" }}>{activeCount}</strong></span>
+                            <span style={{ margin: "0 4px", color: "var(--a1-line)" }}>|</span>
+                            <span>Inactive: <strong style={{ color: "var(--a1-amber)" }}>{inactiveCount}</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Scrollable Questions list */}
+                <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+                    {loading ? (
+                        <div style={{ textAlign: "center", padding: "40px 0", color: "var(--a1-mut)" }}>Loading tech stack questions…</div>
+                    ) : filteredQuestions.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "40px 0", color: "var(--a1-mut)" }}>No questions found.</div>
+                    ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                            {filteredQuestions.map((q) => {
+                                const isSelected = selected.has(q.id);
+                                const isCorrect = (opt) => q.correctOption === opt;
+                                return (
+                                    <div
+                                        key={q.id}
+                                        className="a1-card"
+                                        style={{
+                                            padding: 14,
+                                            margin: 0,
+                                            border: `1.5px solid ${isSelected ? "var(--a1-navy)" : "var(--a1-line)"}`,
+                                            background: isSelected ? "#f8fafc" : "#fff",
+                                            transition: "all .15s",
+                                            display: "flex",
+                                            gap: 12,
+                                        }}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => toggleSelect(q.id)}
+                                            style={{ marginTop: 4, width: 16, height: 16, cursor: "pointer" }}
+                                        />
+                                        <div style={{ flex: 1 }}>
+                                            {/* Question Text */}
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 14, marginBottom: 8 }}>
+                                                <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--a1-navy)", lineHeight: 1.5 }}>
+                                                    {q.questionText}
+                                                </div>
+                                                <span className={`a1-pill ${q.status === "ACTIVE" ? "a1-pill-green" : ""}`} style={{ fontSize: 10.5, textTransform: "uppercase" }}>
+                                                    {q.status || (q.isActive ? "ACTIVE" : "INACTIVE")}
+                                                </span>
+                                            </div>
+
+                                            {/* MCQ Options */}
+                                            {q.type === "MCQ" && (
+                                                <div style={{ 
+                                                    display: "grid", 
+                                                    gridTemplateColumns: "1fr 1fr", 
+                                                    gap: 6, 
+                                                    marginTop: 10,
+                                                    padding: 10,
+                                                    background: "#f1f5f9",
+                                                    borderRadius: 8
+                                                }}>
+                                                    {["A", "B", "C", "D"].map((opt) => {
+                                                        const field = `option${opt}`;
+                                                        const correct = isCorrect(opt);
+                                                        return (
+                                                            <div key={opt} style={{ fontSize: 12, color: correct ? "var(--a1-green)" : "var(--a1-ink)", fontWeight: correct ? 700 : 500 }}>
+                                                                {correct ? "●" : "○"} {opt}. {q[field]}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Inner Confirmation Dialog */}
+                {confirmAction && (
+                    <div className="a1-modal-overlay" style={{ background: "rgba(0,0,0,0.4)" }} onClick={() => setConfirmAction(null)}>
+                        <div className="a1-modal" onClick={(e) => e.stopPropagation()} style={{ width: "min(400px, 90vw)", padding: "20px 24px", textAlign: "center" }}>
+                            <h4 style={{ margin: "0 0 10px", fontSize: 16 }}>Confirm Action</h4>
+                            <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--a1-mut)" }}>
+                                Are you sure you want to {confirmAction.type === "DELETE" ? "delete" : "deactivate/activate"} {confirmAction.count} selected question(s)?
+                                {confirmAction.type === "DELETE" && " This action is permanent and cannot be undone."}
+                            </p>
+                            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                                <button type="button" className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => setConfirmAction(null)} disabled={actionBusy}>
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`a1-btn a1-btn-sm ${confirmAction.type === "DELETE" ? "a1-btn-red" : "a1-btn-primary"}`}
+                                    onClick={executeAction}
+                                    disabled={actionBusy}
+                                >
+                                    {actionBusy ? "Processing…" : "Confirm"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -211,7 +211,7 @@ export default function CandidateResultView() {
               {attempt.examTitle}
             </div>
 
-            {attempt.assignedLevel && (
+            {attempt.assignedLevel && ["L1", "L2", "L3", "L4", "L5"].includes(attempt.assignedLevel) && (
               <div 
                 className="inline-flex items-center gap-4 rounded-2xl"
                 style={{

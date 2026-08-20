@@ -265,6 +265,11 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
                 {/* ---- Step 2: Preview ---- */}
                 {(step === "preview" || step === "saving") && (
                     <>
+                        {questions.duplicatesRemoved > 0 && (
+                            <div className="a1-banner a1-banner-amber" style={{ marginBottom: 14 }}>
+                                ℹ️ {questions.duplicatesRemoved} duplicate question{questions.duplicatesRemoved > 1 ? "s" : ""} were removed.
+                            </div>
+                        )}
                         <div className="a1-banner a1-banner-navy" style={{ marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <span>
                                 <strong>{questions.length}</strong> question{questions.length !== 1 ? "s" : ""} generated.
