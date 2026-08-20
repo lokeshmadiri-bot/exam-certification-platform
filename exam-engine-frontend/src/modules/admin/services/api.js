@@ -232,10 +232,29 @@ export const bulkUpdateQuestions = (ids, patch) =>
     );
 
 export const generateAIQuestions = (payload) =>
-    withFallback(() => post("/questions/ai/generate", payload), () => mockGenerateAIQuestions(payload));
+    withFallback(
+        async () => {
+            const res = await fetch(`${BASE}/questions/ai/generate`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...authHeaders() },
+                body: JSON.stringify(payload),
+            });
+            checkResponse(res, "/questions/ai/generate", "POST");
+            const json = await res.json();
+            const data = json.data;
+            if (Array.isArray(data)) {
+                data.duplicatesRemoved = json.duplicatesRemoved || 0;
+            }
+            return data;
+        },
+        () => mockGenerateAIQuestions(payload)
+    );
 
 export const saveAIQuestions = (payload) =>
     withFallback(() => post("/questions/ai/save", payload), () => mockSaveAIQuestions(payload));
+
+export const bulkDeleteQuestions = (ids) =>
+    withFallback(() => post("/questions/bulk-delete", { ids }), () => mockBulkDeleteQuestions(ids));
 
 export const regenerateAIQuestion = (question) =>
     withFallback(
@@ -313,8 +332,8 @@ export const rejectRequest = (id, note) =>
 
 // ---------------- A2 Dashboard & Attempts ----------------
 
-export const fetchDashboard = () =>
-    withFallback(() => get("/analytics/dashboard"), MOCK.dashboard);
+export const fetchDashboard = (filters = {}) =>
+    withFallback(() => get("/analytics/dashboard", filters), MOCK.dashboard);
 
 export const fetchAttempts = (filters) =>
     withFallback(() => get("/attempts", filters), () => mockAttempts(filters, false));
@@ -862,6 +881,13 @@ function mockAttempts(filters = {}, isReview = false) {
     if (filters.from) rows = rows.filter((r) => r.submittedAt >= filters.from);
     if (filters.to) rows = rows.filter((r) => r.submittedAt <= `${filters.to}T23:59:59Z`);
     return { rows, total: rows.length };
+}
+
+function mockBulkDeleteQuestions(ids) {
+    const toRemove = new Set(ids);
+    MOCK.questions = MOCK.questions.filter((q) => !toRemove.has(q.id));
+    pushAudit("BULK_DELETE_QUESTIONS", "Question Bank", `${ids.length} items`, "-");
+    return { ok: true, deleted: ids.length };
 }
 
 export const META = { STACKS, LEVELS, QUESTION_TYPES, RESULTS };

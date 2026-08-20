@@ -35,8 +35,25 @@ public class GeminiController {
     public ResponseEntity<ApiResponse<List<GeneratedQuestionDTO>>> generate(
             @Valid @RequestBody GenerateQuestionRequest request) {
         List<GeneratedQuestionDTO> questions = questionService.generateQuestions(request);
-        return ResponseEntity.ok(ApiResponse.success(
-                "Generated " + questions.size() + " question(s) successfully", questions));
+        int duplicatesRemoved = 0;
+        if (questions instanceof QuestionService.UniqueQuestionList) {
+            duplicatesRemoved = ((QuestionService.UniqueQuestionList) questions).getDuplicatesRemoved();
+        }
+
+        String msg = "Generated " + questions.size() + " question(s) successfully";
+        if (duplicatesRemoved > 0) {
+            msg += " (" + duplicatesRemoved + " duplicate(s) removed)";
+        }
+
+        ApiResponse<List<GeneratedQuestionDTO>> body = ApiResponse.<List<GeneratedQuestionDTO>>builder()
+                .success(true)
+                .message(msg)
+                .data(questions)
+                .duplicatesRemoved(duplicatesRemoved)
+                .timestamp(java.time.LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.ok(body);
     }
 
     @PostMapping("/save")

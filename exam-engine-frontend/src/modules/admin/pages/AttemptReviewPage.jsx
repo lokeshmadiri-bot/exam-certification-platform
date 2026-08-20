@@ -423,26 +423,34 @@ export default function AttemptReviewPage() {
                     </div>
                   ))}
                 </div>
-                {(score.level || (attempt.level && attempt.level !== "—")) && (
-                  <div style={{
-                    marginTop: "16px", paddingTop: "14px", borderTop: "1px solid rgba(255,255,255,0.06)",
-                    fontSize: "12px", color: "#4a6a9e", display: "flex", alignItems: "center", justifyContent: "space-between"
-                  }}>
-                    <span>Assigned Level</span>
-                    <span className={`a2-pill a2-lvl-${score.level || attempt.level}`} style={{ fontFamily: "monospace", fontWeight: "700" }}>
-                      {score.level || attempt.level}
-                    </span>
-                  </div>
-                )}
-                <div style={{
-                  marginTop: (score.level || (attempt.level && attempt.level !== "—")) ? "10px" : "16px",
-                  paddingTop: (score.level || (attempt.level && attempt.level !== "—")) ? "0" : "14px",
-                  borderTop: (score.level || (attempt.level && attempt.level !== "—")) ? "none" : "1px solid rgba(255,255,255,0.06)",
-                  fontSize: "12px", color: "#4a6a9e", display: "flex", alignItems: "center", justifyContent: "space-between"
-                }}>
-                  <span>Auto result</span>
-                  <ResultPill result={score.autoResult} />
-                </div>
+                {(() => {
+                  const finalLvl = score.level || attempt.level;
+                  const showLvl = ["L1", "L2", "L3", "L4", "L5"].includes(finalLvl);
+                  return (
+                    <>
+                      {showLvl && (
+                        <div style={{
+                          marginTop: "16px", paddingTop: "14px", borderTop: "1px solid rgba(255,255,255,0.06)",
+                          fontSize: "12px", color: "#4a6a9e", display: "flex", alignItems: "center", justifyContent: "space-between"
+                        }}>
+                          <span>Assigned Level</span>
+                          <span className={`a2-pill a2-lvl-${finalLvl}`} style={{ fontFamily: "monospace", fontWeight: "700" }}>
+                            {finalLvl}
+                          </span>
+                        </div>
+                      )}
+                      <div style={{
+                        marginTop: showLvl ? "10px" : "16px",
+                        paddingTop: showLvl ? "0" : "14px",
+                        borderTop: showLvl ? "none" : "1px solid rgba(255,255,255,0.06)",
+                        fontSize: "12px", color: "#4a6a9e", display: "flex", alignItems: "center", justifyContent: "space-between"
+                      }}>
+                        <span>Auto result</span>
+                        <ResultPill result={score.autoResult} />
+                      </div>
+                    </>
+                  );
+                })()}
               </>
             )}
           </div>

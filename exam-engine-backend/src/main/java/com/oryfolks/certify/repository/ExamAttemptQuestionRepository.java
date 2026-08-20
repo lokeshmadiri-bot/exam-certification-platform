@@ -14,4 +14,6 @@ public interface ExamAttemptQuestionRepository extends JpaRepository<ExamAttempt
 
     void deleteByAttemptId(UUID attemptId);
 
+    boolean existsByQuestionId(UUID questionId);
+
 }
