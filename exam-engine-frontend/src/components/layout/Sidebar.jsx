@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  ShieldAlert,
   LayoutDashboard,
   BookOpen,
   Award,
@@ -38,12 +37,14 @@ export default function Sidebar({ user, onNavClose }) {
     <aside className="sidebar flex flex-col h-screen sticky top-0 bg-gradient-to-b from-[#0B1F38] to-[#0a1a30] text-[#cdd9ea] p-5 w-[248px] shrink-0 z-40">
       {/* Brand */}
       <div className="sb-brand flex items-center gap-[11px] pb-[18px] px-2">
-        <div className="glyph w-9 h-9 rounded-lg bg-gradient-to-br from-[#2F6BFF] to-[#5b8cff] flex items-center justify-center shadow-[0_6px_16px_rgba(47,107,255,0.27)]">
-          <ShieldAlert className="w-5 h-5 text-white" />
-        </div>
+        <img
+          src="/Oryfolkslogo.png"
+          alt="ORY SkillCert"
+          className="w-9 h-9 object-contain rounded-lg"
+        />
         <div>
-          <b className="font-display text-white text-[15.5px] font-bold">Certify</b>
-          <small className="text-[#7e93b4] text-[10.5px] block font-mono tracking-wider font-semibold">ORYFOLKS</small>
+          <b className="font-display text-white text-[15.5px] font-bold">SkillCert</b>
+          <small className="text-[#7e93b4] text-[10.5px] block font-mono tracking-wider font-semibold">ORY</small>
         </div>
       </div>
 

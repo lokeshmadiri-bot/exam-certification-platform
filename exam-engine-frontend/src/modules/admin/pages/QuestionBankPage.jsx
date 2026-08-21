@@ -9,7 +9,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
     fetchQuestions, fetchExams, createQuestion, updateQuestion, deleteQuestion, bulkUpdateQuestions, bulkDeleteQuestions, META,
 } from "../services/api";
-import AIQuestionGenerator from "../components/AIQuestionGenerator";
 import "../components/a1.css";
 
 const PAGE_SIZE = 10;
@@ -50,7 +49,6 @@ export default function QuestionBankPage() {
     const [editing, setEditing] = useState(null); // question object or {} for new
     const [viewing, setViewing] = useState(null); // question object to view details
     const [confirmDelete, setConfirmDelete] = useState(null);
-    const [showAIGenerator, setShowAIGenerator] = useState(false);
     const [aiSavedToast, setAiSavedToast] = useState(null);
     const [showQuestionsManager, setShowQuestionsManager] = useState(false);
 
@@ -78,6 +76,15 @@ export default function QuestionBankPage() {
         setSelected(new Set());
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters]);
+
+    useEffect(() => {
+        const handleSaved = (e) => {
+            setAiSavedToast(e.detail.count);
+            load();
+        };
+        window.addEventListener('ai-generator-saved', handleSaved);
+        return () => window.removeEventListener('ai-generator-saved', handleSaved);
+    }, []);
 
     const filteredRows = useMemo(() => {
         if (!rows) return [];
@@ -174,7 +181,11 @@ export default function QuestionBankPage() {
                     </button>
                     <button
                         className="a1-btn a1-btn-ghost"
-                        onClick={() => setShowAIGenerator(true)}
+                        onClick={() => {
+                            window.dispatchEvent(new CustomEvent('open-ai-generator', {
+                                detail: { exams }
+                            }));
+                        }}
                         style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #2d5a9e 100%)", color: "#fff", border: "none" }}
                     >
                         ✨ Generate AI Questions
@@ -219,9 +230,9 @@ export default function QuestionBankPage() {
                     <label>Difficulty</label>
                     <select value={filters.difficulty} onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, difficulty: e.target.value })); }}>
                         <option value="">All</option>
-                        <option value="EASY">Easy</option>
-                        <option value="MEDIUM">Medium</option>
-                        <option value="HARD">Hard</option>
+                        <option value="EASY">Beginner</option>
+                        <option value="MEDIUM">Intermediate</option>
+                        <option value="HARD">Advanced</option>
                     </select>
                 </div>
                 <div className="a1-field">
@@ -277,7 +288,8 @@ export default function QuestionBankPage() {
                                     (typeof q.exam === "string" && q.exam.trim() ? q.exam : null) ||
                                     (exams.find((e) => String(e.id || e.examId) === String(q.examId || q.exam?.id || q.exam_id) || e.title === q.exam || e.title === q.examTitle)?.title) ||
                                     "Unassigned";
-                                const displayDiff = q.difficulty ? (q.difficulty.charAt(0).toUpperCase() + q.difficulty.slice(1).toLowerCase()) : "Medium";
+                                const diffUpper = q.difficulty ? q.difficulty.toUpperCase() : "MEDIUM";
+                                const displayDiff = diffUpper === "EASY" ? "Beginner" : diffUpper === "MEDIUM" ? "Intermediate" : "Advanced";
                                 return (
                                     <tr key={q.id}>
                                         <td style={{ textAlign: "center" }}>
@@ -397,17 +409,6 @@ export default function QuestionBankPage() {
                 </div>
             )}
 
-            {showAIGenerator && (
-                <AIQuestionGenerator
-                    exams={exams}
-                    onClose={() => setShowAIGenerator(false)}
-                    onSaved={(count) => {
-                        setShowAIGenerator(false);
-                        setAiSavedToast(count);
-                        load();
-                    }}
-                />
-            )}
             {showQuestionsManager && (
                 <QuestionsManagementModal
                     filters={filters}
@@ -507,7 +508,10 @@ function QuestionModal({ question, exams = [], onCancel, onSave }) {
                         <div className="a1-field">
                             <label>Difficulty *</label>
                             <select value={form.difficulty} onChange={(e) => setField("difficulty", e.target.value)}>
-                                {DIFFICULTY_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+                                {DIFFICULTY_OPTIONS.map((d) => {
+                                    const label = d === "EASY" ? "Beginner" : d === "MEDIUM" ? "Intermediate" : "Advanced";
+                                    return <option key={d} value={d}>{label}</option>;
+                                })}
                             </select>
                         </div>
                     </div>
