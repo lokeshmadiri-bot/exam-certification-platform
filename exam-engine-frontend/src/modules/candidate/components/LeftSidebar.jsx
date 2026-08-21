@@ -114,7 +114,7 @@ export default function LeftSidebar() {
                 Section 1
               </div>
               <div style={{ fontSize: '11px', color: '#8A99AE', marginTop: '2px' }}>
-                Easy Level – MCQ ({easyQuestions.length})
+                Beginner Level – MCQ ({easyQuestions.length})
               </div>
             </div>
             {expandedSection === 1 ? (
@@ -141,7 +141,7 @@ export default function LeftSidebar() {
                 Section 2
               </div>
               <div style={{ fontSize: '11px', color: '#8A99AE', marginTop: '2px' }}>
-                Medium Level – MCQ ({mediumQuestions.length})
+                Intermediate Level – MCQ ({mediumQuestions.length})
               </div>
             </div>
             {expandedSection === 2 ? (
@@ -168,7 +168,7 @@ export default function LeftSidebar() {
                 Section 3
               </div>
               <div style={{ fontSize: '11px', color: '#8A99AE', marginTop: '2px' }}>
-                Hard Level – MCQ ({hardQuestions.length})
+                Advanced Level – MCQ ({hardQuestions.length})
               </div>
             </div>
             {expandedSection === 3 ? (

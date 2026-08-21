@@ -5,6 +5,7 @@ import Topbar from './Topbar';
 import CmdPalette from '../common/CmdPalette';
 import CommandPalette from '../../modules/admin/components/CommandPalette';
 import { authService } from '../../modules/candidate/services/api';
+import AIQuestionGenerator from '../../modules/admin/components/AIQuestionGenerator';
 
 export default function Layout({ title }) {
   const navigate = useNavigate();
@@ -13,8 +14,17 @@ export default function Layout({ title }) {
   const [navOpen, setNavOpen] = useState(false);
   const [cmdPaletteOpen, setCmdPaletteOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [generatorConfig, setGeneratorConfig] = useState(null);
 
   const hideTopbar = location.pathname.includes('/instructions/') || location.pathname.includes('/check/');
+
+  useEffect(() => {
+    const handleOpenGenerator = (e) => {
+      setGeneratorConfig(e.detail);
+    };
+    window.addEventListener('open-ai-generator', handleOpenGenerator);
+    return () => window.removeEventListener('open-ai-generator', handleOpenGenerator);
+  }, []);
   const hideSearch = 
     location.pathname.includes('/help') || 
     location.pathname.startsWith('/admin') || 
@@ -88,6 +98,19 @@ export default function Layout({ title }) {
           show={cmdPaletteOpen}
           onClose={() => setCmdPaletteOpen(false)}
           role={user?.role}
+        />
+      )}
+
+      {/* Global AI Question Generator */}
+      {generatorConfig && (
+        <AIQuestionGenerator
+          examId={generatorConfig.examId}
+          exams={generatorConfig.exams}
+          onClose={() => setGeneratorConfig(null)}
+          onSaved={(count) => {
+            setGeneratorConfig(null);
+            window.dispatchEvent(new CustomEvent('ai-generator-saved', { detail: { count } }));
+          }}
         />
       )}
     </div>
