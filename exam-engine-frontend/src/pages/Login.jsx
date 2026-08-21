@@ -60,11 +60,14 @@ export default function Login() {
         <div className="auth-inner">
           {/* Brand Header */}
           <div className="brandmark">
-            <div className="glyph">
-              <ShieldAlert className="w-5 h-5 text-white" />
-            </div>
+            <img
+              src="/Oryfolkslogo.png"
+              alt="ORY SkillCert"
+              className="w-9 h-9 object-contain rounded-lg"
+              style={{ width: '36px', height: '36px' }}
+            />
             <div>
-              <b>OryFolks Certify</b>
+              <b>ORY SkillCert</b>
               <span>Certification &amp; Remote Proctoring</span>
             </div>
           </div>
@@ -82,7 +85,7 @@ export default function Login() {
 
           {/* Footer info */}
           <div style={{ marginTop: 'auto', fontSize: '11px', color: '#7e93b4', paddingTop: '16px' }}>
-            &copy; 2026 OryFolks. All rights reserved.
+            &copy; 2026 ORY SkillCert. All rights reserved.
           </div>
         </div>
       </div>
