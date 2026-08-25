@@ -87,6 +87,10 @@ public class QuestionService {
                     .count(shortage)
                     .topic(req.getTopic())
                     .examId(req.getExamId())
+                    .difficultyMode(req.getDifficultyMode())
+                    .beginnerPct(req.getBeginnerPct())
+                    .intermediatePct(req.getIntermediatePct())
+                    .advancedPct(req.getAdvancedPct())
                     .build();
 
             List<GeneratedQuestionDTO> replacementBatch = geminiService.generate(replacementReq);

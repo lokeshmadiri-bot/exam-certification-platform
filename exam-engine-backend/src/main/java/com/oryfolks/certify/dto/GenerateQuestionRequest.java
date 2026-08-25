@@ -18,4 +18,8 @@ public class GenerateQuestionRequest {
     @Builder.Default
     private Integer count = 10;     // Default 10 questions (5 Easy + 3 Medium + 2 Hard when difficulty=null)
     private UUID examId;           // Optional exam ID
+    private String difficultyMode; // MANUAL or SINGLE
+    private Integer beginnerPct;
+    private Integer intermediatePct;
+    private Integer advancedPct;
 }
