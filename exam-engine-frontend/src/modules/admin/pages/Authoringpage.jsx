@@ -19,6 +19,10 @@ const emptyForm = {
     questionsPerAttempt: 25,
     totalMarks: 100,
     instructions: "",
+    difficultyMode: "NONE",
+    beginnerPct: 40,
+    intermediatePct: 40,
+    advancedPct: 20,
 };
 
 const defaultBands = { L1: [90, 100], L2: [75, 89], L3: [60, 74], L4: [40, 59], L5: [0, 39] };
@@ -30,6 +34,78 @@ const BAND_META = {
     L4: { label: "Beginner", desc: "Foundational knowledge" },
     L5: { label: "Needs Training", desc: "Significant upskilling required" },
 };
+
+const TIME_PER_QUESTION = {
+    BEGINNER: 1,
+    INTERMEDIATE: 2,
+    ADVANCED: 3
+};
+
+function calculateSuggestedDuration(beginnerCount, intermediateCount, advancedCount) {
+    return (beginnerCount * TIME_PER_QUESTION.BEGINNER)
+         + (intermediateCount * TIME_PER_QUESTION.INTERMEDIATE)
+         + (advancedCount * TIME_PER_QUESTION.ADVANCED);
+}
+
+function getDifficultyComposition(poolSize, difficultyMode, beginnerPct, intermediatePct, advancedPct) {
+    const total = Number(poolSize) || 0;
+    if (total <= 0) {
+        return { beginner: 0, intermediate: 0, advanced: 0 };
+    }
+
+    if (difficultyMode === "EASY") {
+        return { beginner: total, intermediate: 0, advanced: 0 };
+    }
+    if (difficultyMode === "MEDIUM") {
+        return { beginner: 0, intermediate: total, advanced: 0 };
+    }
+    if (difficultyMode === "HARD") {
+        return { beginner: 0, intermediate: 0, advanced: total };
+    }
+
+    let bPct = 50, iPct = 30, aPct = 20;
+    if (difficultyMode === "MANUAL") {
+        bPct = Number(beginnerPct) || 0;
+        iPct = Number(intermediatePct) || 0;
+        aPct = Number(advancedPct) || 0;
+    }
+
+    // Largest Remainder Method
+    const floatB = (total * bPct) / 100;
+    const floatI = (total * iPct) / 100;
+    const floatA = (total * aPct) / 100;
+
+    let intB = Math.floor(floatB);
+    let intI = Math.floor(floatI);
+    let intA = Math.floor(floatA);
+
+    let remainder = total - (intB + intI + intA);
+
+    const items = [
+        { key: 'B', frac: floatB - intB, val: intB },
+        { key: 'I', frac: floatI - intI, val: intI },
+        { key: 'A', frac: floatA - intA, val: intA }
+    ];
+
+    items.sort((x, y) => y.frac - x.frac);
+
+    if (remainder > 0 && remainder <= items.length) {
+        for (let k = 0; k < remainder; k++) {
+            items[k].val += 1;
+        }
+    }
+
+    const result = {};
+    items.forEach(item => {
+        result[item.key] = item.val;
+    });
+
+    return {
+        beginner: result['B'] || 0,
+        intermediate: result['I'] || 0,
+        advanced: result['A'] || 0
+    };
+}
 
 export default function AuthoringPage() {
     const navigate = useNavigate();
@@ -47,7 +123,32 @@ export default function AuthoringPage() {
     const [savedMsg, setSavedMsg] = useState("");
     const [bandsModified, setBandsModified] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [isDurationCustom, setIsDurationCustom] = useState(false);
     const wasCreated = useRef(false); // tracks whether last save was a create vs update
+
+    const difficultyComposition = useMemo(() => {
+        return getDifficultyComposition(
+            form.questionPoolSize,
+            form.difficultyMode,
+            form.beginnerPct,
+            form.intermediatePct,
+            form.advancedPct
+        );
+    }, [form.questionPoolSize, form.difficultyMode, form.beginnerPct, form.intermediatePct, form.advancedPct]);
+
+    const suggestedDuration = useMemo(() => {
+        return calculateSuggestedDuration(
+            difficultyComposition.beginner,
+            difficultyComposition.intermediate,
+            difficultyComposition.advanced
+        );
+    }, [difficultyComposition]);
+
+    useEffect(() => {
+        if (!isDurationCustom) {
+            setField("durationMin", suggestedDuration);
+        }
+    }, [suggestedDuration, isDurationCustom]);
 
     // Load unique stacks from all existing exams on mount
     useEffect(() => {
@@ -71,6 +172,7 @@ export default function AuthoringPage() {
             setBandsModified(false);
             setIsOtherStack(false);
             setCustomStackInput("");
+            setIsDurationCustom(false);
             setLoading(false);
             return;
         }
@@ -86,7 +188,12 @@ export default function AuthoringPage() {
                     questionsPerAttempt: exam.questionsPerAttempt,
                     totalMarks: exam.totalMarks || 100,
                     instructions: exam.instructions || "",
+                    difficultyMode: exam.difficultyMode || "NONE",
+                    beginnerPct: exam.beginnerPct !== undefined && exam.beginnerPct !== null ? exam.beginnerPct : 40,
+                    intermediatePct: exam.intermediatePct !== undefined && exam.intermediatePct !== null ? exam.intermediatePct : 40,
+                    advancedPct: exam.advancedPct !== undefined && exam.advancedPct !== null ? exam.advancedPct : 20,
                 });
+                setIsDurationCustom(true);
                 if (exam.stack && !META.STACKS.includes(exam.stack)) {
                     setIsOtherStack(true);
                     setCustomStackInput(exam.stack);
@@ -109,6 +216,17 @@ export default function AuthoringPage() {
 
     const submitFormatForm = async (e) => {
         e.preventDefault();
+
+        if (form.difficultyMode === "MANUAL") {
+            const bPct = Number(form.beginnerPct) || 0;
+            const iPct = Number(form.intermediatePct) || 0;
+            const aPct = Number(form.advancedPct) || 0;
+            if (bPct + iPct + aPct !== 100) {
+                alert(`Difficulty distribution must equal exactly 100% (currently ${bPct + iPct + aPct}%).`);
+                return;
+            }
+        }
+
         setSavingForm(true);
         setSavedMsg("");
         const payload = {
@@ -118,6 +236,9 @@ export default function AuthoringPage() {
             questionPoolSize: Number(form.questionPoolSize),
             questionsPerAttempt: Number(form.questionsPerAttempt),
             totalMarks: Number(form.totalMarks),
+            beginnerPct: form.difficultyMode === "MANUAL" ? Number(form.beginnerPct) : null,
+            intermediatePct: form.difficultyMode === "MANUAL" ? Number(form.intermediatePct) : null,
+            advancedPct: form.difficultyMode === "MANUAL" ? Number(form.advancedPct) : null,
         };
         if (examId) {
             wasCreated.current = false;
@@ -220,7 +341,38 @@ export default function AuthoringPage() {
                             </div>
                             <div className="a1-field">
                                 <label>Duration (minutes) *</label>
-                                <input type="number" min="1" required value={form.durationMin} onChange={(e) => setField("durationMin", e.target.value)} />
+                                <input 
+                                    type="number" 
+                                    min="1" 
+                                    required 
+                                    value={form.durationMin} 
+                                    onChange={(e) => {
+                                        setField("durationMin", e.target.value);
+                                        setIsDurationCustom(true);
+                                    }} 
+                                />
+                                {isDurationCustom ? (
+                                    <div style={{ fontSize: 11, color: "var(--a1-mut)", marginTop: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <span>Custom duration</span>
+                                        {Number(form.durationMin) !== suggestedDuration && (
+                                            <button 
+                                                type="button" 
+                                                className="a1-btn-link" 
+                                                onClick={() => {
+                                                    setField("durationMin", suggestedDuration);
+                                                    setIsDurationCustom(false);
+                                                }}
+                                                style={{ fontSize: 11, background: "none", border: "none", color: "var(--a1-blue)", cursor: "pointer", padding: 0 }}
+                                            >
+                                                Reset to Suggested ({suggestedDuration} min)
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div style={{ fontSize: 11, color: "var(--a1-mut)", marginTop: 4 }}>
+                                        Suggested based on {form.questionPoolSize} questions & mix
+                                    </div>
+                                )}
                             </div>
                             <div className="a1-field">
                                 <label>Pass Mark (%) *</label>
@@ -238,7 +390,131 @@ export default function AuthoringPage() {
                                 <label>Total Marks *</label>
                                 <input type="number" min="1" required value={form.totalMarks} onChange={(e) => setField("totalMarks", e.target.value)} />
                             </div>
+                            <div className="a1-field">
+                                <label>Difficulty Mode</label>
+                                <select 
+                                    value={form.difficultyMode || "NONE"} 
+                                    onChange={(e) => setField("difficultyMode", e.target.value)}
+                                >
+                                    <option value="NONE">None (Auto-distribute)</option>
+                                    <option value="EASY">Beginner</option>
+                                    <option value="MEDIUM">Intermediate</option>
+                                    <option value="HARD">Advanced</option>
+                                    <option value="MANUAL">Manual Distribution</option>
+                                </select>
+                            </div>
                         </div>
+
+                        {form.difficultyMode === "MANUAL" && (
+                            <div className="a1-card" style={{ marginTop: 14, padding: 14, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                                <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--a1-navy)", marginBottom: 4 }}>Difficulty Distribution</h3>
+                                <p style={{ fontSize: 11, color: "var(--a1-mut)", marginBottom: 12 }}>Define exactly how the question pool should be divided.</p>
+                                
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
+                                    <div className="a1-field">
+                                        <label style={{ fontSize: 12 }}>Beginner (%)</label>
+                                        <input 
+                                            type="number" 
+                                            min="0" 
+                                            max="100" 
+                                            value={form.beginnerPct} 
+                                            onChange={(e) => setField("beginnerPct", e.target.value)} 
+                                        />
+                                    </div>
+                                    <div className="a1-field">
+                                        <label style={{ fontSize: 12 }}>Intermediate (%)</label>
+                                        <input 
+                                            type="number" 
+                                            min="0" 
+                                            max="100" 
+                                            value={form.intermediatePct} 
+                                            onChange={(e) => setField("intermediatePct", e.target.value)} 
+                                        />
+                                    </div>
+                                    <div className="a1-field">
+                                        <label style={{ fontSize: 12 }}>Advanced (%)</label>
+                                        <input 
+                                            type="number" 
+                                            min="0" 
+                                            max="100" 
+                                            value={form.advancedPct} 
+                                            onChange={(e) => setField("advancedPct", e.target.value)} 
+                                        />
+                                    </div>
+                                </div>
+
+                                <div style={{ 
+                                    display: "flex", 
+                                    justifyContent: "space-between", 
+                                    padding: "8px 12px", 
+                                    background: ((Number(form.beginnerPct) || 0) + (Number(form.intermediatePct) || 0) + (Number(form.advancedPct) || 0)) === 100 ? "#ecfdf5" : "#fffbeb", 
+                                    border: ((Number(form.beginnerPct) || 0) + (Number(form.intermediatePct) || 0) + (Number(form.advancedPct) || 0)) === 100 ? "1.5px solid #10b981" : "1.5px solid #f59e0b", 
+                                    borderRadius: 6, 
+                                    fontSize: 12, 
+                                    fontWeight: 700, 
+                                    color: ((Number(form.beginnerPct) || 0) + (Number(form.intermediatePct) || 0) + (Number(form.advancedPct) || 0)) === 100 ? "#065f46" : "#b45309", 
+                                    marginBottom: 14 
+                                }}>
+                                    <span>Distribution: {form.beginnerPct || 0}% + {form.intermediatePct || 0}% + {form.advancedPct || 0}%</span>
+                                    <span>
+                                        {((Number(form.beginnerPct) || 0) + (Number(form.intermediatePct) || 0) + (Number(form.advancedPct) || 0)) === 100 ? "✓ 100%" : `⚠ Distribution must total 100% (currently ${(Number(form.beginnerPct) || 0) + (Number(form.intermediatePct) || 0) + (Number(form.advancedPct) || 0)}%)`}
+                                    </span>
+                                </div>
+
+                                <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 6, padding: 12 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--a1-navy)", marginBottom: 8 }}>
+                                        Questions (based on Pool Size: {form.questionPoolSize})
+                                    </div>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                        <div>
+                                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--a1-navy)", marginBottom: 2 }}>
+                                                <span>Beginner</span>
+                                                <strong>{difficultyComposition.beginner} questions</strong>
+                                            </div>
+                                            <div style={{ width: "100%", background: "#f1f5f9", borderRadius: 4, height: 6, overflow: "hidden" }}>
+                                                <div style={{ 
+                                                    width: `${((Number(form.beginnerPct) || 0) + (Number(form.intermediatePct) || 0) + (Number(form.advancedPct) || 0)) > 0 ? (form.beginnerPct / Math.max(100, ((Number(form.beginnerPct) || 0) + (Number(form.intermediatePct) || 0) + (Number(form.advancedPct) || 0)))) * 100 : 0}%`, 
+                                                    background: "#2f6bff", 
+                                                    height: "100%" 
+                                                }} />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--a1-navy)", marginBottom: 2 }}>
+                                                <span>Intermediate</span>
+                                                <strong>{difficultyComposition.intermediate} questions</strong>
+                                            </div>
+                                            <div style={{ width: "100%", background: "#f1f5f9", borderRadius: 4, height: 6, overflow: "hidden" }}>
+                                                <div style={{ 
+                                                    width: `${((Number(form.beginnerPct) || 0) + (Number(form.intermediatePct) || 0) + (Number(form.advancedPct) || 0)) > 0 ? (form.intermediatePct / Math.max(100, ((Number(form.beginnerPct) || 0) + (Number(form.intermediatePct) || 0) + (Number(form.advancedPct) || 0)))) * 100 : 0}%`, 
+                                                    background: "#10b981", 
+                                                    height: "100%" 
+                                                }} />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--a1-navy)", marginBottom: 2 }}>
+                                                <span>Advanced</span>
+                                                <strong>{difficultyComposition.advanced} questions</strong>
+                                            </div>
+                                            <div style={{ width: "100%", background: "#f1f5f9", borderRadius: 4, height: 6, overflow: "hidden" }}>
+                                                <div style={{ 
+                                                    width: `${((Number(form.beginnerPct) || 0) + (Number(form.intermediatePct) || 0) + (Number(form.advancedPct) || 0)) > 0 ? (form.advancedPct / Math.max(100, ((Number(form.beginnerPct) || 0) + (Number(form.intermediatePct) || 0) + (Number(form.advancedPct) || 0)))) * 100 : 0}%`, 
+                                                    background: "#f59e0b", 
+                                                    height: "100%" 
+                                                }} />
+                                            </div>
+                                        </div>
+                                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: "var(--a1-navy)", borderTop: "1px solid #f1f5f9", paddingTop: 8, marginTop: 4 }}>
+                                            <span>Total</span>
+                                            <span>
+                                                {difficultyComposition.beginner + difficultyComposition.intermediate + difficultyComposition.advanced} / {form.questionPoolSize} questions
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className={`a1-pool-note ${poolTooSmall ? "a1-pool-warn" : ""}`}>
                             Question Pool = {form.questionPoolSize || 0} · Per Attempt = {form.questionsPerAttempt || 0} · Minimum
