@@ -795,21 +795,87 @@ const AI_MOCK_TEMPLATES = {
 };
 
 function mockGenerateAIQuestions(payload) {
-    const { stack = "Java", level = "L3", difficulty = "MEDIUM", type = "MCQ", count = 3 } = payload;
+    const { stack = "Java", level = "L3", difficulty = "MEDIUM", type = "MCQ", count = 3, difficultyMode, difficultyDistribution } = payload;
     const templates = AI_MOCK_TEMPLATES[stack] || AI_MOCK_TEMPLATES.Java;
     const marksMap = { EASY: 1, MEDIUM: 2, HARD: 3 };
 
-    return Array.from({ length: Math.min(count, 10) }, (_, i) => {
+    let distribution = [];
+    if (difficulty === "MANUAL" || difficultyMode === "MANUAL") {
+        const bPct = difficultyDistribution?.BEGINNER ?? 40;
+        const iPct = difficultyDistribution?.INTERMEDIATE ?? 40;
+        const aPct = difficultyDistribution?.ADVANCED ?? 20;
+
+        const floatB = (count * bPct) / 100;
+        const floatI = (count * iPct) / 100;
+        const floatA = (count * aPct) / 100;
+
+        let intB = Math.floor(floatB);
+        let intI = Math.floor(floatI);
+        let intA = Math.floor(floatA);
+
+        let remainder = count - (intB + intI + intA);
+        const items = [
+            { key: 'EASY', frac: floatB - intB, val: intB },
+            { key: 'MEDIUM', frac: floatI - intI, val: intI },
+            { key: 'HARD', frac: floatA - intA, val: intA }
+        ];
+        items.sort((x, y) => y.frac - x.frac);
+        if (remainder > 0 && remainder <= items.length) {
+            for (let k = 0; k < remainder; k++) {
+                items[k].val += 1;
+            }
+        }
+
+        items.forEach(item => {
+            for (let j = 0; j < item.val; j++) {
+                distribution.push(item.key);
+            }
+        });
+    } else if (difficulty === "NONE" || !difficulty) {
+        // Auto-distribute: 50% Easy, 30% Medium, 20% Hard
+        const floatB = (count * 50) / 100;
+        const floatI = (count * 30) / 100;
+        const floatA = (count * 20) / 100;
+
+        let intB = Math.floor(floatB);
+        let intI = Math.floor(floatI);
+        let intA = Math.floor(floatA);
+
+        let remainder = count - (intB + intI + intA);
+        const items = [
+            { key: 'EASY', frac: floatB - intB, val: intB },
+            { key: 'MEDIUM', frac: floatI - intI, val: intI },
+            { key: 'HARD', frac: floatA - intA, val: intA }
+        ];
+        items.sort((x, y) => y.frac - x.frac);
+        for (let k = 0; k < remainder; k++) {
+            items[k].val += 1;
+        }
+
+        items.forEach(item => {
+            for (let j = 0; j < item.val; j++) {
+                distribution.push(item.key);
+            }
+        });
+    } else {
+        // Single difficulty
+        for (let j = 0; j < count; j++) {
+            distribution.push(difficulty);
+        }
+    }
+
+    return Array.from({ length: count }, (_, i) => {
         const t = templates[i % templates.length];
+        const qDiff = distribution[i] || "MEDIUM";
         return {
-            tempId: `gen-${i}-${Date.now()}`,
+            tempId: `gen-${i}-${Date.now()}-${Math.random()}`,
             questionText: t.q,
             codeSnippet: type === "CODING" ? `// ${stack} example\nSystem.out.println("Q${i + 1}");` : "",
             stack,
             type,
             level,
-            difficulty,
-            marks: marksMap[difficulty] || 2,
+            difficulty: qDiff,
+            marks: marksMap[qDiff] || 2,
             optionA: t.a,
             optionB: t.b,
             optionC: t.c,

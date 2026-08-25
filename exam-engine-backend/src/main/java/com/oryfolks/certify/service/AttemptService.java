@@ -124,9 +124,32 @@ public class AttemptService {
 
                 List<Question> selectedQuestions = new ArrayList<>();
                 if (required > 0 && !activeQuestions.isEmpty()) {
-                        int easyTarget = (int) Math.round(required * 0.50);
-                        int mediumTarget = (int) Math.round(required * 0.30);
-                        int hardTarget = required - easyTarget - mediumTarget;
+                        int easyTarget = 0;
+                        int mediumTarget = 0;
+                        int hardTarget = 0;
+
+                        String diffMode = exam.getDifficultyMode() != null ? exam.getDifficultyMode().trim().toUpperCase() : "NONE";
+                        if ("EASY".equalsIgnoreCase(diffMode)) {
+                                easyTarget = required;
+                        } else if ("MEDIUM".equalsIgnoreCase(diffMode)) {
+                                mediumTarget = required;
+                        } else if ("HARD".equalsIgnoreCase(diffMode)) {
+                                hardTarget = required;
+                        } else if ("MANUAL".equalsIgnoreCase(diffMode)) {
+                                int bPct = exam.getBeginnerPct() != null ? exam.getBeginnerPct() : 40;
+                                int iPct = exam.getIntermediatePct() != null ? exam.getIntermediatePct() : 40;
+                                int aPct = exam.getAdvancedPct() != null ? exam.getAdvancedPct() : 20;
+                                com.oryfolks.certify.util.DifficultyCalculator.DifficultyCounts counts = 
+                                        com.oryfolks.certify.util.DifficultyCalculator.calculateCounts(required, bPct, iPct, aPct);
+                                easyTarget = counts.getBeginner();
+                                mediumTarget = counts.getIntermediate();
+                                hardTarget = counts.getAdvanced();
+                        } else {
+                                // Default / Auto-distribute: 50% Easy, 30% Medium, 20% Hard
+                                easyTarget = (int) Math.round(required * 0.50);
+                                mediumTarget = (int) Math.round(required * 0.30);
+                                hardTarget = required - easyTarget - mediumTarget;
+                        }
 
                         List<Question> easyPool = new ArrayList<>();
                         List<Question> mediumPool = new ArrayList<>();
@@ -143,39 +166,34 @@ public class AttemptService {
                                 }
                         }
 
+                        // Validate that each pool has sufficient questions
+                        if (easyPool.size() < easyTarget) {
+                                throw new BadRequestException(String.format(
+                                        "Unable to create exam.\nRequested:\nBeginner: %d\nAvailable:\nBeginner: %d\nPlease add %d more Beginner questions or adjust the difficulty distribution.",
+                                        easyTarget, easyPool.size(), easyTarget - easyPool.size()
+                                ));
+                        }
+                        if (mediumPool.size() < mediumTarget) {
+                                throw new BadRequestException(String.format(
+                                        "Unable to create exam.\nRequested:\nIntermediate: %d\nAvailable:\nIntermediate: %d\nPlease add %d more Intermediate questions or adjust the difficulty distribution.",
+                                        mediumTarget, mediumPool.size(), mediumTarget - mediumPool.size()
+                                ));
+                        }
+                        if (hardPool.size() < hardTarget) {
+                                throw new BadRequestException(String.format(
+                                        "Unable to create exam.\nRequested:\nAdvanced: %d\nAvailable:\nAdvanced: %d\nPlease add %d more Advanced questions or adjust the difficulty distribution.",
+                                        hardTarget, hardPool.size(), hardTarget - hardPool.size()
+                                ));
+                        }
+
                         Collections.shuffle(easyPool);
                         Collections.shuffle(mediumPool);
                         Collections.shuffle(hardPool);
 
                         List<Question> selected = new ArrayList<>();
-
-                        // Select Easy
-                        int easySelectedCount = Math.min(easyTarget, easyPool.size());
-                        selected.addAll(easyPool.subList(0, easySelectedCount));
-                        List<Question> unusedEasy = new ArrayList<>(easyPool.subList(easySelectedCount, easyPool.size()));
-
-                        // Select Medium
-                        int mediumSelectedCount = Math.min(mediumTarget, mediumPool.size());
-                        selected.addAll(mediumPool.subList(0, mediumSelectedCount));
-                        List<Question> unusedMedium = new ArrayList<>(mediumPool.subList(mediumSelectedCount, mediumPool.size()));
-
-                        // Select Hard
-                        int hardSelectedCount = Math.min(hardTarget, hardPool.size());
-                        selected.addAll(hardPool.subList(0, hardSelectedCount));
-                        List<Question> unusedHard = new ArrayList<>(hardPool.subList(hardSelectedCount, hardPool.size()));
-
-                        // Fallback: if we haven't selected enough questions, fill from unused pools
-                        int selectedSize = selected.size();
-                        if (selectedSize < required) {
-                                List<Question> allUnused = new ArrayList<>();
-                                allUnused.addAll(unusedEasy);
-                                allUnused.addAll(unusedMedium);
-                                allUnused.addAll(unusedHard);
-                                Collections.shuffle(allUnused);
-                                int remainingNeeded = required - selectedSize;
-                                int toAdd = Math.min(remainingNeeded, allUnused.size());
-                                selected.addAll(allUnused.subList(0, toAdd));
-                        }
+                        selected.addAll(easyPool.subList(0, easyTarget));
+                        selected.addAll(mediumPool.subList(0, mediumTarget));
+                        selected.addAll(hardPool.subList(0, hardTarget));
 
                         selectedQuestions = selected;
                 }

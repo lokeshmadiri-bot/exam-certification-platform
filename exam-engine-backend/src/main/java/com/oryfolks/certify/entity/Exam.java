@@ -78,6 +78,19 @@ public class Exam {
     @Builder.Default
     private ExamStatus status = ExamStatus.DRAFT;
 
+    @Column(name = "difficulty_mode", length = 30)
+    @Builder.Default
+    private String difficultyMode = "NONE";
+
+    @Column(name = "beginner_pct")
+    private Integer beginnerPct;
+
+    @Column(name = "intermediate_pct")
+    private Integer intermediatePct;
+
+    @Column(name = "advanced_pct")
+    private Integer advancedPct;
+
     @OneToMany(mappedBy = "exam", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties("exam")
     @Builder.Default

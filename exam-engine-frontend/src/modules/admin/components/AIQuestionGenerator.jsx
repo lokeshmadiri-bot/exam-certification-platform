@@ -23,6 +23,9 @@ const DEFAULT_FORM = {
     poolSize: 50,
     topic: "",
     examId: "",
+    beginnerPct: 40,
+    intermediatePct: 40,
+    advancedPct: 20,
 };
  
 const LEVEL_LABELS = { L1: "L1 · Expert", L2: "L2 · Advanced", L3: "L3 · Intermediate", L4: "L4 · Elementary", L5: "L5 · Beginner" };
@@ -51,6 +54,57 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
     });
 
     const [questions, setQuestions] = useState([]);
+    const totalPct = useMemo(() => {
+        return Number(form.beginnerPct || 0) + Number(form.intermediatePct || 0) + Number(form.advancedPct || 0);
+    }, [form.beginnerPct, form.intermediatePct, form.advancedPct]);
+
+    const manualCounts = useMemo(() => {
+        if (form.difficulty !== "MANUAL") return { beginner: 0, intermediate: 0, advanced: 0 };
+        
+        const pool = Number(form.poolSize) || 0;
+        const shortage = Math.max(0, pool - initialAvailable);
+        const baseSize = shortage > 0 ? shortage : (Number(form.count) || 10);
+        const bPct = Number(form.beginnerPct) || 0;
+        const iPct = Number(form.intermediatePct) || 0;
+        const aPct = Number(form.advancedPct) || 0;
+        
+        const floatB = (baseSize * bPct) / 100;
+        const floatI = (baseSize * iPct) / 100;
+        const floatA = (baseSize * aPct) / 100;
+
+        let intB = Math.floor(floatB);
+        let intI = Math.floor(floatI);
+        let intA = Math.floor(floatA);
+
+        let remainder = baseSize - (intB + intI + intA);
+
+        // Sort by fractional parts descending to distribute remainder
+        const items = [
+            { key: 'B', frac: floatB - intB, val: intB },
+            { key: 'I', frac: floatI - intI, val: intI },
+            { key: 'A', frac: floatA - intA, val: intA }
+        ];
+
+        items.sort((x, y) => y.frac - x.frac);
+
+        if (remainder > 0 && remainder <= items.length) {
+            for (let k = 0; k < remainder; k++) {
+                items[k].val += 1;
+            }
+        }
+
+        const result = {};
+        items.forEach(item => {
+            result[item.key] = item.val;
+        });
+
+        return {
+            beginner: result['B'],
+            intermediate: result['I'],
+            advanced: result['A']
+        };
+    }, [form.poolSize, form.count, initialAvailable, form.difficulty, form.beginnerPct, form.intermediatePct, form.advancedPct]);
+
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState(null);
     const [regeneratingIdx, setRegeneratingIdx] = useState(null);
@@ -134,6 +188,10 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
                     count: batchSize,
                     topic: form.topic || null,
                     examId: form.examId || null,
+                    difficultyMode: form.difficulty === "MANUAL" ? "MANUAL" : "SINGLE",
+                    beginnerPct: form.difficulty === "MANUAL" ? Number(form.beginnerPct) : null,
+                    intermediatePct: form.difficulty === "MANUAL" ? Number(form.intermediatePct) : null,
+                    advancedPct: form.difficulty === "MANUAL" ? Number(form.advancedPct) : null,
                 };
 
                 const result = await generateAIQuestions(payload);
@@ -170,8 +228,14 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
             }
         } catch (err) {
             setError(err.message || "Generation failed. Please check backend connection or API key.");
+            if (currentQuestions.length === 0) {
+                setStep("form");
+            }
         } finally {
             setGenerating(false);
+            if (currentQuestions.length === 0) {
+                setStep("form");
+            }
         }
     };
  
@@ -181,7 +245,13 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
         setStep("preview");
         setQuestions([]);
         setDuplicateCount(0);
-        await runGeneration(Number(form.poolSize) || 50, []);
+        
+        let targetSize = Number(form.poolSize) || 50;
+        if (initialAvailable >= targetSize) {
+            targetSize = initialAvailable + (Number(form.count) || 10);
+            setForm(f => ({ ...f, poolSize: targetSize }));
+        }
+        await runGeneration(targetSize, []);
     };
  
     // ---- Step 2: Edit a question inline ----
@@ -229,6 +299,9 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
     const handleStopGeneration = () => {
         cancelRef.current = true;
         setGenerating(false);
+        if (questions.length === 0) {
+            setStep("form");
+        }
     };
 
     const handleCloseClick = () => {
@@ -592,10 +665,15 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
                                     const label = d === "EASY" ? "Beginner" : d === "MEDIUM" ? "Intermediate" : "Advanced";
                                     return <option key={d} value={d}>{label}</option>;
                                 })}
+                                <option value="MANUAL">Manual Distribution</option>
                             </select>
                             {(form.difficulty === "NONE" || !form.difficulty) ? (
                                 <p style={{ margin: "5px 0 0", fontSize: 11.5, color: "#2d6cdf", fontStyle: "italic" }}>
                                     ✦ Default 50% Easy, 30% Medium, 20% Hard distribution.
+                                </p>
+                            ) : form.difficulty === "MANUAL" ? (
+                                <p style={{ margin: "5px 0 0", fontSize: 11.5, color: "#2d6cdf", fontStyle: "italic" }}>
+                                    ⚙️ Custom manual percentage distribution active.
                                 </p>
                             ) : (
                                 <p style={{ margin: "5px 0 0", fontSize: 11.5, color: "#b45309", fontStyle: "italic" }}>
@@ -630,6 +708,164 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
                             </p>
                         </div>
                     </div>
+
+                    {/* Manual Distribution Configuration Panel */}
+                    {form.difficulty === "MANUAL" && (
+                        <div className="a1-card" style={{ 
+                            background: "#f8fafc", 
+                            border: "1.5px solid #e2e8f0", 
+                            borderRadius: 12, 
+                            padding: "18px 22px", 
+                            marginBottom: 16 
+                        }}>
+                            <div style={{ fontWeight: 700, fontSize: 14.5, color: "var(--a1-navy)", marginBottom: 4 }}>
+                                Difficulty Distribution
+                            </div>
+                            <p className="a1-sub" style={{ margin: "0 0 16px", fontSize: 12 }}>
+                                Define exactly how the question pool should be divided.
+                            </p>
+
+                            <div style={{ display: "flex", gap: 24, marginBottom: 16 }}>
+                                <div className="a1-field" style={{ flex: 1 }}>
+                                    <label style={{ fontSize: 12, fontWeight: 700, color: "var(--a1-navy)" }}>Beginner</label>
+                                    <div style={{ display: "flex", flex: 1, alignItems: "center", gap: 8, marginTop: 4 }}>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            required
+                                            disabled={generating || questions.length > 0}
+                                            value={form.beginnerPct === 0 ? "0" : form.beginnerPct || ""}
+                                            onChange={(e) => {
+                                                const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                                                setField("beginnerPct", val);
+                                            }}
+                                            style={{ width: "90px", textAlign: "center", padding: "6px" }}
+                                        />
+                                        <span style={{ fontSize: 14, fontWeight: 700, color: "var(--a1-ink)" }}>%</span>
+                                    </div>
+                                </div>
+                                <div className="a1-field" style={{ flex: 1 }}>
+                                    <label style={{ fontSize: 12, fontWeight: 700, color: "var(--a1-navy)" }}>Intermediate</label>
+                                    <div style={{ display: "flex", flex: 1, alignItems: "center", gap: 8, marginTop: 4 }}>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            required
+                                            disabled={generating || questions.length > 0}
+                                            value={form.intermediatePct === 0 ? "0" : form.intermediatePct || ""}
+                                            onChange={(e) => {
+                                                const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                                                setField("intermediatePct", val);
+                                            }}
+                                            style={{ width: "90px", textAlign: "center", padding: "6px" }}
+                                        />
+                                        <span style={{ fontSize: 14, fontWeight: 700, color: "var(--a1-ink)" }}>%</span>
+                                    </div>
+                                </div>
+                                <div className="a1-field" style={{ flex: 1 }}>
+                                    <label style={{ fontSize: 12, fontWeight: 700, color: "var(--a1-navy)" }}>Advanced</label>
+                                    <div style={{ display: "flex", flex: 1, alignItems: "center", gap: 8, marginTop: 4 }}>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            required
+                                            disabled={generating || questions.length > 0}
+                                            value={form.advancedPct === 0 ? "0" : form.advancedPct || ""}
+                                            onChange={(e) => {
+                                                const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                                                setField("advancedPct", val);
+                                            }}
+                                            style={{ width: "90px", textAlign: "center", padding: "6px" }}
+                                        />
+                                        <span style={{ fontSize: 14, fontWeight: 700, color: "var(--a1-ink)" }}>%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Live Distribution Status */}
+                            <div style={{ 
+                                display: "flex", 
+                                justifyContent: "space-between", 
+                                alignItems: "center", 
+                                padding: "10px 14px",
+                                background: totalPct === 100 ? "#ecfdf5" : "#fffbeb",
+                                border: totalPct === 100 ? "1.5px solid #10b981" : "1.5px solid #f59e0b",
+                                borderRadius: 8,
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: totalPct === 100 ? "#065f46" : "#b45309",
+                                marginBottom: 16
+                            }}>
+                                <span>Distribution: {form.beginnerPct || 0}% + {form.intermediatePct || 0}% + {form.advancedPct || 0}%</span>
+                                <span>
+                                    {totalPct === 100 ? "✓ 100%" : `⚠ Distribution must total 100% (currently ${totalPct}%)`}
+                                </span>
+                            </div>
+
+                            {/* Live Count Visualization */}
+                            <div style={{ 
+                                background: "#ffffff", 
+                                border: "1px solid #e2e8f0", 
+                                borderRadius: 8, 
+                                padding: "16px" 
+                            }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--a1-navy)", marginBottom: 12 }}>
+                                    Questions to generate {initialAvailable >= (Number(form.poolSize) || 0) ? `(based on Batch Size: ${form.count})` : `(based on Remaining: ${Number(form.poolSize) - initialAvailable})`}
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                    {/* Beginner Count */}
+                                    <div>
+                                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--a1-ink)", marginBottom: 4 }}>
+                                            <span>Beginner</span>
+                                            <strong>{manualCounts.beginner} questions</strong>
+                                        </div>
+                                        <div style={{ width: "100%", background: "#f1f5f9", borderRadius: 4, height: 8, overflow: "hidden" }}>
+                                            <div style={{ 
+                                                width: `${totalPct > 0 ? (form.beginnerPct / Math.max(100, totalPct)) * 100 : 0}%`, 
+                                                background: "#2f6bff", 
+                                                height: "100%",
+                                                transition: "width 0.2s ease"
+                                            }} />
+                                        </div>
+                                    </div>
+                                    {/* Intermediate Count */}
+                                    <div>
+                                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--a1-ink)", marginBottom: 4 }}>
+                                            <span>Intermediate</span>
+                                            <strong>{manualCounts.intermediate} questions</strong>
+                                        </div>
+                                        <div style={{ width: "100%", background: "#f1f5f9", borderRadius: 4, height: 8, overflow: "hidden" }}>
+                                            <div style={{ 
+                                                width: `${totalPct > 0 ? (form.intermediatePct / Math.max(100, totalPct)) * 100 : 0}%`, 
+                                                background: "#2f6bff", 
+                                                height: "100%",
+                                                transition: "width 0.2s ease"
+                                            }} />
+                                        </div>
+                                    </div>
+                                    {/* Advanced Count */}
+                                    <div>
+                                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--a1-ink)", marginBottom: 4 }}>
+                                            <span>Advanced</span>
+                                            <strong>{manualCounts.advanced} questions</strong>
+                                        </div>
+                                        <div style={{ width: "100%", background: "#f1f5f9", borderRadius: 4, height: 8, overflow: "hidden" }}>
+                                            <div style={{ 
+                                                width: `${totalPct > 0 ? (form.advancedPct / Math.max(100, totalPct)) * 100 : 0}%`, 
+                                                background: "#2f6bff", 
+                                                height: "100%",
+                                                transition: "width 0.2s ease"
+                                            }} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="a1-field" style={{ marginBottom: 18 }}>
                         <label>Topic / Prompt guidance (optional)</label>
                         <input
@@ -642,7 +878,13 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
                     {questions.length === 0 && !generating && (
                         <div className="a1-modal-actions">
                             <button type="button" className="a1-btn a1-btn-ghost" onClick={handleCloseClick}>Cancel</button>
-                            <button type="submit" className="a1-btn a1-btn-primary">✨ Generate Questions</button>
+                            <button 
+                                type="submit" 
+                                className="a1-btn a1-btn-primary"
+                                disabled={form.difficulty === "MANUAL" && totalPct !== 100}
+                            >
+                                ✨ Generate Questions
+                            </button>
                         </div>
                     )}
                 </form>
