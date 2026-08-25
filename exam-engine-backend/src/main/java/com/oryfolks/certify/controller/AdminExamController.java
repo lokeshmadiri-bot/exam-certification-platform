@@ -4,6 +4,7 @@ import com.oryfolks.certify.entity.*;
 import com.oryfolks.certify.enums.*;
 import com.oryfolks.certify.repository.*;
 import com.oryfolks.certify.response.ApiResponse;
+import com.oryfolks.certify.exception.BadRequestException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -95,6 +96,10 @@ public class AdminExamController {
             map.put("version", e.getVersion());
             map.put("status", e.getStatus() != null ? e.getStatus().name() : "DRAFT");
             map.put("totalMarks", e.getTotalMarks() != null ? e.getTotalMarks() : 100);
+            map.put("difficultyMode", e.getDifficultyMode() != null ? e.getDifficultyMode() : "NONE");
+            map.put("beginnerPct", e.getBeginnerPct());
+            map.put("intermediatePct", e.getIntermediatePct());
+            map.put("advancedPct", e.getAdvancedPct());
             map.put("createdAt", e.getCreatedAt());
             map.put("updatedAt", e.getUpdatedAt());
 
@@ -147,6 +152,10 @@ public class AdminExamController {
         map.put("version", exam.getVersion());
         map.put("status", exam.getStatus() != null ? exam.getStatus().name() : "DRAFT");
         map.put("totalMarks", exam.getTotalMarks() != null ? exam.getTotalMarks() : 100);
+        map.put("difficultyMode", exam.getDifficultyMode() != null ? exam.getDifficultyMode() : "NONE");
+        map.put("beginnerPct", exam.getBeginnerPct());
+        map.put("intermediatePct", exam.getIntermediatePct());
+        map.put("advancedPct", exam.getAdvancedPct());
         map.put("createdAt", exam.getCreatedAt());
         map.put("updatedAt", exam.getUpdatedAt());
         map.put("currentQuestionCount", activeCount);
@@ -172,6 +181,7 @@ public class AdminExamController {
             exam.setPerAttempt(exam.getQuestionsPerAttempt());
         }
 
+        validateDifficultyDistribution(exam);
         Exam saved = examRepository.save(exam);
 
         auditLogRepository.save(AccessAuditLog.builder()
@@ -211,6 +221,13 @@ public class AdminExamController {
 
         if (payload.getInstructions() != null) exam.setInstructions(payload.getInstructions());
 
+        if (payload.getDifficultyMode() != null) exam.setDifficultyMode(payload.getDifficultyMode());
+        exam.setBeginnerPct(payload.getBeginnerPct());
+        exam.setIntermediatePct(payload.getIntermediatePct());
+        exam.setAdvancedPct(payload.getAdvancedPct());
+
+        validateDifficultyDistribution(exam);
+
         Exam saved = examRepository.save(exam);
 
         auditLogRepository.save(AccessAuditLog.builder()
@@ -238,6 +255,10 @@ public class AdminExamController {
                 .passMark(src.getPassMark())
                 .totalMarks(src.getTotalMarks())
                 .instructions(src.getInstructions())
+                .difficultyMode(src.getDifficultyMode())
+                .beginnerPct(src.getBeginnerPct())
+                .intermediatePct(src.getIntermediatePct())
+                .advancedPct(src.getAdvancedPct())
                 .version("1")
                 .status(ExamStatus.DRAFT)
                 .build();
@@ -539,5 +560,22 @@ public class AdminExamController {
                 .build());
 
         return ResponseEntity.ok(ApiResponse.success("Exam deleted successfully", Map.of("ok", true)));
+    }
+
+    private void validateDifficultyDistribution(Exam exam) {
+        if ("MANUAL".equalsIgnoreCase(exam.getDifficultyMode())) {
+            Integer b = exam.getBeginnerPct();
+            Integer i = exam.getIntermediatePct();
+            Integer a = exam.getAdvancedPct();
+            if (b == null || i == null || a == null) {
+                throw new BadRequestException("Percentages for Beginner, Intermediate, and Advanced must be defined for Manual Distribution.");
+            }
+            if (b < 0 || b > 100 || i < 0 || i > 100 || a < 0 || a > 100) {
+                throw new BadRequestException("Difficulty percentages must be between 0 and 100.");
+            }
+            if (b + i + a != 100) {
+                throw new BadRequestException("Total distribution percentage must equal exactly 100% (currently " + (b + i + a) + "%).");
+            }
+        }
     }
 }

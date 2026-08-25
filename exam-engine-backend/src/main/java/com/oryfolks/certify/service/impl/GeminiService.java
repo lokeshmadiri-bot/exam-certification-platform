@@ -26,7 +26,7 @@ import java.util.Map;
 @Slf4j
 public class GeminiService {
 
-    @Value("${groq.api.key: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}")
+    @Value("${groq.api.key:}")
     private String groqApiKey;
 
     @Value("${groq.api.url:https://api.groq.com/openai/v1/chat/completions}")
@@ -55,9 +55,13 @@ public class GeminiService {
 
     /** Generate N questions using Groq Cloud, Grok, Gemini, or local fallback. */
     public List<GeneratedQuestionDTO> generate(GenerateQuestionRequest req) {
-        // If difficulty is null/blank: use 50% Easy, 30% Medium, 20% Hard distribution
-        if (req.getDifficulty() == null || req.getDifficulty().isBlank()) {
+        // If difficulty is null/blank or NONE: use 50% Easy, 30% Medium, 20% Hard distribution
+        if (req.getDifficulty() == null || req.getDifficulty().isBlank() || "NONE".equalsIgnoreCase(req.getDifficulty())) {
             return generateWithDistribution(req);
+        }
+
+        if ("MANUAL".equalsIgnoreCase(req.getDifficulty()) || "MANUAL".equalsIgnoreCase(req.getDifficultyMode())) {
+            return generateWithManualDistribution(req);
         }
 
         String defaultGroqKey = "";
@@ -141,6 +145,59 @@ public class GeminiService {
                 all.stream().filter(q -> "EASY".equalsIgnoreCase(q.getDifficulty())).count(),
                 all.stream().filter(q -> "MEDIUM".equalsIgnoreCase(q.getDifficulty())).count(),
                 all.stream().filter(q -> "HARD".equalsIgnoreCase(q.getDifficulty())).count());
+        return all;
+    }
+
+    /** Generate questions using user-specified manual percentage distribution. */
+    private List<GeneratedQuestionDTO> generateWithManualDistribution(GenerateQuestionRequest req) {
+        int total = (req.getCount() != null && req.getCount() > 0) ? req.getCount() : 10;
+
+        int bPct = req.getBeginnerPct() != null ? req.getBeginnerPct() : 40;
+        int iPct = req.getIntermediatePct() != null ? req.getIntermediatePct() : 40;
+        int aPct = req.getAdvancedPct() != null ? req.getAdvancedPct() : 20;
+
+        com.oryfolks.certify.util.DifficultyCalculator.DifficultyCounts counts = 
+                com.oryfolks.certify.util.DifficultyCalculator.calculateCounts(total, bPct, iPct, aPct);
+
+        int easyCount = counts.getBeginner();
+        int mediumCount = counts.getIntermediate();
+        int hardCount = counts.getAdvanced();
+
+        log.info("Manual-distributing {} questions: {} Easy, {} Medium, {} Hard (distribution: {}% / {}% / {}%)", 
+            total, easyCount, mediumCount, hardCount, bPct, iPct, aPct);
+
+        List<GeneratedQuestionDTO> all = new ArrayList<>();
+
+        if (easyCount > 0) {
+            GenerateQuestionRequest easyReq = GenerateQuestionRequest.builder()
+                    .stack(req.getStack()).level(req.getLevel())
+                    .difficulty("EASY").type(req.getType())
+                    .count(easyCount).topic(req.getTopic()).examId(req.getExamId())
+                    .build();
+            all.addAll(generateSingle(easyReq));
+        }
+        if (mediumCount > 0) {
+            try { Thread.sleep(1200); } catch (InterruptedException ignored) {}
+            GenerateQuestionRequest medReq = GenerateQuestionRequest.builder()
+                    .stack(req.getStack()).level(req.getLevel())
+                    .difficulty("MEDIUM").type(req.getType())
+                    .count(mediumCount).topic(req.getTopic()).examId(req.getExamId())
+                    .build();
+            all.addAll(generateSingle(medReq));
+        }
+        if (hardCount > 0) {
+            try { Thread.sleep(1200); } catch (InterruptedException ignored) {}
+            GenerateQuestionRequest hardReq = GenerateQuestionRequest.builder()
+                    .stack(req.getStack()).level(req.getLevel())
+                    .difficulty("HARD").type(req.getType())
+                    .count(hardCount).topic(req.getTopic()).examId(req.getExamId())
+                    .build();
+            all.addAll(generateSingle(hardReq));
+        }
+
+        // Validate distribution and fix any tags if AI returned wrong labels
+        all = enforceDistribution(all, easyCount, mediumCount, hardCount);
+
         return all;
     }
 
