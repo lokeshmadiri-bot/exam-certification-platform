@@ -13,4 +13,8 @@ public class AnswerSubmission {
     private String selectedOption;// A, B, C, D
 
     private Integer optionId; // 1, 2, 3, 4
+
+    private Long beginnerTimeRemaining;
+    private Long intermediateTimeRemaining;
+    private Long advancedTimeRemaining;
 }

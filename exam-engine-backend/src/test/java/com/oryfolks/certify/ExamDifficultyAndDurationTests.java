@@ -90,26 +90,26 @@ public class ExamDifficultyAndDurationTests {
 
     @Test
     public void testDurationCalculations() {
-        // Beginner only: 50 Qs * 1 min = 50 mins
+        // Beginner only: 50 Qs * 2 min = 100 mins
         int d1 = DurationCalculator.calculateSuggestedDuration(50, 0, 0);
-        assertEquals(50, d1);
+        assertEquals(100, d1);
 
-        // Intermediate only: 50 Qs * 2 min = 100 mins
+        // Intermediate only: 50 Qs * 5 min = 250 mins
         int d2 = DurationCalculator.calculateSuggestedDuration(0, 50, 0);
-        assertEquals(100, d2);
+        assertEquals(250, d2);
 
-        // Advanced only: 50 Qs * 3 min = 150 mins
+        // Advanced only: 50 Qs * 10 min = 500 mins
         int d3 = DurationCalculator.calculateSuggestedDuration(0, 0, 50);
-        assertEquals(150, d3);
+        assertEquals(500, d3);
 
         // Auto-distribute: 100 questions -> 50% Easy (50), 30% Medium (30), 20% Hard (20)
-        // 50*1 + 30*2 + 20*3 = 50 + 60 + 60 = 170 mins
+        // 50*2 + 30*5 + 20*10 = 100 + 150 + 200 = 450 mins
         int d4 = DurationCalculator.calculateSuggestedDuration(50, 30, 20);
-        assertEquals(170, d4);
+        assertEquals(450, d4);
 
         // Manual 40/40/20 on 100 Qs: 40 Easy, 40 Medium, 20 Hard
-        // 40*1 + 40*2 + 20*3 = 40 + 80 + 60 = 180 mins
+        // 40*2 + 40*5 + 20*10 = 80 + 200 + 200 = 480 mins
         int d5 = DurationCalculator.calculateSuggestedDuration(40, 40, 20);
-        assertEquals(180, d5);
+        assertEquals(480, d5);
     }
 }

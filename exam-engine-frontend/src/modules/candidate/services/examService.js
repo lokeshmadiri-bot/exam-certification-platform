@@ -18,8 +18,15 @@ export const examService = {
     const response = await api.get(`/exams/attempts/${attemptId}`);
     return response.data;
   },
-  saveAnswer: async (attemptId, questionId, selectedOption, optionId) => {
-    const response = await api.post(`/exams/attempts/${attemptId}/answers`, { questionId, selectedOption, optionId });
+  saveAnswer: async (attemptId, questionId, selectedOption, optionId, beginnerTimeRemaining, intermediateTimeRemaining, advancedTimeRemaining) => {
+    const response = await api.post(`/exams/attempts/${attemptId}/answers`, { 
+      questionId, 
+      selectedOption, 
+      optionId,
+      beginnerTimeRemaining,
+      intermediateTimeRemaining,
+      advancedTimeRemaining
+    });
     return response.data;
   },
   submitAttemptNew: async (request) => {

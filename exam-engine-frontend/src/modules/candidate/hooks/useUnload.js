@@ -1,7 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { examSyncService } from '../services/examSyncService';
 
-export function useUnload({ attemptId, answersRef, timeRemainingRef, active }) {
+export function useUnload({
+  attemptId,
+  answersRef,
+  timeRemainingRef,
+  beginnerTimeRemainingRef,
+  intermediateTimeRemainingRef,
+  advancedTimeRemainingRef,
+  active
+}) {
   const isNavigatingAwayRef = useRef(false);
 
   useEffect(() => {
@@ -11,9 +19,12 @@ export function useUnload({ attemptId, answersRef, timeRemainingRef, active }) {
     const handleBeforeUnload = (e) => {
       const answers = answersRef.current || {};
       const remainingSeconds = timeRemainingRef.current || 0;
+      const bTime = beginnerTimeRemainingRef.current || 0;
+      const iTime = intermediateTimeRemainingRef.current || 0;
+      const aTime = advancedTimeRemainingRef.current || 0;
 
       // Transmit state via sendBeacon (non-blocking async beacon)
-      examSyncService.sendBeaconData(attemptId, answers, remainingSeconds);
+      examSyncService.sendBeaconData(attemptId, answers, remainingSeconds, bTime, iTime, aTime);
 
       // standard browser prompt on tab close / reload
       e.preventDefault();
@@ -35,7 +46,10 @@ export function useUnload({ attemptId, answersRef, timeRemainingRef, active }) {
         // Trigger beacon transmission before exiting
         const answers = answersRef.current || {};
         const remainingSeconds = timeRemainingRef.current || 0;
-        examSyncService.sendBeaconData(attemptId, answers, remainingSeconds);
+        const bTime = beginnerTimeRemainingRef.current || 0;
+        const iTime = intermediateTimeRemainingRef.current || 0;
+        const aTime = advancedTimeRemainingRef.current || 0;
+        examSyncService.sendBeaconData(attemptId, answers, remainingSeconds, bTime, iTime, aTime);
       }
     };
 

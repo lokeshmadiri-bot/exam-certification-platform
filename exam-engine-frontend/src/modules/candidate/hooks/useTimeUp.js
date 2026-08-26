@@ -1,18 +1,23 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useExam } from '../context/ExamContext';
 import { examSyncService } from '../services/examSyncService';
 
-export function useTimeUp({ attemptId, initialSeconds, answers, active, onAutoSubmit }) {
-  const [remainingSeconds, setRemainingSeconds] = useState(initialSeconds || 0);
+export function useTimeUp({ attemptId, answers, active, onAutoSubmit }) {
+  const {
+    beginnerTimeRemaining,
+    intermediateTimeRemaining,
+    advancedTimeRemaining,
+    loading,
+    offline
+  } = useExam();
+
+  const totalRemaining = beginnerTimeRemaining !== null && intermediateTimeRemaining !== null && advancedTimeRemaining !== null
+    ? (beginnerTimeRemaining + intermediateTimeRemaining + advancedTimeRemaining)
+    : null;
+
   const [submitting, setSubmitting] = useState(false);
   const [isTimeUp, setIsTimeUp] = useState(false);
   const autoSubmittedRef = useRef(false);
-
-  // Sync initial seconds when loaded
-  useEffect(() => {
-    if (typeof initialSeconds === 'number') {
-      setRemainingSeconds(initialSeconds);
-    }
-  }, [initialSeconds]);
 
   const handleTimeUp = useCallback(async () => {
     if (autoSubmittedRef.current) return;
@@ -22,56 +27,38 @@ export function useTimeUp({ attemptId, initialSeconds, answers, active, onAutoSu
     setSubmitting(true);
 
     try {
-      // 1. Flush last state & unsaved answers
+      // Flush last state & unsaved answers
       if (attemptId && answers) {
-        await examSyncService.syncAnswers(attemptId, answers, 0).catch(() => {});
+        await examSyncService.syncAnswers(
+          attemptId,
+          answers,
+          0,
+          0,
+          0,
+          0
+        ).catch(() => {});
       }
     } catch (err) {
       console.error('Error flushing answers on time-up:', err);
     }
 
-    // 2. Trigger submission callback
+    // Trigger submission callback
     if (onAutoSubmit) {
       await onAutoSubmit();
     }
   }, [attemptId, answers, onAutoSubmit]);
 
   useEffect(() => {
-    if (!active || submitting || isTimeUp) return;
+    if (!active || submitting || isTimeUp || totalRemaining === null) return;
 
-    if (remainingSeconds <= 0 && initialSeconds > 0) {
+    if (totalRemaining <= 0) {
       handleTimeUp();
-      return;
     }
-
-    const interval = setInterval(() => {
-      setRemainingSeconds((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          handleTimeUp();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [active, submitting, isTimeUp, remainingSeconds, initialSeconds, handleTimeUp]);
-
-  const formatTime = (secs) => {
-    if (secs < 0) secs = 0;
-    const h = String(Math.floor(secs / 3600)).padStart(2, '0');
-    const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
-    const s = String(secs % 60).padStart(2, '0');
-    return `${h}:${m}:${s}`;
-  };
+  }, [active, submitting, isTimeUp, totalRemaining, handleTimeUp]);
 
   return {
-    remainingSeconds,
-    setRemainingSeconds,
+    remainingSeconds: totalRemaining || 0,
     submitting,
-    isTimeUp,
-    formattedTime: formatTime(remainingSeconds),
-    formatTime
+    isTimeUp
   };
 }
