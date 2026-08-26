@@ -279,6 +279,9 @@ public class ExamController {
         data.put("sections", sectionsData);
         data.put("answers", answersMap);
         data.put("resultStatus", attempt.getResultStatus().toString());
+        data.put("beginnerTimeRemaining", attempt.getBeginnerTimeRemaining());
+        data.put("intermediateTimeRemaining", attempt.getIntermediateTimeRemaining());
+        data.put("advancedTimeRemaining", attempt.getAdvancedTimeRemaining());
         long strikeCount = examViolationRepository.countByAttemptId(attemptId);
         data.put("strikeCount", (int) strikeCount);
 
@@ -291,17 +294,15 @@ public class ExamController {
                 .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
 
         long remaining = 0;
-        if (attempt.getResultStatus() == ResultStatus.IN_PROGRESS && attempt.getStartTime() != null) {
-            LocalDateTime expectedEndTime = attempt.getStartTime().plusMinutes(attempt.getExam().getDurationMinutes());
-            remaining = Duration.between(LocalDateTime.now(), expectedEndTime).getSeconds();
-            if (remaining < 0) remaining = 0;
-        } else if (attempt.getEndTime() != null) {
-            remaining = Duration.between(LocalDateTime.now(), attempt.getEndTime()).getSeconds();
-            if (remaining < 0) remaining = 0;
-        }
+        if (attempt.getBeginnerTimeRemaining() != null) remaining += attempt.getBeginnerTimeRemaining();
+        if (attempt.getIntermediateTimeRemaining() != null) remaining += attempt.getIntermediateTimeRemaining();
+        if (attempt.getAdvancedTimeRemaining() != null) remaining += attempt.getAdvancedTimeRemaining();
 
         Map<String, Object> response = new HashMap<>();
         response.put("remainingSeconds", remaining);
+        response.put("beginnerTimeRemaining", attempt.getBeginnerTimeRemaining());
+        response.put("intermediateTimeRemaining", attempt.getIntermediateTimeRemaining());
+        response.put("advancedTimeRemaining", attempt.getAdvancedTimeRemaining());
 
         return ResponseEntity.ok(ApiResponse.success("Remaining time retrieved", response));
     }
@@ -340,6 +341,23 @@ public class ExamController {
         }
 
         answerRepository.save(answer);
+
+        if (submission.getBeginnerTimeRemaining() != null) {
+            attempt.setBeginnerTimeRemaining(submission.getBeginnerTimeRemaining());
+        }
+        if (submission.getIntermediateTimeRemaining() != null) {
+            attempt.setIntermediateTimeRemaining(submission.getIntermediateTimeRemaining());
+        }
+        if (submission.getAdvancedTimeRemaining() != null) {
+            attempt.setAdvancedTimeRemaining(submission.getAdvancedTimeRemaining());
+        }
+        long remaining = 0;
+        if (attempt.getBeginnerTimeRemaining() != null) remaining += attempt.getBeginnerTimeRemaining();
+        if (attempt.getIntermediateTimeRemaining() != null) remaining += attempt.getIntermediateTimeRemaining();
+        if (attempt.getAdvancedTimeRemaining() != null) remaining += attempt.getAdvancedTimeRemaining();
+        attempt.setRemainingSeconds(remaining);
+        attempt.setLastSeen(LocalDateTime.now());
+        examAttemptRepository.save(attempt);
 
         Map<String, Object> response = new HashMap<>();
         response.put("message", "Answer Saved");
@@ -605,14 +623,9 @@ public class ExamController {
                 .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
 
         long remaining = 0;
-        if (attempt.getResultStatus() == ResultStatus.IN_PROGRESS && attempt.getStartTime() != null) {
-            LocalDateTime expectedEndTime = attempt.getStartTime().plusMinutes(attempt.getExam().getDurationMinutes());
-            remaining = Duration.between(LocalDateTime.now(), expectedEndTime).getSeconds();
-            if (remaining < 0) remaining = 0;
-        } else if (attempt.getEndTime() != null) {
-            remaining = Duration.between(LocalDateTime.now(), attempt.getEndTime()).getSeconds();
-            if (remaining < 0) remaining = 0;
-        }
+        if (attempt.getBeginnerTimeRemaining() != null) remaining += attempt.getBeginnerTimeRemaining();
+        if (attempt.getIntermediateTimeRemaining() != null) remaining += attempt.getIntermediateTimeRemaining();
+        if (attempt.getAdvancedTimeRemaining() != null) remaining += attempt.getAdvancedTimeRemaining();
 
         attempt.setLastSeen(LocalDateTime.now());
         attempt.setRemainingSeconds(remaining);
@@ -622,6 +635,9 @@ public class ExamController {
                 .status(attempt.getResultStatus().toString())
                 .remainingSeconds(remaining)
                 .lastSeen(attempt.getLastSeen())
+                .beginnerTimeRemaining(attempt.getBeginnerTimeRemaining())
+                .intermediateTimeRemaining(attempt.getIntermediateTimeRemaining())
+                .advancedTimeRemaining(attempt.getAdvancedTimeRemaining())
                 .build();
 
         return ResponseEntity.ok(ApiResponse.success("Attempt status retrieved", statusDTO));
@@ -668,22 +684,24 @@ public class ExamController {
             }
         }
 
-        long remaining = 0;
-        if (attempt.getResultStatus() == ResultStatus.IN_PROGRESS && attempt.getStartTime() != null) {
-            LocalDateTime expectedEndTime = attempt.getStartTime().plusMinutes(attempt.getExam().getDurationMinutes());
-            remaining = Duration.between(LocalDateTime.now(), expectedEndTime).getSeconds();
-            if (remaining < 0) remaining = 0;
-        } else if (attempt.getEndTime() != null) {
-            remaining = Duration.between(LocalDateTime.now(), attempt.getEndTime()).getSeconds();
-            if (remaining < 0) remaining = 0;
+        if (request != null) {
+            if (request.getBeginnerTimeRemaining() != null) {
+                attempt.setBeginnerTimeRemaining(request.getBeginnerTimeRemaining());
+            }
+            if (request.getIntermediateTimeRemaining() != null) {
+                attempt.setIntermediateTimeRemaining(request.getIntermediateTimeRemaining());
+            }
+            if (request.getAdvancedTimeRemaining() != null) {
+                attempt.setAdvancedTimeRemaining(request.getAdvancedTimeRemaining());
+            }
         }
+        long remaining = 0;
+        if (attempt.getBeginnerTimeRemaining() != null) remaining += attempt.getBeginnerTimeRemaining();
+        if (attempt.getIntermediateTimeRemaining() != null) remaining += attempt.getIntermediateTimeRemaining();
+        if (attempt.getAdvancedTimeRemaining() != null) remaining += attempt.getAdvancedTimeRemaining();
 
         attempt.setLastSeen(LocalDateTime.now());
-        if (request != null && request.getRemainingSeconds() != null) {
-            attempt.setRemainingSeconds(request.getRemainingSeconds());
-        } else {
-            attempt.setRemainingSeconds(remaining);
-        }
+        attempt.setRemainingSeconds(remaining);
         examAttemptRepository.save(attempt);
 
         AttemptStatusDTO statusDTO = AttemptStatusDTO.builder()
@@ -691,6 +709,9 @@ public class ExamController {
                 .remainingSeconds(remaining)
                 .lastSeen(attempt.getLastSeen())
                 .syncedCount(syncedCount)
+                .beginnerTimeRemaining(attempt.getBeginnerTimeRemaining())
+                .intermediateTimeRemaining(attempt.getIntermediateTimeRemaining())
+                .advancedTimeRemaining(attempt.getAdvancedTimeRemaining())
                 .build();
 
         return ResponseEntity.ok(ApiResponse.success("Answers synchronized successfully", statusDTO));
@@ -708,6 +729,22 @@ public class ExamController {
             try {
                 ObjectMapper mapper = new ObjectMapper();
                 SyncRequestDTO request = mapper.readValue(rawBody, SyncRequestDTO.class);
+                if (request != null) {
+                    if (request.getBeginnerTimeRemaining() != null) {
+                        attempt.setBeginnerTimeRemaining(request.getBeginnerTimeRemaining());
+                    }
+                    if (request.getIntermediateTimeRemaining() != null) {
+                        attempt.setIntermediateTimeRemaining(request.getIntermediateTimeRemaining());
+                    }
+                    if (request.getAdvancedTimeRemaining() != null) {
+                        attempt.setAdvancedTimeRemaining(request.getAdvancedTimeRemaining());
+                    }
+                    long remaining = 0;
+                    if (attempt.getBeginnerTimeRemaining() != null) remaining += attempt.getBeginnerTimeRemaining();
+                    if (attempt.getIntermediateTimeRemaining() != null) remaining += attempt.getIntermediateTimeRemaining();
+                    if (attempt.getAdvancedTimeRemaining() != null) remaining += attempt.getAdvancedTimeRemaining();
+                    attempt.setRemainingSeconds(remaining);
+                }
                 if (request != null && request.getAnswers() != null) {
                     for (AnswerSyncDTO dto : request.getAnswers()) {
                         if (dto.getQuestionId() == null) continue;

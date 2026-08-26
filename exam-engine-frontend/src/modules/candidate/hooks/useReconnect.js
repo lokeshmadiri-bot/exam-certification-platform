@@ -1,7 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { examSyncService } from '../services/examSyncService';
 
-export function useReconnect({ attemptId, answers, timeRemaining, setTimeRemaining, onResumed } = {}) {
+export function useReconnect({
+  attemptId,
+  answers,
+  timeRemaining,
+  setTimeRemaining,
+  beginnerTimeRemaining,
+  setBeginnerTimeRemaining,
+  intermediateTimeRemaining,
+  setIntermediateTimeRemaining,
+  advancedTimeRemaining,
+  setAdvancedTimeRemaining,
+  onResumed
+} = {}) {
   const [statusState, setStatusState] = useState({
     online: navigator.onLine,
     syncing: false,
@@ -15,7 +27,14 @@ export function useReconnect({ attemptId, answers, timeRemaining, setTimeRemaini
     try {
       // 1. Sync pending local answers to backend
       if (answers) {
-        await examSyncService.syncAnswers(attemptId, answers, timeRemaining);
+        await examSyncService.syncAnswers(
+          attemptId,
+          answers,
+          timeRemaining,
+          beginnerTimeRemaining,
+          intermediateTimeRemaining,
+          advancedTimeRemaining
+        );
       }
 
       // 2. Fetch updated attempt status and remaining time
@@ -23,6 +42,15 @@ export function useReconnect({ attemptId, answers, timeRemaining, setTimeRemaini
       if (res && res.data) {
         if (setTimeRemaining && typeof res.data.remainingSeconds === 'number') {
           setTimeRemaining(res.data.remainingSeconds);
+        }
+        if (setBeginnerTimeRemaining && typeof res.data.beginnerTimeRemaining === 'number') {
+          setBeginnerTimeRemaining(res.data.beginnerTimeRemaining);
+        }
+        if (setIntermediateTimeRemaining && typeof res.data.intermediateTimeRemaining === 'number') {
+          setIntermediateTimeRemaining(res.data.intermediateTimeRemaining);
+        }
+        if (setAdvancedTimeRemaining && typeof res.data.advancedTimeRemaining === 'number') {
+          setAdvancedTimeRemaining(res.data.advancedTimeRemaining);
         }
       }
 

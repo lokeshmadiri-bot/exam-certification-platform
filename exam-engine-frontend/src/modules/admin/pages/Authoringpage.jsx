@@ -13,10 +13,10 @@ const LEVELS = META.LEVELS;
 const emptyForm = {
     title: "",
     stack: META.STACKS[0],
-    durationMin: 60,
+    durationMin: "",
     passMark: 60,
-    questionPoolSize: 100,
-    questionsPerAttempt: 25,
+    questionPoolSize: "",
+    questionsPerAttempt: "",
     totalMarks: 100,
     instructions: "",
     difficultyMode: "NONE",
@@ -36,9 +36,9 @@ const BAND_META = {
 };
 
 const TIME_PER_QUESTION = {
-    BEGINNER: 1,
-    INTERMEDIATE: 2,
-    ADVANCED: 3
+    BEGINNER: 2,
+    INTERMEDIATE: 5,
+    ADVANCED: 10
 };
 
 function calculateSuggestedDuration(beginnerCount, intermediateCount, advancedCount) {
@@ -123,32 +123,47 @@ export default function AuthoringPage() {
     const [savedMsg, setSavedMsg] = useState("");
     const [bandsModified, setBandsModified] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
-    const [isDurationCustom, setIsDurationCustom] = useState(false);
+    const isInitialLoadRef = useRef(true);
     const wasCreated = useRef(false); // tracks whether last save was a create vs update
+    const [availableCounts, setAvailableCounts] = useState({ beginner: 0, intermediate: 0, advanced: 0 });
 
     const difficultyComposition = useMemo(() => {
         return getDifficultyComposition(
-            form.questionPoolSize,
+            form.questionsPerAttempt,
             form.difficultyMode,
             form.beginnerPct,
             form.intermediatePct,
             form.advancedPct
         );
-    }, [form.questionPoolSize, form.difficultyMode, form.beginnerPct, form.intermediatePct, form.advancedPct]);
+    }, [form.questionsPerAttempt, form.difficultyMode, form.beginnerPct, form.intermediatePct, form.advancedPct]);
+
+    const isManualTotalValid = useMemo(() => {
+        if (form.difficultyMode !== "MANUAL") return true;
+        const b = Number(form.beginnerPct) || 0;
+        const i = Number(form.intermediatePct) || 0;
+        const a = Number(form.advancedPct) || 0;
+        return (b + i + a) === 100;
+    }, [form.difficultyMode, form.beginnerPct, form.intermediatePct, form.advancedPct]);
+
+
 
     const suggestedDuration = useMemo(() => {
+        const total = Number(form.questionsPerAttempt) || 0;
+        if (total <= 0) return 0;
         return calculateSuggestedDuration(
             difficultyComposition.beginner,
             difficultyComposition.intermediate,
             difficultyComposition.advanced
         );
-    }, [difficultyComposition]);
+    }, [difficultyComposition, form.questionsPerAttempt]);
 
     useEffect(() => {
-        if (!isDurationCustom) {
-            setField("durationMin", suggestedDuration);
+        if (isInitialLoadRef.current) {
+            isInitialLoadRef.current = false;
+            return;
         }
-    }, [suggestedDuration, isDurationCustom]);
+        setField("durationMin", suggestedDuration || "");
+    }, [suggestedDuration]);
 
     // Load unique stacks from all existing exams on mount
     useEffect(() => {
@@ -172,7 +187,8 @@ export default function AuthoringPage() {
             setBandsModified(false);
             setIsOtherStack(false);
             setCustomStackInput("");
-            setIsDurationCustom(false);
+            setAvailableCounts({ beginner: 0, intermediate: 0, advanced: 0 });
+            isInitialLoadRef.current = false;
             setLoading(false);
             return;
         }
@@ -193,7 +209,11 @@ export default function AuthoringPage() {
                     intermediatePct: exam.intermediatePct !== undefined && exam.intermediatePct !== null ? exam.intermediatePct : 40,
                     advancedPct: exam.advancedPct !== undefined && exam.advancedPct !== null ? exam.advancedPct : 20,
                 });
-                setIsDurationCustom(true);
+                setAvailableCounts({
+                    beginner: exam.beginnerQuestionCount || 0,
+                    intermediate: exam.intermediateQuestionCount || 0,
+                    advanced: exam.advancedQuestionCount || 0
+                });
                 if (exam.stack && !META.STACKS.includes(exam.stack)) {
                     setIsOtherStack(true);
                     setCustomStackInput(exam.stack);
@@ -202,6 +222,7 @@ export default function AuthoringPage() {
                     setCustomStackInput("");
                 }
                 setAvailableStacks((prev) => Array.from(new Set([...prev, exam.stack].filter(Boolean))));
+                isInitialLoadRef.current = true;
             }
             setBands(b && Object.keys(b).length > 0 ? b : defaultBands);
             setBandsModified(false);
@@ -211,11 +232,53 @@ export default function AuthoringPage() {
 
     const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
+    const handleNumberChange = (key, val, maxVal) => {
+        if (val === "") {
+            setField(key, "");
+            return;
+        }
+        const num = Number(val);
+        if (num > maxVal) {
+            setField(key, maxVal);
+        } else if (num < 0) {
+            setField(key, 0);
+        } else {
+            setField(key, val);
+        }
+    };
+
+    const isPoolTooSmall = useMemo(() => {
+        const pool = Number(form.questionPoolSize) || 0;
+        const attempt = Number(form.questionsPerAttempt) || 0;
+        return attempt > pool;
+    }, [form.questionPoolSize, form.questionsPerAttempt]);
+
     const minRequired = Number(form.questionsPerAttempt) || 0;
     const poolTooSmall = Number(form.questionPoolSize) < minRequired;
 
     const submitFormatForm = async (e) => {
         e.preventDefault();
+
+        if (Number(form.questionsPerAttempt) > Number(form.questionPoolSize)) {
+            alert("Questions per attempt cannot exceed the question pool size.");
+            return;
+        }
+        if (Number(form.durationMin) > 1000) {
+            alert("Duration cannot exceed 1000 minutes.");
+            return;
+        }
+        if (Number(form.questionPoolSize) > 1000) {
+            alert("Question pool size cannot exceed 1000.");
+            return;
+        }
+        if (Number(form.questionsPerAttempt) > 100) {
+            alert("Questions per attempt cannot exceed 100.");
+            return;
+        }
+        if (Number(form.totalMarks) > 100) {
+            alert("Total marks cannot exceed 100.");
+            return;
+        }
 
         if (form.difficultyMode === "MANUAL") {
             const bPct = Number(form.beginnerPct) || 0;
@@ -226,6 +289,8 @@ export default function AuthoringPage() {
                 return;
             }
         }
+
+
 
         setSavingForm(true);
         setSavedMsg("");
@@ -301,9 +366,10 @@ export default function AuthoringPage() {
                                 <label>Exam Title *</label>
                                 <input
                                     required
+                                    maxLength={32}
                                     placeholder="e.g. Java Backend Developer"
                                     value={form.title}
-                                    onChange={(e) => setField("title", e.target.value)}
+                                    onChange={(e) => setField("title", e.target.value.slice(0, 32))}
                                 />
                             </div>
                             <div className="a1-field">
@@ -328,11 +394,12 @@ export default function AuthoringPage() {
                                 {isOtherStack && (
                                     <input
                                         required
+                                        maxLength={32}
                                         style={{ marginTop: "8px" }}
                                         placeholder="Enter custom stack name (e.g. Go)"
                                         value={customStackInput}
                                         onChange={(e) => {
-                                            const val = e.target.value;
+                                            const val = e.target.value.slice(0, 32);
                                             setCustomStackInput(val);
                                             setField("stack", val);
                                         }}
@@ -340,55 +407,48 @@ export default function AuthoringPage() {
                                 )}
                             </div>
                             <div className="a1-field">
-                                <label>Duration (minutes) *</label>
+                                <label>Pass Mark (%) *</label>
                                 <input 
                                     type="number" 
-                                    min="1" 
+                                    min="0" 
+                                    max="100" 
                                     required 
-                                    value={form.durationMin} 
-                                    onChange={(e) => {
-                                        setField("durationMin", e.target.value);
-                                        setIsDurationCustom(true);
-                                    }} 
+                                    value={form.passMark} 
+                                    onChange={(e) => handleNumberChange("passMark", e.target.value, 100)} 
                                 />
-                                {isDurationCustom ? (
-                                    <div style={{ fontSize: 11, color: "var(--a1-mut)", marginTop: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                        <span>Custom duration</span>
-                                        {Number(form.durationMin) !== suggestedDuration && (
-                                            <button 
-                                                type="button" 
-                                                className="a1-btn-link" 
-                                                onClick={() => {
-                                                    setField("durationMin", suggestedDuration);
-                                                    setIsDurationCustom(false);
-                                                }}
-                                                style={{ fontSize: 11, background: "none", border: "none", color: "var(--a1-blue)", cursor: "pointer", padding: 0 }}
-                                            >
-                                                Reset to Suggested ({suggestedDuration} min)
-                                            </button>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div style={{ fontSize: 11, color: "var(--a1-mut)", marginTop: 4 }}>
-                                        Suggested based on {form.questionPoolSize} questions & mix
-                                    </div>
-                                )}
-                            </div>
-                            <div className="a1-field">
-                                <label>Pass Mark (%) *</label>
-                                <input type="number" min="0" max="100" required value={form.passMark} onChange={(e) => setField("passMark", e.target.value)} />
                             </div>
                             <div className="a1-field">
                                 <label>Question Pool Size *</label>
-                                <input type="number" min="1" required value={form.questionPoolSize} onChange={(e) => setField("questionPoolSize", e.target.value)} />
+                                <input 
+                                    type="number" 
+                                    min="1" 
+                                    max="1000" 
+                                    required 
+                                    value={form.questionPoolSize} 
+                                    onChange={(e) => handleNumberChange("questionPoolSize", e.target.value, 1000)} 
+                                />
                             </div>
                             <div className="a1-field">
                                 <label>Questions Per Attempt *</label>
-                                <input type="number" min="1" required value={form.questionsPerAttempt} onChange={(e) => setField("questionsPerAttempt", e.target.value)} />
+                                <input 
+                                    type="number" 
+                                    min="1" 
+                                    max="100" 
+                                    required 
+                                    value={form.questionsPerAttempt} 
+                                    onChange={(e) => handleNumberChange("questionsPerAttempt", e.target.value, 100)} 
+                                />
                             </div>
                             <div className="a1-field">
                                 <label>Total Marks *</label>
-                                <input type="number" min="1" required value={form.totalMarks} onChange={(e) => setField("totalMarks", e.target.value)} />
+                                <input 
+                                    type="number" 
+                                    min="1" 
+                                    max="100" 
+                                    required 
+                                    value={form.totalMarks} 
+                                    onChange={(e) => handleNumberChange("totalMarks", e.target.value, 100)} 
+                                />
                             </div>
                             <div className="a1-field">
                                 <label>Difficulty Mode</label>
@@ -402,6 +462,17 @@ export default function AuthoringPage() {
                                     <option value="HARD">Advanced</option>
                                     <option value="MANUAL">Manual Distribution</option>
                                 </select>
+                            </div>
+                            <div className="a1-field">
+                                <label>Duration (minutes) *</label>
+                                <input 
+                                    type="number" 
+                                    min="1" 
+                                    max="1000" 
+                                    required 
+                                    value={form.durationMin} 
+                                    onChange={(e) => handleNumberChange("durationMin", e.target.value, 1000)} 
+                                />
                             </div>
                         </div>
 
@@ -418,7 +489,7 @@ export default function AuthoringPage() {
                                             min="0" 
                                             max="100" 
                                             value={form.beginnerPct} 
-                                            onChange={(e) => setField("beginnerPct", e.target.value)} 
+                                            onChange={(e) => handleNumberChange("beginnerPct", e.target.value, 100)} 
                                         />
                                     </div>
                                     <div className="a1-field">
@@ -428,7 +499,7 @@ export default function AuthoringPage() {
                                             min="0" 
                                             max="100" 
                                             value={form.intermediatePct} 
-                                            onChange={(e) => setField("intermediatePct", e.target.value)} 
+                                            onChange={(e) => handleNumberChange("intermediatePct", e.target.value, 100)} 
                                         />
                                     </div>
                                     <div className="a1-field">
@@ -438,7 +509,7 @@ export default function AuthoringPage() {
                                             min="0" 
                                             max="100" 
                                             value={form.advancedPct} 
-                                            onChange={(e) => setField("advancedPct", e.target.value)} 
+                                            onChange={(e) => handleNumberChange("advancedPct", e.target.value, 100)} 
                                         />
                                     </div>
                                 </div>
@@ -463,13 +534,13 @@ export default function AuthoringPage() {
 
                                 <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 6, padding: 12 }}>
                                     <div style={{ fontSize: 12, fontWeight: 700, color: "var(--a1-navy)", marginBottom: 8 }}>
-                                        Questions (based on Pool Size: {form.questionPoolSize})
+                                        Questions (based on Questions Per Attempt: {form.questionsPerAttempt})
                                     </div>
                                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                         <div>
                                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--a1-navy)", marginBottom: 2 }}>
                                                 <span>Beginner</span>
-                                                <strong>{difficultyComposition.beginner} questions</strong>
+                                                <strong>{difficultyComposition.beginner} questions (Available: {availableCounts.beginner})</strong>
                                             </div>
                                             <div style={{ width: "100%", background: "#f1f5f9", borderRadius: 4, height: 6, overflow: "hidden" }}>
                                                 <div style={{ 
@@ -482,7 +553,7 @@ export default function AuthoringPage() {
                                         <div>
                                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--a1-navy)", marginBottom: 2 }}>
                                                 <span>Intermediate</span>
-                                                <strong>{difficultyComposition.intermediate} questions</strong>
+                                                <strong>{difficultyComposition.intermediate} questions (Available: {availableCounts.intermediate})</strong>
                                             </div>
                                             <div style={{ width: "100%", background: "#f1f5f9", borderRadius: 4, height: 6, overflow: "hidden" }}>
                                                 <div style={{ 
@@ -495,7 +566,7 @@ export default function AuthoringPage() {
                                         <div>
                                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--a1-navy)", marginBottom: 2 }}>
                                                 <span>Advanced</span>
-                                                <strong>{difficultyComposition.advanced} questions</strong>
+                                                <strong>{difficultyComposition.advanced} questions (Available: {availableCounts.advanced})</strong>
                                             </div>
                                             <div style={{ width: "100%", background: "#f1f5f9", borderRadius: 4, height: 6, overflow: "hidden" }}>
                                                 <div style={{ 
@@ -508,22 +579,32 @@ export default function AuthoringPage() {
                                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: "var(--a1-navy)", borderTop: "1px solid #f1f5f9", paddingTop: 8, marginTop: 4 }}>
                                             <span>Total</span>
                                             <span>
-                                                {difficultyComposition.beginner + difficultyComposition.intermediate + difficultyComposition.advanced} / {form.questionPoolSize} questions
+                                                {difficultyComposition.beginner + difficultyComposition.intermediate + difficultyComposition.advanced} / {form.questionsPerAttempt} questions
                                             </span>
                                         </div>
                                     </div>
                                 </div>
+
                             </div>
                         )}
 
-                        <div className={`a1-pool-note ${poolTooSmall ? "a1-pool-warn" : ""}`}>
+
+
+                        <div className={`a1-pool-note ${poolTooSmall ? "a1-pool-warn" : ""}`} style={{ marginTop: 14 }}>
                             Question Pool = {form.questionPoolSize || 0} · Per Attempt = {form.questionsPerAttempt || 0} · Minimum
                             Required Questions = {minRequired}
                             {poolTooSmall && " — pool is smaller than questions per attempt."}
                         </div>
 
                         <div className="a1-modal-actions" style={{ marginTop: 16, justifyContent: "flex-start" }}>
-                            <button className="a1-btn a1-btn-primary" disabled={savingForm}>
+                            <button 
+                                className="a1-btn a1-btn-primary" 
+                                disabled={savingForm || !isManualTotalValid || isPoolTooSmall}
+                                style={{
+                                    cursor: (savingForm || !isManualTotalValid || isPoolTooSmall) ? 'not-allowed' : 'pointer',
+                                    opacity: (savingForm || !isManualTotalValid || isPoolTooSmall) ? 0.65 : 1
+                                }}
+                            >
                                 {savingForm ? "Saving…" : "Save exam format"}
                             </button>
                         </div>
