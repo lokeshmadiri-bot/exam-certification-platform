@@ -137,7 +137,26 @@ public class AdminExamController {
         long remaining = Math.max(0, poolSize - activeCount);
         boolean eligible = activeCount >= poolSize && poolSize > 0;
 
+        // Breakdown counts
+        List<Question> activeQuestions = questionRepository.findByExamIdAndIsActiveTrue(exam.getId());
+        long beginnerQuestionCount = 0;
+        long intermediateQuestionCount = 0;
+        long advancedQuestionCount = 0;
+        for (Question q : activeQuestions) {
+            String diff = q.getDifficulty() != null ? q.getDifficulty().trim().toUpperCase() : "EASY";
+            if ("HARD".equals(diff)) {
+                advancedQuestionCount++;
+            } else if ("MEDIUM".equals(diff)) {
+                intermediateQuestionCount++;
+            } else {
+                beginnerQuestionCount++;
+            }
+        }
+
         Map<String, Object> map = new HashMap<>();
+        map.put("beginnerQuestionCount", beginnerQuestionCount);
+        map.put("intermediateQuestionCount", intermediateQuestionCount);
+        map.put("advancedQuestionCount", advancedQuestionCount);
         map.put("id", exam.getId());
         map.put("title", exam.getTitle());
         map.put("stack", exam.getStack());
@@ -227,7 +246,6 @@ public class AdminExamController {
         exam.setAdvancedPct(payload.getAdvancedPct());
 
         validateDifficultyDistribution(exam);
-
         Exam saved = examRepository.save(exam);
 
         auditLogRepository.save(AccessAuditLog.builder()

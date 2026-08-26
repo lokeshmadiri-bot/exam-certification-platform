@@ -104,85 +104,91 @@ export default function LeftSidebar() {
 
       <div className="flex flex-col gap-3 flex-1">
         {/* Section 1 Accordion */}
-        <div className="run-section-card">
-          <button
-            onClick={() => toggleSection(1)}
-            className={`run-section-btn ${expandedSection === 1 ? 'active' : ''}`}
-          >
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: expandedSection === 1 ? '#2F6BFF' : '#FFFFFF' }}>
-                Section 1
+        {easyQuestions.length > 0 && (
+          <div className="run-section-card">
+            <button
+              onClick={() => toggleSection(1)}
+              className={`run-section-btn ${expandedSection === 1 ? 'active' : ''}`}
+            >
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: expandedSection === 1 ? '#2F6BFF' : '#FFFFFF' }}>
+                  Section 1
+                </div>
+                <div style={{ fontSize: '11px', color: '#8A99AE', marginTop: '2px' }}>
+                  Beginner Level – MCQ ({easyQuestions.length})
+                </div>
               </div>
-              <div style={{ fontSize: '11px', color: '#8A99AE', marginTop: '2px' }}>
-                Beginner Level – MCQ ({easyQuestions.length})
+              {expandedSection === 1 ? (
+                <ChevronDown className="w-4 h-4 text-[#8A99AE]" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-[#8A99AE]" />
+              )}
+            </button>
+            {expandedSection === 1 && (
+              <div className="run-section-content">
+                {renderSectionQuestions(easyQuestions)}
               </div>
-            </div>
-            {expandedSection === 1 ? (
-              <ChevronDown className="w-4 h-4 text-[#8A99AE]" />
-            ) : (
-              <ChevronRight className="w-4 h-4 text-[#8A99AE]" />
             )}
-          </button>
-          {expandedSection === 1 && (
-            <div className="run-section-content">
-              {renderSectionQuestions(easyQuestions)}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Section 2 Accordion */}
-        <div className="run-section-card">
-          <button
-            onClick={() => toggleSection(2)}
-            className={`run-section-btn ${expandedSection === 2 ? 'active' : ''}`}
-          >
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: expandedSection === 2 ? '#2F6BFF' : '#FFFFFF' }}>
-                Section 2
+        {mediumQuestions.length > 0 && (
+          <div className="run-section-card">
+            <button
+              onClick={() => toggleSection(2)}
+              className={`run-section-btn ${expandedSection === 2 ? 'active' : ''}`}
+            >
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: expandedSection === 2 ? '#2F6BFF' : '#FFFFFF' }}>
+                  Section 2
+                </div>
+                <div style={{ fontSize: '11px', color: '#8A99AE', marginTop: '2px' }}>
+                  Intermediate Level – MCQ ({mediumQuestions.length})
+                </div>
               </div>
-              <div style={{ fontSize: '11px', color: '#8A99AE', marginTop: '2px' }}>
-                Intermediate Level – MCQ ({mediumQuestions.length})
+              {expandedSection === 2 ? (
+                <ChevronDown className="w-4 h-4 text-[#8A99AE]" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-[#8A99AE]" />
+              )}
+            </button>
+            {expandedSection === 2 && (
+              <div className="run-section-content">
+                {renderSectionQuestions(mediumQuestions)}
               </div>
-            </div>
-            {expandedSection === 2 ? (
-              <ChevronDown className="w-4 h-4 text-[#8A99AE]" />
-            ) : (
-              <ChevronRight className="w-4 h-4 text-[#8A99AE]" />
             )}
-          </button>
-          {expandedSection === 2 && (
-            <div className="run-section-content">
-              {renderSectionQuestions(mediumQuestions)}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Section 3 Accordion */}
-        <div className="run-section-card">
-          <button
-            onClick={() => toggleSection(3)}
-            className={`run-section-btn ${expandedSection === 3 ? 'active' : ''}`}
-          >
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: expandedSection === 3 ? '#2F6BFF' : '#FFFFFF' }}>
-                Section 3
+        {hardQuestions.length > 0 && (
+          <div className="run-section-card">
+            <button
+              onClick={() => toggleSection(3)}
+              className={`run-section-btn ${expandedSection === 3 ? 'active' : ''}`}
+            >
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: expandedSection === 3 ? '#2F6BFF' : '#FFFFFF' }}>
+                  Section 3
+                </div>
+                <div style={{ fontSize: '11px', color: '#8A99AE', marginTop: '2px' }}>
+                  Advanced Level – MCQ ({hardQuestions.length})
+                </div>
               </div>
-              <div style={{ fontSize: '11px', color: '#8A99AE', marginTop: '2px' }}>
-                Advanced Level – MCQ ({hardQuestions.length})
+              {expandedSection === 3 ? (
+                <ChevronDown className="w-4 h-4 text-[#8A99AE]" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-[#8A99AE]" />
+              )}
+            </button>
+            {expandedSection === 3 && (
+              <div className="run-section-content">
+                {renderSectionQuestions(hardQuestions)}
               </div>
-            </div>
-            {expandedSection === 3 ? (
-              <ChevronDown className="w-4 h-4 text-[#8A99AE]" />
-            ) : (
-              <ChevronRight className="w-4 h-4 text-[#8A99AE]" />
             )}
-          </button>
-          {expandedSection === 3 && (
-            <div className="run-section-content">
-              {renderSectionQuestions(hardQuestions)}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </aside>
   );

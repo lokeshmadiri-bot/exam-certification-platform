@@ -16,4 +16,7 @@ public class AttemptStatusDTO {
     private long remainingSeconds;
     private LocalDateTime lastSeen;
     private int syncedCount;
+    private Long beginnerTimeRemaining;
+    private Long intermediateTimeRemaining;
+    private Long advancedTimeRemaining;
 }

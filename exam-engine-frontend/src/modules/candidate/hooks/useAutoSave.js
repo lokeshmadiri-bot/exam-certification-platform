@@ -4,7 +4,16 @@ import { storage } from '../utils/storage';
 import { examService } from '../services/examService';
 
 export function useAutoSave() {
-  const { answers, setAnswers, attemptId, saving, setSaving } = useExam();
+  const {
+    answers,
+    setAnswers,
+    attemptId,
+    saving,
+    setSaving,
+    beginnerTimeRemaining,
+    intermediateTimeRemaining,
+    advancedTimeRemaining
+  } = useExam();
   const retryTimeoutRef = useRef(null);
 
   const getOptionId = (option) => {
@@ -32,7 +41,15 @@ export function useAutoSave() {
       const optId = getOptionId(option);
 
       try {
-        await examService.saveAnswer(attemptId, qId, option, optId);
+        await examService.saveAnswer(
+          attemptId,
+          qId,
+          option,
+          optId,
+          beginnerTimeRemaining,
+          intermediateTimeRemaining,
+          advancedTimeRemaining
+        );
         
         // Remove from queue on success
         const currentQueue = storage.get(`queue_${attemptId}`, {});

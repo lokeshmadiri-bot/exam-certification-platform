@@ -198,6 +198,34 @@ public class AttemptService {
                         selectedQuestions = selected;
                 }
 
+                int bCount = 0;
+                int iCount = 0;
+                int aCount = 0;
+                for (Question q : selectedQuestions) {
+                        String diff = q.getDifficulty() != null ? q.getDifficulty().trim().toUpperCase() : "EASY";
+                        if ("HARD".equals(diff)) {
+                                aCount++;
+                        } else if ("MEDIUM".equals(diff)) {
+                                iCount++;
+                        } else {
+                                bCount++;
+                        }
+                }
+
+                long totalDurationSeconds = (long) (exam.getDurationMinutes() != null ? exam.getDurationMinutes() : 45) * 60;
+                int totalQuestions = selectedQuestions.size();
+                long beginnerTimeSeconds = 0;
+                long intermediateTimeSeconds = 0;
+                long advancedTimeSeconds = 0;
+
+                if (totalQuestions > 0) {
+                        beginnerTimeSeconds = totalDurationSeconds * bCount / totalQuestions;
+                        intermediateTimeSeconds = totalDurationSeconds * iCount / totalQuestions;
+                        advancedTimeSeconds = totalDurationSeconds - beginnerTimeSeconds - intermediateTimeSeconds;
+                }
+
+                long totalSeconds = beginnerTimeSeconds + intermediateTimeSeconds + advancedTimeSeconds;
+
                 ExamAttempt attempt = ExamAttempt.builder()
                                 .candidate(candidate)
                                 .exam(exam)
@@ -205,6 +233,10 @@ public class AttemptService {
                                 .resultStatus(ResultStatus.IN_PROGRESS)
                                 .startTime(LocalDateTime.now())
                                 .tabSwitchCount(0)
+                                .beginnerTimeRemaining(beginnerTimeSeconds)
+                                .intermediateTimeRemaining(intermediateTimeSeconds)
+                                .advancedTimeRemaining(advancedTimeSeconds)
+                                .remainingSeconds(totalSeconds)
                                 .build();
 
                 attempt = attemptRepository.save(attempt);
@@ -224,7 +256,7 @@ public class AttemptService {
                                 .attemptId(attempt.getId())
                                 .examId(exam.getId())
                                 .examTitle(exam.getTitle())
-                                .durationMinutes(exam.getDurationMinutes())
+                                .durationMinutes((int) (totalSeconds / 60))
                                 .startTime(attempt.getStartTime())
                                 .build();
         }

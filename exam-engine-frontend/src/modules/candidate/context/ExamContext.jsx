@@ -7,7 +7,12 @@ export function ExamProvider({ children }) {
   const [questions, setQuestions] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState({});
-  const [timeRemaining, setTimeRemaining] = useState(45 * 60); // 45 mins default
+  
+  const [beginnerTimeRemaining, setBeginnerTimeRemaining] = useState(null);
+  const [intermediateTimeRemaining, setIntermediateTimeRemaining] = useState(null);
+  const [advancedTimeRemaining, setAdvancedTimeRemaining] = useState(null);
+  const timeRemaining = (beginnerTimeRemaining || 0) + (intermediateTimeRemaining || 0) + (advancedTimeRemaining || 0);
+
   const [strikes, setStrikes] = useState(0);
   const [offline, setOffline] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
@@ -40,7 +45,10 @@ export function ExamProvider({ children }) {
     questions, setQuestions,
     currentIdx, setCurrentIdx,
     selectedAnswers, setSelectedAnswers,
-    timeRemaining, setTimeRemaining,
+    timeRemaining, setTimeRemaining: () => {},
+    beginnerTimeRemaining, setBeginnerTimeRemaining,
+    intermediateTimeRemaining, setIntermediateTimeRemaining,
+    advancedTimeRemaining, setAdvancedTimeRemaining,
     strikes, setStrikes,
     offline, setOffline,
     handRaised, setHandRaised,
