@@ -10,7 +10,7 @@ export default function WatermarkOverlay() {
   const items = Array(24).fill(watermarkText);
 
   return (
-    <div className="watermark-overlay fixed inset-0 z-40 pointer-events-none user-select-none overflow-hidden opacity-[0.04] grid grid-cols-4 grid-rows-6 gap-y-24 gap-x-12">
+    <div className="watermark-overlay fixed inset-0 z-40 pointer-events-none user-select-none overflow-hidden opacity-[0.09] grid grid-cols-4 grid-rows-6 gap-y-24 gap-x-12">
       {items.map((text, idx) => (
         <div 
           key={idx} 

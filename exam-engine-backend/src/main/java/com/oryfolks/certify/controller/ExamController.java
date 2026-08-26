@@ -65,6 +65,10 @@ public class ExamController {
 
     @Autowired
     private ExamViolationRepository examViolationRepository;
+
+    @Autowired
+    private GovernanceSettingRepository governanceSettingRepository;
+
     @GetMapping
     public ResponseEntity<ApiResponse<List<ExamCardResponseDTO>>> getAllExams() {
         return ResponseEntity.ok(
@@ -435,11 +439,16 @@ public class ExamController {
         ExamAttempt attempt = examAttemptRepository.findById(attemptId)
                 .orElseThrow(() -> new RuntimeException("Attempt not found: " + attemptId));
 
+        boolean watermarkEnabled = governanceSettingRepository.findAll().stream()
+                .findFirst()
+                .map(gs -> gs.getWatermark() != null ? gs.getWatermark() : true)
+                .orElse(true);
+
         Map<String, Object> response = new HashMap<>();
         response.put("candidateName", attempt.getCandidate().getFullName());
         response.put("candidateId", attempt.getCandidate().getId().toString());
         response.put("examName", attempt.getExam().getTitle());
-        response.put("watermarkEnabled", true);
+        response.put("watermarkEnabled", watermarkEnabled);
         response.put("fullscreenRequired", true);
 
         return ResponseEntity.ok(ApiResponse.success("Integrity settings retrieved", response));
