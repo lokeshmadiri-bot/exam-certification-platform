@@ -3,7 +3,7 @@ import { useExamTimer } from '../hooks/useExamTimer';
 import { useExam } from '../context/ExamContext';
 
 export default function Timer({ durationSeconds }) {
-  const { formattedTime, timeRemaining } = useExamTimer();
+  const { formattedTime, timeRemaining, activeSectionLabel } = useExamTimer();
   const { examDuration } = useExam();
   
   const maxTime = examDuration || durationSeconds || 45 * 60;
@@ -100,7 +100,7 @@ export default function Timer({ durationSeconds }) {
             lineHeight: '1'
           }}
         >
-          Time left
+          {activeSectionLabel || 'Time left'}
         </div>
       </div>
     </div>

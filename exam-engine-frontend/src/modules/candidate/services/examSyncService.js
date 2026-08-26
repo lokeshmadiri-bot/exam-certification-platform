@@ -8,7 +8,7 @@ export const examSyncService = {
     return response.data;
   },
 
-  syncAnswers: async (attemptId, answers, remainingSeconds) => {
+  syncAnswers: async (attemptId, answers, remainingSeconds, beginnerTimeRemaining, intermediateTimeRemaining, advancedTimeRemaining) => {
     const formattedAnswers = Array.isArray(answers)
       ? answers
       : Object.keys(answers || {}).map((qId) => ({
@@ -18,12 +18,15 @@ export const examSyncService = {
 
     const response = await api.post(`/exams/attempts/${attemptId}/sync`, {
       answers: formattedAnswers,
-      remainingSeconds
+      remainingSeconds,
+      beginnerTimeRemaining,
+      intermediateTimeRemaining,
+      advancedTimeRemaining
     });
     return response.data;
   },
 
-  sendBeaconData: (attemptId, answers, remainingSeconds) => {
+  sendBeaconData: (attemptId, answers, remainingSeconds, beginnerTimeRemaining, intermediateTimeRemaining, advancedTimeRemaining) => {
     const formattedAnswers = Array.isArray(answers)
       ? answers
       : Object.keys(answers || {}).map((qId) => ({
@@ -33,7 +36,10 @@ export const examSyncService = {
 
     const payload = JSON.stringify({
       answers: formattedAnswers,
-      remainingSeconds
+      remainingSeconds,
+      beginnerTimeRemaining,
+      intermediateTimeRemaining,
+      advancedTimeRemaining
     });
 
     const targetUrl = `${API_BASE_URL}/exams/attempts/${attemptId}/beacon`;

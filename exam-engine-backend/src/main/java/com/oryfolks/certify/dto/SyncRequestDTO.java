@@ -14,4 +14,7 @@ import java.util.List;
 public class SyncRequestDTO {
     private List<AnswerSyncDTO> answers;
     private Long remainingSeconds;
+    private Long beginnerTimeRemaining;
+    private Long intermediateTimeRemaining;
+    private Long advancedTimeRemaining;
 }

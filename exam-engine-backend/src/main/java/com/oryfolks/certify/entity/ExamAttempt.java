@@ -114,6 +114,15 @@ public class ExamAttempt {
     @Column(name = "remaining_seconds")
     private Long remainingSeconds;
 
+    @Column(name = "beginner_time_remaining")
+    private Long beginnerTimeRemaining;
+
+    @Column(name = "intermediate_time_remaining")
+    private Long intermediateTimeRemaining;
+
+    @Column(name = "advanced_time_remaining")
+    private Long advancedTimeRemaining;
+
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
 

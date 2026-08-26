@@ -62,6 +62,12 @@ function ExamRunnerContent() {
     selectedAnswers,
     timeRemaining,
     setTimeRemaining,
+    beginnerTimeRemaining,
+    setBeginnerTimeRemaining,
+    intermediateTimeRemaining,
+    setIntermediateTimeRemaining,
+    advancedTimeRemaining,
+    setAdvancedTimeRemaining,
     strikes,
     setStrikes,
     setWarningToast,
@@ -88,6 +94,12 @@ function ExamRunnerContent() {
     answers,
     timeRemaining,
     setTimeRemaining,
+    beginnerTimeRemaining,
+    setBeginnerTimeRemaining,
+    intermediateTimeRemaining,
+    setIntermediateTimeRemaining,
+    advancedTimeRemaining,
+    setAdvancedTimeRemaining,
     onResumed: () => setOffline(false)
   });
 
@@ -167,6 +179,17 @@ function ExamRunnerContent() {
           throw new Error("This exam does not contain any questions. Please check the question bank or section settings.");
         }
 
+        let bCount = 0, iCount = 0, aCount = 0;
+        allQuestions.forEach(q => {
+          const diff = q.difficulty ? q.difficulty.trim().toUpperCase() : 'EASY';
+          if (diff === 'HARD') aCount++;
+          else if (diff === 'MEDIUM') iCount++;
+          else bCount++;
+        });
+        setBeginnerTimeRemaining(data.beginnerTimeRemaining !== undefined && data.beginnerTimeRemaining !== null ? data.beginnerTimeRemaining : (bCount * 2 * 60));
+        setIntermediateTimeRemaining(data.intermediateTimeRemaining !== undefined && data.intermediateTimeRemaining !== null ? data.intermediateTimeRemaining : (iCount * 5 * 60));
+        setAdvancedTimeRemaining(data.advancedTimeRemaining !== undefined && data.advancedTimeRemaining !== null ? data.advancedTimeRemaining : (aCount * 10 * 60));
+
         setSections(loadedSections);
         setQuestions(allQuestions);
         setAnswers(data.answers || {});
@@ -178,7 +201,7 @@ function ExamRunnerContent() {
       }
     }
     loadAttempt();
-  }, [attemptId, setQuestions, setLoading, setAttemptId, setSections, setAnswers, navigate, setStrikes]);
+  }, [attemptId, setQuestions, setLoading, setAttemptId, setSections, setAnswers, navigate, setStrikes, setBeginnerTimeRemaining, setIntermediateTimeRemaining, setAdvancedTimeRemaining]);
 
   const handleGradingSubmit = async (forceSubmit = false) => {
     if (terminatedState) {
@@ -234,16 +257,22 @@ function ExamRunnerContent() {
   // Maintain refs for unload/sendBeacon handlers to access latest values
   const answersRef = React.useRef(answers);
   const timeRemainingRef = React.useRef(timeRemaining);
+  const beginnerTimeRemainingRef = React.useRef(beginnerTimeRemaining);
+  const intermediateTimeRemainingRef = React.useRef(intermediateTimeRemaining);
+  const advancedTimeRemainingRef = React.useRef(advancedTimeRemaining);
+
   useEffect(() => {
     answersRef.current = answers;
     timeRemainingRef.current = timeRemaining;
-  }, [answers, timeRemaining]);
+    beginnerTimeRemainingRef.current = beginnerTimeRemaining;
+    intermediateTimeRemainingRef.current = intermediateTimeRemaining;
+    advancedTimeRemainingRef.current = advancedTimeRemaining;
+  }, [answers, timeRemaining, beginnerTimeRemaining, intermediateTimeRemaining, advancedTimeRemaining]);
 
 
   // Time-up hook
   const { submitting, isTimeUp } = useTimeUp({
     attemptId,
-    initialSeconds: timeRemaining,
     answers,
     active: !loading && online && !offline && !terminatedState,
     onAutoSubmit: () => handleGradingSubmit(true)
@@ -254,6 +283,9 @@ function ExamRunnerContent() {
     attemptId,
     answersRef,
     timeRemainingRef,
+    beginnerTimeRemainingRef,
+    intermediateTimeRemainingRef,
+    advancedTimeRemainingRef,
     active: !loading
   });
 
