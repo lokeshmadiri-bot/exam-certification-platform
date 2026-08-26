@@ -16,7 +16,7 @@ export function useWatermark() {
   }, []);
 
   const watermarkText = watermark.watermarkEnabled
-    ? `${watermark.candidateName} · ${watermark.candidateId} · ${watermark.examName} · ${timeStr} `
+    ? `${watermark.candidateName}· ${watermark.examName} · ${timeStr} `
     : '';
 
   return {
