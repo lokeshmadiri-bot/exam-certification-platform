@@ -342,6 +342,11 @@ export default function CandidatesPage() {
                                             {c.locked ? (
                                                 <button
                                                     className="a1-btn a1-btn-amber a1-btn-sm"
+                                                    disabled={c.status === "SUBMITTED" || c.adminDecision === "PENDING" || c.resultPublishStatus === "PENDING"}
+                                                    style={{
+                                                        cursor: (c.status === "SUBMITTED" || c.adminDecision === "PENDING" || c.resultPublishStatus === "PENDING") ? "not-allowed" : "pointer",
+                                                        opacity: (c.status === "SUBMITTED" || c.adminDecision === "PENDING" || c.resultPublishStatus === "PENDING") ? 0.6 : 1
+                                                    }}
                                                     onClick={() => setOverrideFor(c)}
                                                 >
                                                     Override Lock
