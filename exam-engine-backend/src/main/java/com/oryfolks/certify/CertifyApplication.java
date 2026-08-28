@@ -57,6 +57,42 @@ public class CertifyApplication {
                                 userRepository.save(ravi);
                         }
 
+                        // Create 8 more default users (Candidates/Admins)
+                        String[][] extraUsers = {
+                            {"pavan", "Pavan Kumar", "Software Engineer", "ROLE_CANDIDATE"},
+                            {"yasaswini", "Yasaswini Y.", "QA Analyst", "ROLE_CANDIDATE"},
+                            {"karthik", "Karthik Raja", "Frontend Developer", "ROLE_CANDIDATE"},
+                            {"priya", "Priya Sharma", "HR Executive", "ROLE_CANDIDATE"},
+                            {"anil", "Anil Verma", "DevOps Engineer", "ROLE_CANDIDATE"},
+                            {"deepa", "Deepa Nair", "Project Manager", "ROLE_CANDIDATE"},
+                            {"suresh", "Suresh Raina", "Database Administrator", "ROLE_CANDIDATE"},
+                            {"neha", "Neha Gupta", "Security Analyst", "ROLE_CANDIDATE"}
+                        };
+                        for (String[] uInfo : extraUsers) {
+                            String uname = uInfo[0];
+                            String fname = uInfo[1];
+                            String title = uInfo[2];
+                            UserRole role = UserRole.valueOf(uInfo[3]);
+                            java.util.Optional<User> uOpt = userRepository.findByUsername(uname);
+                            if (uOpt.isEmpty()) {
+                                userRepository.save(User.builder()
+                                        .username(uname)
+                                        .password(passwordEncoder.encode("password123"))
+                                        .role(role)
+                                        .fullName(fname)
+                                        .title(title)
+                                        .build());
+                            } else {
+                                User u = uOpt.get();
+                                u.setPassword(passwordEncoder.encode("password123"));
+                                u.setRole(role);
+                                u.setFullName(fname);
+                                u.setTitle(title);
+                                userRepository.save(u);
+                            }
+                        }
+
+
                         // 2. Remove seeded dummy exams — only show admin-created exams in library.
                         // Uses native SQL for correct FK cascade ordering across all dependent tables.
                         String[] dummyTitles = { "Selenium Certification", "API Testing", "DevOps" };
