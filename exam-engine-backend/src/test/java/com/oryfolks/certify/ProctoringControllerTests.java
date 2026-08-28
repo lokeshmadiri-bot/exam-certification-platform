@@ -43,8 +43,8 @@ public class ProctoringControllerTests {
     @org.junit.jupiter.api.BeforeEach
     public void setupDbSchema() {
         try {
-            jdbcTemplate.execute("ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS result_publish_status VARCHAR(20) DEFAULT 'PENDING'");
-            jdbcTemplate.execute("ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS published_at TIMESTAMP");
+            jdbcTemplate.execute("ALTER TABLE exam_attempts ADD IF NOT EXISTS result_publish_status VARCHAR(20) DEFAULT 'PENDING'");
+            jdbcTemplate.execute("ALTER TABLE exam_attempts ADD IF NOT EXISTS published_at TIMESTAMP");
             jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS recording_session (id UUID PRIMARY KEY, attempt_id UUID, video_url VARCHAR(500), status VARCHAR(30), started_at TIMESTAMP, ended_at TIMESTAMP)");
             jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS ai_flag (id UUID PRIMARY KEY, attempt_id UUID, type VARCHAR(50), confidence DOUBLE PRECISION, timestamp TIMESTAMP, snapshot_url VARCHAR(500))");
         } catch (Exception e) {
