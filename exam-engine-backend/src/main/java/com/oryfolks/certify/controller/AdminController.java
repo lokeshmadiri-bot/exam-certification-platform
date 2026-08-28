@@ -128,6 +128,8 @@ public class AdminController {
                 map.put("locked", false);
                 map.put("overrideLockStatus", "UNLOCKED");
                 map.put("retryOverrideApproved", false);
+                map.put("adminDecision", "CONFIRMED");
+                map.put("resultPublishStatus", "PUBLISHED");
                 map.put("lastAttempt", null);
                 map.put("startTime", null);
                 map.put("endTime", null);
@@ -200,6 +202,8 @@ public class AdminController {
                         map.put("overrideLockStatus", overrideActive
                                 ? "OVERRIDE_APPROVED" : (isLocked ? "LOCKED" : "UNLOCKED"));
                         map.put("retryOverrideApproved", overrideActive);
+                        map.put("adminDecision", attempt.getAdminDecision() != null ? attempt.getAdminDecision() : "PENDING");
+                        map.put("resultPublishStatus", attempt.getResultPublishStatus() != null ? attempt.getResultPublishStatus().name() : "PENDING");
                         map.put("lastAttempt", attempt.getEndTime() != null ? attempt.getEndTime() : attempt.getCreatedAt());
                         map.put("startTime", attempt.getStartTime());
                         map.put("endTime", attempt.getEndTime());
@@ -220,6 +224,8 @@ public class AdminController {
                         map.put("locked", false);
                         map.put("overrideLockStatus", "UNLOCKED");
                         map.put("retryOverrideApproved", false);
+                        map.put("adminDecision", "CONFIRMED");
+                        map.put("resultPublishStatus", "PUBLISHED");
                         map.put("lastAttempt", null);
                         map.put("startTime", null);
                         map.put("endTime", null);
@@ -289,6 +295,8 @@ public class AdminController {
                         map.put("overrideLockStatus", overrideActive
                                 ? "OVERRIDE_APPROVED" : (isLocked ? "LOCKED" : "UNLOCKED"));
                         map.put("retryOverrideApproved", overrideActive);
+                        map.put("adminDecision", attempt.getAdminDecision() != null ? attempt.getAdminDecision() : "PENDING");
+                        map.put("resultPublishStatus", attempt.getResultPublishStatus() != null ? attempt.getResultPublishStatus().name() : "PENDING");
                         map.put("lastAttempt", attempt.getEndTime() != null ? attempt.getEndTime() : attempt.getCreatedAt());
                         map.put("startTime", attempt.getStartTime());
                         map.put("endTime", attempt.getEndTime());
