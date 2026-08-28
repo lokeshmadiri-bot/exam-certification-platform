@@ -5,26 +5,26 @@ import Layout from './components/layout/Layout';
 // Auth Pages
 import Login from './pages/Login';
 
-// Candidate Pages
-import CandidateDashboard from './pages/candidate/Dashboard';
-import CandidateCatalog from './pages/candidate/Catalog';
-import CandidateResults from './pages/candidate/Results';
-import CandidateHelp from './pages/candidate/Help';
-import CandidateInstructions from './pages/candidate/Instructions';
-import CandidateSystemCheck from './pages/candidate/SystemCheck';
-import ExamRunner from './pages/ExamRunner';
-import CandidateResultView from './pages/candidate/ResultView';
-import CandidateTerminatedView from './pages/candidate/TerminatedView';
+// Candidate Pages (Consolidated)
+import CandidateDashboard from './modules/candidate/pages/Dashboard';
+import CandidateCatalog from './modules/candidate/pages/Catalog';
+import CandidateResults from './modules/candidate/pages/Results';
+import CandidateHelp from './modules/candidate/pages/Help';
+import CandidateInstructions from './modules/candidate/pages/Instructions';
+import CandidateSystemCheck from './modules/candidate/pages/SystemCheck';
+import ExamRunner from './modules/candidate/pages/ExamRunner';
+import CandidateResultView from './modules/candidate/pages/ResultView';
+import CandidateTerminatedView from './modules/candidate/pages/TerminatedView';
 
-// Admin Pages
-import AdminDashboard from './admin/a2/AdminDashboard';
-import AdminAttempts from './admin/a2/AttemptsPage';
-import AdminReview from './admin/a2/AttemptReviewPage';
-import CandidatesPage from './admin/a2/a1/CandidatesPage';
-import ExamsLibraryPage from './admin/a2/a1/ExamsLibraryPage';
-import AuthoringPage from './admin/a2/a1/Authoringpage';
-import QuestionBankPage from './admin/a2/a1/QuestionBankPage';
-import GovernanceSettingsPage from './admin/a2/a1/Goveranancesettingspage';
+// Admin Pages (Consolidated)
+import AdminDashboard from './modules/admin/pages/AdminDashboard';
+import AdminAttempts from './modules/admin/pages/AttemptsPage';
+import AdminReview from './modules/admin/pages/AttemptReviewPage';
+import CandidatesPage from './modules/admin/pages/CandidatesPage';
+import ExamsLibraryPage from './modules/admin/pages/ExamsLibraryPage';
+import AuthoringPage from './modules/admin/pages/Authoringpage';
+import QuestionBankPage from './modules/admin/pages/QuestionBankPage';
+import GovernanceSettingsPage from './modules/admin/pages/Goveranancesettingspage';
 
 export default function App() {
   return (
@@ -34,7 +34,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
 
         {/* Candidate Routes */}
-        <Route path="/candidate" element={<Layout title="Dashboard" />}>
+        <Route path="/candidate" element={<Layout title="" />}>
           <Route index element={<CandidateDashboard />} />
           <Route path="catalog" element={<CandidateCatalog />} />
           <Route path="results" element={<CandidateResults />} />
@@ -54,7 +54,7 @@ export default function App() {
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="attempts" element={<AdminAttempts />} />
           <Route path="attempts/:attemptId/review" element={<AdminReview />} />
-          <Route path="review" element={<Navigate to="/admin/attempts?result=NEEDS_REVIEW" replace />} />
+          <Route path="review" element={<AdminAttempts />} />
           <Route path="candidates" element={<CandidatesPage />} />
           <Route path="exams" element={<ExamsLibraryPage />} />
           <Route path="authoring" element={<AuthoringPage />} />

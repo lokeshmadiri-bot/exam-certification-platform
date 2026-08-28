@@ -9,6 +9,8 @@ import com.oryfolks.certify.entity.Question;
 import com.oryfolks.certify.repository.AccessAuditLogRepository;
 import com.oryfolks.certify.repository.ExamRepository;
 import com.oryfolks.certify.repository.QuestionRepository;
+import com.oryfolks.certify.repository.ExamAttemptQuestionRepository;
+import com.oryfolks.certify.repository.AnswerRepository;
 import com.oryfolks.certify.response.ApiResponse;
 import com.oryfolks.certify.service.impl.GeminiService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +38,12 @@ public class AdminQuestionController {
     @Autowired
     private GeminiService geminiService;
 
+    @Autowired
+    private ExamAttemptQuestionRepository examAttemptQuestionRepository;
+
+    @Autowired
+    private AnswerRepository answerRepository;
+
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> getQuestions(
             @RequestParam(required = false) String q,
@@ -44,7 +52,16 @@ public class AdminQuestionController {
             @RequestParam(required = false) String level,
             @RequestParam(required = false) String status) {
 
-        List<Question> questions = questionRepository.findAll();
+        List<Question> questions;
+        try {
+            questions = questionRepository.findAllByOrderByCreatedAtDesc();
+        } catch (Exception e) {
+            try {
+                questions = questionRepository.findAll();
+            } catch (Exception ex) {
+                questions = new ArrayList<>();
+            }
+        }
 
         if (q != null && !q.isBlank()) {
             String query = q.toLowerCase();
@@ -162,22 +179,100 @@ public class AdminQuestionController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> deleteQuestion(@PathVariable UUID id, Principal principal) {
-        questionRepository.deleteById(id);
+        Question q = questionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Question not found: " + id));
+
+        boolean usedInAttempt = false;
+        try {
+            if (examAttemptQuestionRepository.existsByQuestionId(id)) {
+                usedInAttempt = true;
+            }
+        } catch (Exception ignored) {}
+        try {
+            if (answerRepository.existsByQuestionId(id)) {
+                usedInAttempt = true;
+            }
+        } catch (Exception ignored) {}
+
+        if (usedInAttempt) {
+            q.setIsActive(false);
+            q.setStatus("INACTIVE");
+            questionRepository.save(q);
+        } else {
+            questionRepository.delete(q);
+        }
 
         auditLogRepository.save(AccessAuditLog.builder()
                 .userName(principal != null ? principal.getName() : "Admin User")
                 .action("DELETE_QUESTION")
                 .module("Question Bank")
                 .oldValue(id.toString())
-                .newValue("-")
+                .newValue(usedInAttempt ? "SOFT_DELETED" : "PHYSICALLY_DELETED")
                 .build());
 
         Map<String, Boolean> res = new HashMap<>();
         res.put("ok", true);
-        return ResponseEntity.ok(ApiResponse.success("Question deleted", res));
+        return ResponseEntity.ok(ApiResponse.success(usedInAttempt ? "Question set to INACTIVE (soft-deleted)" : "Question physically deleted", res));
     }
 
-    @PostMapping("/bulk")
+    @PostMapping("/bulk-delete")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> bulkDelete(
+            @RequestBody Map<String, Object> body,
+            Principal principal) {
+
+        List<String> idsStr = (List<String>) body.get("ids");
+        int deletedCount = 0;
+        int softDeletedCount = 0;
+
+        if (idsStr != null) {
+            for (String idStr : idsStr) {
+                try {
+                    UUID id = UUID.fromString(idStr);
+                    Optional<Question> opt = questionRepository.findById(id);
+                    if (opt.isPresent()) {
+                        Question q = opt.get();
+                        boolean usedInAttempt = false;
+                        try {
+                            if (examAttemptQuestionRepository.existsByQuestionId(id)) {
+                                usedInAttempt = true;
+                            }
+                        } catch (Exception ignored) {}
+                        try {
+                            if (answerRepository.existsByQuestionId(id)) {
+                                usedInAttempt = true;
+                            }
+                        } catch (Exception ignored) {}
+
+                        if (usedInAttempt) {
+                            q.setIsActive(false);
+                            q.setStatus("INACTIVE");
+                            questionRepository.save(q);
+                            softDeletedCount++;
+                        } else {
+                            questionRepository.delete(q);
+                            deletedCount++;
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+
+        auditLogRepository.save(AccessAuditLog.builder()
+                .userName(principal != null ? principal.getName() : "Admin User")
+                .action("BULK_DELETE_QUESTIONS")
+                .module("Question Bank")
+                .oldValue((deletedCount + softDeletedCount) + " items")
+                .newValue("Deleted: " + deletedCount + ", Soft Deleted: " + softDeletedCount)
+                .build());
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("ok", true);
+        res.put("deleted", deletedCount);
+        res.put("softDeleted", softDeletedCount);
+        return ResponseEntity.ok(ApiResponse.success("Bulk delete completed", res));
+    }
+
+    @RequestMapping(value = "/bulk", method = {RequestMethod.POST, RequestMethod.PUT})
     public ResponseEntity<ApiResponse<Map<String, Object>>> bulkUpdate(
             @RequestBody Map<String, Object> body,
             Principal principal) {

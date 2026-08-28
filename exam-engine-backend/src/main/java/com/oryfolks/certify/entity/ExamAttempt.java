@@ -100,7 +100,7 @@ public class ExamAttempt {
     private LocalDateTime createdAt;
 
     @Column(name = "published_at")
-private LocalDateTime publishedAt;
+    private LocalDateTime publishedAt;
 
     @NotNull(message = "Result publish status is required.")
     @Enumerated(EnumType.STRING)
@@ -114,7 +114,21 @@ private LocalDateTime publishedAt;
     @Column(name = "remaining_seconds")
     private Long remainingSeconds;
 
+    @Column(name = "beginner_time_remaining")
+    private Long beginnerTimeRemaining;
+
+    @Column(name = "intermediate_time_remaining")
+    private Long intermediateTimeRemaining;
+
+    @Column(name = "advanced_time_remaining")
+    private Long advancedTimeRemaining;
+
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
 
+    @Column(name = "admin_decision", length = 30)
+    private String adminDecision;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
 }

@@ -1,22 +1,15 @@
 package com.oryfolks.certify;
 
 import com.oryfolks.certify.enums.UserRole;
-import com.oryfolks.certify.enums.ExamStatus;
-import com.oryfolks.certify.enums.CompetencyLevel;
 import com.oryfolks.certify.entity.User;
-import com.oryfolks.certify.entity.Exam;
-import com.oryfolks.certify.entity.CompetencyBand;
-import com.oryfolks.certify.entity.Question;
 import com.oryfolks.certify.repository.ExamRepository;
-import com.oryfolks.certify.repository.QuestionRepository;
 import com.oryfolks.certify.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
-
-import java.util.List;
 
 @SpringBootApplication
 public class CertifyApplication {
@@ -26,11 +19,14 @@ public class CertifyApplication {
         }
 
         @Bean
-        public CommandLineRunner initDatabase(UserRepository userRepository, ExamRepository examRepository,
-                        QuestionRepository questionRepository, PasswordEncoder passwordEncoder) {
+        public static CommandLineRunner initDatabase(UserRepository userRepository,
+                        ExamRepository examRepository,
+                        JdbcTemplate jdbc,
+                        PasswordEncoder passwordEncoder) {
                 return args -> {
-                        // 1. Seed Users
-                        if (userRepository.findByUsername("aarav").isEmpty()) {
+                        // 1. Ensure default users exist and roles are synchronized
+                        java.util.Optional<User> aaravOpt = userRepository.findByUsername("aarav");
+                        if (aaravOpt.isEmpty()) {
                                 userRepository.save(User.builder()
                                                 .username("aarav")
                                                 .password(passwordEncoder.encode("password123"))
@@ -38,9 +34,15 @@ public class CertifyApplication {
                                                 .fullName("Aarav Mehta")
                                                 .title("QA Automation Engineer")
                                                 .build());
+                        } else {
+                                User aarav = aaravOpt.get();
+                                aarav.setPassword(passwordEncoder.encode("password123"));
+                                aarav.setRole(UserRole.ROLE_ADMIN);
+                                userRepository.save(aarav);
                         }
 
-                        if (userRepository.findByUsername("ravi").isEmpty()) {
+                        java.util.Optional<User> raviOpt = userRepository.findByUsername("ravi");
+                        if (raviOpt.isEmpty()) {
                                 userRepository.save(User.builder()
                                                 .username("ravi")
                                                 .password(passwordEncoder.encode("password123"))
@@ -48,125 +50,47 @@ public class CertifyApplication {
                                                 .fullName("Ravi Khanna")
                                                 .title("L&D Administrator")
                                                 .build());
+                        } else {
+                                User ravi = raviOpt.get();
+                                ravi.setPassword(passwordEncoder.encode("password123"));
+                                ravi.setRole(UserRole.ROLE_CANDIDATE);
+                                userRepository.save(ravi);
                         }
 
-                        // 2. Seed Default Exams and Questions if library is empty
-                        if (examRepository.count() == 0) {
-                                // Selenium Exam
-                                Exam selenium = Exam.builder()
-                                                .title("Selenium Certification")
-                                                .stack("selenium")
-                                                .durationMinutes(45)
-                                                .questionPool(120)
-                                                .perAttempt(30)
-                                                .passMark(60)
-                                                .version("v4")
-                                                .status(ExamStatus.ACTIVE)
-                                                .build();
-
-                                // Build bands
-                                List<CompetencyBand> bands = List.of(
-                                                CompetencyBand.builder().exam(selenium).levelName(CompetencyLevel.L1)
-                                                                .title("Expert")
-                                                                .minScore(90).maxScore(100).build(),
-                                                CompetencyBand.builder().exam(selenium).levelName(CompetencyLevel.L2)
-                                                                .title("Advanced").minScore(75).maxScore(89).build(),
-                                                CompetencyBand.builder().exam(selenium).levelName(CompetencyLevel.L3)
-                                                                .title("Intermediate").minScore(60).maxScore(74)
-                                                                .build(),
-                                                CompetencyBand.builder().exam(selenium).levelName(CompetencyLevel.L4)
-                                                                .title("Beginner").minScore(40).maxScore(59).build(),
-                                                CompetencyBand.builder().exam(selenium).levelName(CompetencyLevel.L5)
-                                                                .title("Needs Training").minScore(0).maxScore(39)
-                                                                .build());
-                                selenium.setCompetencyBands(bands);
-                                examRepository.save(selenium);
-
-                                // Seed some default questions
-                                questionRepository.save(Question.builder()
-                                                .exam(selenium)
-                                                .questionText("Which wait strategy should you use when an element's presence is conditional and you want to poll until it appears, without failing immediately?")
-                                                .codeSnippet("WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));\nwait.until(ExpectedConditions.________( By.id(\"results\") ));")
-                                                .difficulty("MEDIUM")
-                                                .marks(2)
-                                                .correctOption("B")
-                                                .optionA("Thread.sleep(10000) before locating the element")
-                                                .optionB("presenceOfElementLocated — an explicit wait condition")
-                                                .optionC("implicitlyWait set globally on the driver")
-                                                .optionD("A fixed polling loop with a custom counter")
-                                                .build());
-
-                                questionRepository.save(Question.builder()
-                                                .exam(selenium)
-                                                .questionText("Difference between explicit, implicit and fluent waits in Selenium")
-                                                .difficulty("HARD")
-                                                .marks(2)
-                                                .correctOption("A")
-                                                .optionA("Explicit polls for condition, Fluent allows polling frequency tuning, Implicit sets static timeout")
-                                                .optionB("Explicit and implicit are same, fluent is deprecated")
-                                                .optionC("Fluent is faster because it uses multi-threading")
-                                                .optionD("Implicit wait is recommended for conditional AJAX elements")
-                                                .build());
-
-                                // Seed API testing exam
-                                Exam apiExam = Exam.builder()
-                                                .title("API Testing")
-                                                .stack("api")
-                                                .durationMinutes(45)
-                                                .questionPool(90)
-                                                .perAttempt(30)
-                                                .passMark(60)
-                                                .version("v3")
-                                                .status(ExamStatus.ACTIVE)
-                                                .build();
-
-                                List<CompetencyBand> apiBands = List.of(
-                                                CompetencyBand.builder().exam(apiExam).levelName(CompetencyLevel.L1)
-                                                                .title("Expert")
-                                                                .minScore(90).maxScore(100).build(),
-                                                CompetencyBand.builder().exam(apiExam).levelName(CompetencyLevel.L2)
-                                                                .title("Advanced")
-                                                                .minScore(75).maxScore(89).build(),
-                                                CompetencyBand.builder().exam(apiExam).levelName(CompetencyLevel.L3)
-                                                                .title("Intermediate").minScore(60).maxScore(74)
-                                                                .build(),
-                                                CompetencyBand.builder().exam(apiExam).levelName(CompetencyLevel.L4)
-                                                                .title("Beginner")
-                                                                .minScore(40).maxScore(59).build(),
-                                                CompetencyBand.builder().exam(apiExam).levelName(CompetencyLevel.L5)
-                                                                .title("Needs Training").minScore(0).maxScore(39)
-                                                                .build());
-                                apiExam.setCompetencyBands(apiBands);
-                                examRepository.save(apiExam);
-
-                                // Seed DevOps exam
-                                Exam devops = Exam.builder()
-                                                .title("DevOps")
-                                                .stack("devops")
-                                                .durationMinutes(45)
-                                                .questionPool(80)
-                                                .perAttempt(30)
-                                                .passMark(60)
-                                                .version("v2")
-                                                .status(ExamStatus.ACTIVE)
-                                                .build();
-                                devops.setCompetencyBands(List.of(
-                                                CompetencyBand.builder().exam(devops).levelName(CompetencyLevel.L1)
-                                                                .title("Expert")
-                                                                .minScore(90).maxScore(100).build(),
-                                                CompetencyBand.builder().exam(devops).levelName(CompetencyLevel.L2)
-                                                                .title("Advanced")
-                                                                .minScore(75).maxScore(89).build(),
-                                                CompetencyBand.builder().exam(devops).levelName(CompetencyLevel.L3)
-                                                                .title("Intermediate").minScore(60).maxScore(74)
-                                                                .build(),
-                                                CompetencyBand.builder().exam(devops).levelName(CompetencyLevel.L4)
-                                                                .title("Beginner")
-                                                                .minScore(40).maxScore(59).build(),
-                                                CompetencyBand.builder().exam(devops).levelName(CompetencyLevel.L5)
-                                                                .title("Needs Training").minScore(0).maxScore(39)
-                                                                .build()));
-                                examRepository.save(devops);
+                        // 2. Remove seeded dummy exams — only show admin-created exams in library.
+                        // Uses native SQL for correct FK cascade ordering across all dependent tables.
+                        String[] dummyTitles = { "Selenium Certification", "API Testing", "DevOps" };
+                        for (String title : dummyTitles) {
+                                String findExamSql = "SELECT id FROM exams WHERE title = ?";
+                                var ids = jdbc.queryForList(findExamSql, String.class, title);
+                                for (String examId : ids) {
+                                        // Delete all child data in FK-safe order
+                                        String attemptsSql = "SELECT id FROM exam_attempts WHERE exam_id = CAST(? AS uuid)";
+                                        var attemptIds = jdbc.queryForList(attemptsSql, String.class, examId);
+                                        for (String attemptId : attemptIds) {
+                                                String uuid = attemptId;
+                                                jdbc.update("DELETE FROM ai_flag WHERE attempt_id = CAST(? AS uuid)",
+                                                                uuid);
+                                                jdbc.update("DELETE FROM exam_violation WHERE attempt_id = CAST(? AS uuid)",
+                                                                uuid);
+                                                jdbc.update("DELETE FROM integrity_violations WHERE attempt_id = CAST(? AS uuid)",
+                                                                uuid);
+                                                jdbc.update("DELETE FROM recording_session WHERE attempt_id = CAST(? AS uuid)",
+                                                                uuid);
+                                                jdbc.update("DELETE FROM attempt_answers WHERE attempt_id = CAST(? AS uuid)",
+                                                                uuid);
+                                                jdbc.update("DELETE FROM answers WHERE attempt_id = CAST(? AS uuid)",
+                                                                uuid);
+                                        }
+                                        jdbc.update("DELETE FROM exam_attempts WHERE exam_id = CAST(? AS uuid)",
+                                                        examId);
+                                        jdbc.update("DELETE FROM sections WHERE exam_id = CAST(? AS uuid)", examId);
+                                        jdbc.update("DELETE FROM questions WHERE exam_id = CAST(? AS uuid)", examId);
+                                        jdbc.update("DELETE FROM approval_requests WHERE target_id = ?", examId);
+                                        jdbc.update("DELETE FROM competency_bands WHERE exam_id = CAST(? AS uuid)",
+                                                        examId);
+                                        jdbc.update("DELETE FROM exams WHERE id = CAST(? AS uuid)", examId);
+                                }
                         }
                 };
         }

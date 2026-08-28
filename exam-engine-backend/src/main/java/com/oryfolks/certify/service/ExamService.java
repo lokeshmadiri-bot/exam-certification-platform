@@ -13,6 +13,7 @@
     import com.oryfolks.certify.dto.CompetencyBandDTO;
     import com.oryfolks.certify.dto.ExamDetailsResponseDTO;
     import com.oryfolks.certify.entity.CompetencyBand;
+    import com.oryfolks.certify.enums.CompetencyLevel;
     
     import java.util.UUID;
 
@@ -33,18 +34,20 @@
 
         public List<ExamCardResponseDTO> getAvailableExams() {
 
-            List<Exam> exams = examRepository.findByStatus(ExamStatus.ACTIVE);
+            List<Exam> exams = examRepository.findAll();
 
             return exams.stream()
+                    .filter(exam -> exam.getStatus() == ExamStatus.ACTIVE)
                     .map(exam -> ExamCardResponseDTO.builder()
                             .examId(exam.getId())
                             .title(exam.getTitle())
                             .stack(exam.getStack())
-                            .durationMinutes(exam.getDurationMinutes())
-                            .perAttempt(exam.getPerAttempt())
-                            .passMark(exam.getPassMark())
-                            .version(exam.getVersion())
-                            .status(exam.getStatus())
+                            .durationMinutes(exam.getDurationMinutes() != null ? exam.getDurationMinutes() : (exam.getDurationMin() != null ? exam.getDurationMin() : 60))
+                            .perAttempt(exam.getPerAttempt() != null ? exam.getPerAttempt() : (exam.getQuestionsPerAttempt() != null ? exam.getQuestionsPerAttempt() : 25))
+                            .passMark(exam.getPassMark() != null ? exam.getPassMark() : 60)
+                            .version(exam.getVersion() != null ? exam.getVersion() : "1")
+                            .status(exam.getStatus() != null ? exam.getStatus() : ExamStatus.ACTIVE)
+                            .totalMarks(exam.getTotalMarks() != null ? exam.getTotalMarks() : 100)
                             .build())
                     .toList();
         }
@@ -73,6 +76,7 @@
                     .version(exam.getVersion())
                     .status(exam.getStatus())
                     .competencyBands(competencyBands)
+                    .totalMarks(exam.getTotalMarks() != null ? exam.getTotalMarks() : 100)
                     .build();
         }
 
@@ -101,8 +105,19 @@
 
         @Transactional
         public Exam createExam(Exam exam) {
-
-            if (exam.getCompetencyBands() != null) {
+            if (exam.getStatus() == null) {
+                exam.setStatus(ExamStatus.ACTIVE);
+            }
+            if (exam.getCompetencyBands() == null || exam.getCompetencyBands().isEmpty()) {
+                List<CompetencyBand> defaultBands = List.of(
+                        CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L1).title("Expert").minScore(90).maxScore(100).build(),
+                        CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L2).title("Advanced").minScore(75).maxScore(89).build(),
+                        CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L3).title("Intermediate").minScore(60).maxScore(74).build(),
+                        CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L4).title("Beginner").minScore(40).maxScore(59).build(),
+                        CompetencyBand.builder().exam(exam).levelName(CompetencyLevel.L5).title("Needs Training").minScore(0).maxScore(39).build()
+                );
+                exam.setCompetencyBands(defaultBands);
+            } else {
                 for (CompetencyBand band : exam.getCompetencyBands()) {
                     band.setExam(exam);
                 }

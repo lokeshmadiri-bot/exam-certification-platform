@@ -9,7 +9,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * GeminiController
@@ -33,16 +35,43 @@ public class GeminiController {
     public ResponseEntity<ApiResponse<List<GeneratedQuestionDTO>>> generate(
             @Valid @RequestBody GenerateQuestionRequest request) {
         List<GeneratedQuestionDTO> questions = questionService.generateQuestions(request);
-        return ResponseEntity.ok(ApiResponse.success(
-                "Generated " + questions.size() + " question(s) successfully", questions));
+        int duplicatesRemoved = 0;
+        if (questions instanceof QuestionService.UniqueQuestionList) {
+            duplicatesRemoved = ((QuestionService.UniqueQuestionList) questions).getDuplicatesRemoved();
+        }
+
+        String msg = "Generated " + questions.size() + " question(s) successfully";
+        if (duplicatesRemoved > 0) {
+            msg += " (" + duplicatesRemoved + " duplicate(s) removed)";
+        }
+
+        ApiResponse<List<GeneratedQuestionDTO>> body = ApiResponse.<List<GeneratedQuestionDTO>>builder()
+                .success(true)
+                .message(msg)
+                .data(questions)
+                .duplicatesRemoved(duplicatesRemoved)
+                .timestamp(java.time.LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.ok(body);
     }
 
     @PostMapping("/save")
-    public ResponseEntity<ApiResponse<String>> save(
-            @Valid @RequestBody SaveGeneratedQuestionsRequest request) {
-        List<Question> saved = questionService.saveGeneratedQuestions(request);
-        return ResponseEntity.ok(ApiResponse.success(
-                "Saved " + saved.size() + " question(s) to the bank", "OK"));
+    public ResponseEntity<ApiResponse<Object>> save(
+            @RequestBody SaveGeneratedQuestionsRequest request) {
+        try {
+            List<Question> saved = questionService.saveGeneratedQuestions(request);
+            Map<String, Object> result = new HashMap<>();
+            result.put("saved", saved.size());
+            result.put("rows", saved);
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Saved " + saved.size() + " question(s) to the bank", result));
+        } catch (Exception e) {
+            Map<String, Object> fallback = new HashMap<>();
+            fallback.put("saved", 0);
+            fallback.put("rows", List.of());
+            return ResponseEntity.ok(ApiResponse.success("Failed to save questions: " + e.getMessage(), fallback));
+        }
     }
 
     @PostMapping("/regenerate")

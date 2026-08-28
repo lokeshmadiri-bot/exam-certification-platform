@@ -29,11 +29,23 @@ public class AttemptDetailsResponseDTO {
 
     private LocalDateTime submittedAt;
 
+    private Integer score;
+
+    private Integer totalMarks;
+
     private ResultStatus resultStatus;
 
     private ResultPublishStatus resultPublishStatus;
 
+    private String assignedLevel;
+
+    private String assignedLevelTitle;
+
     private List<AttemptAnswerResponseDTO> answers;
 
     private List<IntegrityViolationResponseDTO> integrityViolations;
+
+    private String adminDecision;
+
+    private String rejectionReason;
 }

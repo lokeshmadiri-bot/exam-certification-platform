@@ -1,16 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Outlet } from 'react-router-dom';
+import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import CmdPalette from '../common/CmdPalette';
-import CommandPalette from '../../admin/a2/CommandPalette';
-import { authService } from '../../services/api';
+import CommandPalette from '../../modules/admin/components/CommandPalette';
+import { authService } from '../../modules/candidate/services/api';
+import AIQuestionGenerator from '../../modules/admin/components/AIQuestionGenerator';
 
 export default function Layout({ title }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(null);
   const [navOpen, setNavOpen] = useState(false);
   const [cmdPaletteOpen, setCmdPaletteOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [generatorConfig, setGeneratorConfig] = useState(null);
+
+  const hideTopbar = location.pathname.includes('/instructions/') || location.pathname.includes('/check/');
+
+  useEffect(() => {
+    const handleOpenGenerator = (e) => {
+      setGeneratorConfig(e.detail);
+    };
+    window.addEventListener('open-ai-generator', handleOpenGenerator);
+    return () => window.removeEventListener('open-ai-generator', handleOpenGenerator);
+  }, []);
+  const hideSearch = 
+    location.pathname.includes('/help') || 
+    location.pathname.startsWith('/admin') || 
+    hideTopbar;
 
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
@@ -56,14 +74,19 @@ export default function Layout({ title }) {
 
       {/* Main Content Area */}
       <div className="main flex flex-col min-w-0 bg-[#F4F7FC]">
-        <Topbar
-          user={user}
-          title={title}
-          onMenuToggle={() => setNavOpen(!navOpen)}
-          onOpenCmdPalette={() => setCmdPaletteOpen(true)}
-        />
+        {!hideTopbar && (
+          <Topbar
+            user={user}
+            title={title}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            hideSearch={hideSearch}
+            onMenuToggle={() => setNavOpen(!navOpen)}
+            onOpenCmdPalette={() => setCmdPaletteOpen(true)}
+          />
+        )}
         <main className="content p-[28px_30px_48px] max-w-[1280px] w-full mx-auto">
-          <Outlet context={{ user }} />
+          <Outlet context={{ user, searchQuery }} />
         </main>
       </div>
 
@@ -75,6 +98,19 @@ export default function Layout({ title }) {
           show={cmdPaletteOpen}
           onClose={() => setCmdPaletteOpen(false)}
           role={user?.role}
+        />
+      )}
+
+      {/* Global AI Question Generator */}
+      {generatorConfig && (
+        <AIQuestionGenerator
+          examId={generatorConfig.examId}
+          exams={generatorConfig.exams}
+          onClose={() => setGeneratorConfig(null)}
+          onSaved={(count) => {
+            setGeneratorConfig(null);
+            window.dispatchEvent(new CustomEvent('ai-generator-saved', { detail: { count } }));
+          }}
         />
       )}
     </div>

@@ -3,15 +3,11 @@ exam-engine-frontend/node_modules/
 exam-engine-frontend/dist/
 exam-engine-frontend/dist-ssr/
 exam-engine-frontend/*.local
+# Environment files / Secrets
+.env
+.env.*
+*.env
 exam-engine-frontend/.env
-
-# Maven / Java / Backend
-exam-engine-backend/target/
-exam-engine-backend/*.class
-exam-engine-backend/*.log
-exam-engine-backend/*.jar
-exam-engine-backend/*.war
-exam-engine-backend/*.ear
 exam-engine-backend/.env
 
 # OS Files

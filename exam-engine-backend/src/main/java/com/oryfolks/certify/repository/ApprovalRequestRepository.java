@@ -6,7 +6,15 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+import java.util.Optional;
+
 @Repository
 public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest, String> {
     List<ApprovalRequest> findByStatusOrderByRequestedAtDesc(String status);
+    void deleteByTargetId(String targetId);
+    Optional<ApprovalRequest> findFirstByTargetIdAndStatus(String targetId, String status);
+    Optional<ApprovalRequest> findFirstByTypeAndStatus(String type, String status);
+    Optional<ApprovalRequest> findFirstByTypeAndTargetIdAndStatus(String type, String targetId, String status);
+    Optional<ApprovalRequest> findFirstByTypeAndTargetIdAndStatusOrderByResolvedAtDesc(String type, String targetId, String status);
+    List<ApprovalRequest> findByTypeAndTargetIdStartingWithAndStatus(String type, String targetIdPrefix, String status);
 }

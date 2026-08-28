@@ -12,4 +12,5 @@ import lombok.NoArgsConstructor;
 public class ViolationRequestDTO {
     private String type;
     private String timestamp;
+    private String snapshotUrl;
 }

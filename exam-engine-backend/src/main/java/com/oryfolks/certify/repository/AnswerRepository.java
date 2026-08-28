@@ -12,4 +12,6 @@ import java.util.UUID;
 public interface AnswerRepository extends JpaRepository<Answer, UUID> {
     List<Answer> findByAttemptId(UUID attemptId);
     Optional<Answer> findByAttemptIdAndQuestionId(UUID attemptId, UUID questionId);
+    void deleteByAttemptId(UUID attemptId);
+    boolean existsByQuestionId(UUID questionId);
 }

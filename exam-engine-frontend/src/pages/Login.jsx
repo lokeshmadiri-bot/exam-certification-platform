@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, Award, ShieldCheck, Info, Loader } from 'lucide-react';
-import { authService } from '../services/api';
+import { authService } from '../modules/candidate/services/api';
 import Toast from '../components/common/Toast';
 
 export default function Login() {
@@ -30,8 +30,12 @@ export default function Login() {
         setToastShow(true);
         setTimeout(() => {
           if (response.data.role === 'ROLE_ADMIN') {
+            // Store token under both keys so the admin API layer finds it
+            localStorage.setItem('admin_token', response.data.token);
             navigate('/admin');
           } else {
+            // Clear any stale admin token
+            localStorage.removeItem('admin_token');
             navigate('/candidate');
           }
         }, 1000);
@@ -52,15 +56,18 @@ export default function Login() {
       <div className="auth-art">
         <span className="ring" style={{ width: '520px', height: '520px', left: '-120px', top: '-120px' }}></span>
         <span className="ring" style={{ width: '360px', height: '360px', right: '-80px', bottom: '60px' }}></span>
-        
+
         <div className="auth-inner">
           {/* Brand Header */}
           <div className="brandmark">
-            <div className="glyph">
-              <ShieldAlert className="w-5 h-5 text-white" />
-            </div>
+            <img
+              src="/Oryfolkslogo.png"
+              alt="ORY SkillCert"
+              className="w-9 h-9 object-contain rounded-lg"
+              style={{ width: '36px', height: '36px' }}
+            />
             <div>
-              <b>OryFolks Certify</b>
+              <b>ORY SkillCert</b>
               <span>Certification &amp; Remote Proctoring</span>
             </div>
           </div>
@@ -69,7 +76,7 @@ export default function Login() {
           <div style={{ margin: 'auto 0' }}>
             <h1>Prove your skills.<br />Earn your level.</h1>
             <p>Timed, fairly proctored technical certifications — aligned to your stack, graded L1 to L5, with your privacy and your result handled with care.</p>
-            
+
             <div className="auth-feats">
               <span><ShieldCheck /> Live proctoring</span>
               <span><Award /> Timed &amp; fair</span>
@@ -78,7 +85,7 @@ export default function Login() {
 
           {/* Footer info */}
           <div style={{ marginTop: 'auto', fontSize: '11px', color: '#7e93b4', paddingTop: '16px' }}>
-            &copy; 2026 OryFolks. All rights reserved.
+            &copy; 2026 ORY SkillCert. All rights reserved.
           </div>
         </div>
       </div>

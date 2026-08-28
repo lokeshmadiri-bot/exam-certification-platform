@@ -26,10 +26,16 @@ public class ApprovalsController {
     private ExamRepository examRepository;
 
     @Autowired
+    private QuestionRepository questionRepository;
+
+    @Autowired
     private GovernanceSettingRepository governanceSettingRepository;
 
     @Autowired
     private AccessAuditLogRepository auditLogRepository;
+
+    @Autowired
+    private ExamAttemptRepository attemptRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -60,23 +66,36 @@ public class ApprovalsController {
 
         // Execute side effect based on approval type
         if ("EXAM_ACTIVATE".equalsIgnoreCase(req.getType()) || "EXAM_DEACTIVATE".equalsIgnoreCase(req.getType())) {
-            try {
-                UUID examId = UUID.fromString(req.getTargetId());
-                Exam exam = examRepository.findById(examId).orElse(null);
-                if (exam != null) {
-                    ExamStatus newStatus = "EXAM_ACTIVATE".equalsIgnoreCase(req.getType()) ? ExamStatus.ACTIVE : ExamStatus.INACTIVE;
-                    auditLogRepository.save(AccessAuditLog.builder()
-                            .userName(adminName)
-                            .action(req.getType())
-                            .module("Exams Library")
-                            .oldValue(exam.getStatus().name())
-                            .newValue(newStatus.name())
-                            .build());
-
-                    exam.setStatus(newStatus);
-                    examRepository.save(exam);
+            UUID examId = UUID.fromString(req.getTargetId());
+            Exam exam = examRepository.findById(examId).orElse(null);
+            if (exam != null) {
+                if ("EXAM_ACTIVATE".equalsIgnoreCase(req.getType())) {
+                    long activeCount = questionRepository != null ? questionRepository.countByExamIdAndIsActiveTrue(examId) : 0;
+                    if (activeCount == 0 && questionRepository != null) {
+                        activeCount = questionRepository.countByExamId(examId);
+                    }
+                    int poolSize = exam.getQuestionPool() != null ? exam.getQuestionPool() : 0;
+                    if (activeCount < poolSize) {
+                        long remaining = poolSize - activeCount;
+                        throw new RuntimeException(String.format(
+                            "Cannot approve activation: Question Pool Size is incomplete (%d required, %d available, %d remaining).",
+                            poolSize, activeCount, remaining
+                        ));
+                    }
                 }
-            } catch (Exception ignored) {}
+
+                ExamStatus newStatus = "EXAM_ACTIVATE".equalsIgnoreCase(req.getType()) ? ExamStatus.ACTIVE : ExamStatus.INACTIVE;
+                auditLogRepository.save(AccessAuditLog.builder()
+                        .userName(adminName)
+                        .action(req.getType())
+                        .module("Exams Library")
+                        .oldValue(exam.getStatus().name())
+                        .newValue(newStatus.name())
+                        .build());
+
+                exam.setStatus(newStatus);
+                examRepository.save(exam);
+            }
         } else if ("RETENTION_CHANGE".equalsIgnoreCase(req.getType())) {
             List<GovernanceSetting> settings = governanceSettingRepository.findAll();
             if (!settings.isEmpty() && req.getPayloadJson() != null) {
@@ -98,9 +117,28 @@ public class ApprovalsController {
             }
         } else if ("CANDIDATE_UNLOCK".equalsIgnoreCase(req.getType())) {
             try {
-                UUID candidateId = UUID.fromString(req.getTargetId());
+                String[] parts = req.getTargetId().split(":");
+                UUID candidateId = UUID.fromString(parts[0]);
+                UUID examId = parts.length > 1 ? UUID.fromString(parts[1]) : null;
+
                 User candidate = userRepository.findById(candidateId).orElse(null);
-                String candName = candidate != null ? candidate.getFullName() : req.getTargetId();
+                if (candidate != null) {
+                    if (examId != null) {
+                        Optional<ExamAttempt> attemptOpt = attemptRepository.findFirstByCandidateIdAndExamIdOrderByCreatedAtDesc(candidate.getId(), examId);
+                        if (attemptOpt.isPresent()) {
+                            ExamAttempt a = attemptOpt.get();
+                            a.setRetryOverrideApproved(true);
+                            attemptRepository.save(a);
+                        }
+                    } else {
+                        List<ExamAttempt> candidateAttempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(candidate.getId());
+                        for (ExamAttempt a : candidateAttempts) {
+                            a.setRetryOverrideApproved(true);
+                            attemptRepository.save(a);
+                        }
+                    }
+                }
+                String candName = candidate != null ? candidate.getFullName() : parts[0];
                 auditLogRepository.save(AccessAuditLog.builder()
                         .userName(adminName)
                         .action("Approved 30-day exam retry override lock for candidate: " + candName)
