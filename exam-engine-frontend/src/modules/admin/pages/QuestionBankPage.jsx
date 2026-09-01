@@ -51,6 +51,7 @@ export default function QuestionBankPage() {
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [aiSavedToast, setAiSavedToast] = useState(null);
     const [showQuestionsManager, setShowQuestionsManager] = useState(false);
+    const [examSelectWarning, setExamSelectWarning] = useState(false);
 
     const availableStacks = useMemo(() => {
         const customStacks = exams.map((e) => e.stack).filter(Boolean);
@@ -237,7 +238,7 @@ export default function QuestionBankPage() {
                     style={{ whiteSpace: "nowrap", height: "36px", padding: "0 16px", display: "flex", alignItems: "center" }}
                     onClick={() => {
                         if (!filters.examId) {
-                            alert("Please select an Assigned Exam first to view matching questions.");
+                            setExamSelectWarning(true);
                             return;
                         }
                         setShowQuestionsManager(true);
@@ -392,6 +393,22 @@ export default function QuestionBankPage() {
                         <div className="a1-modal-actions">
                             <button className="a1-btn a1-btn-ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
                             <button className="a1-btn a1-btn-red" onClick={doDelete}>Delete</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {examSelectWarning && (
+                <div className="a1-modal-overlay" onClick={() => setExamSelectWarning(false)}>
+                    <div className="a1-modal" onClick={(e) => e.stopPropagation()} style={{ width: "min(440px, 92vw)", borderRadius: "16px", padding: "24px" }}>
+                        <h3 style={{ fontSize: "19px", fontWeight: 700, color: "var(--a1-navy)", margin: "0 0 10px 0" }}>Select an Exam First</h3>
+                        <p style={{ fontSize: "14px", lineHeight: 1.5, color: "var(--a1-mut)", margin: "0 0 20px 0" }}>
+                            Please select an Assigned Exam from the filter dropdown above to view all matching questions for that exam.
+                        </p>
+                        <div className="a1-modal-actions" style={{ display: "flex", justifyContent: "flex-end" }}>
+                            <button className="a1-btn a1-btn-primary" onClick={() => setExamSelectWarning(false)} style={{ borderRadius: "10px", padding: "8px 20px" }}>
+                                Got it
+                            </button>
                         </div>
                     </div>
                 </div>
