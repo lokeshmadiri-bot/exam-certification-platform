@@ -387,9 +387,6 @@ export default function AuthoringPage() {
                         {examId ? `Editing Exam: ${form.title || "Certification Exam"}` : "Configure a new exam's format, then define its difficulty bands."}
                     </p>
                 </div>
-                <button className="a1-btn a1-btn-ghost" onClick={() => navigate("/admin/exams")}>
-                    ← Back to Exams Library
-                </button>
             </header>
 
             {savedMsg && <div className="a1-banner a1-banner-green a1-banner-slim">{savedMsg}</div>}

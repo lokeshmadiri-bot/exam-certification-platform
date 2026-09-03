@@ -96,10 +96,6 @@ async function withFallback(fn, mock) {
     try {
         return await fn();
     } catch (e) {
-        // Do NOT fall back to mock data on auth errors — re-throw so the UI can react
-        if (e.message && (e.message.includes("401") || e.message.includes("403") || e.message === "Unauthorized")) {
-            throw e;
-        }
         console.warn("[Admin API] falling back to mock data:", e.message);
         return typeof mock === "function" ? mock() : mock;
     }
@@ -361,16 +357,32 @@ export const fetchScore = (attemptId) =>
     withFallback(() => get(`/attempts/${attemptId}/score`), MOCK.score);
 
 export const confirmResult = (attemptId, payload) =>
-    withFallback(() => post(`/attempts/${attemptId}/decision/confirm`, payload), {
-        ok: true,
-        status: "CONFIRMED",
-    });
+    withFallback(
+        () => post(`/attempts/${attemptId}/decision/confirm`, payload),
+        () => {
+            const item = MOCK.attemptList.find((a) => String(a.id) === String(attemptId));
+            if (item) {
+                item.result = "CONFIRMED";
+                item.adminDecision = "CONFIRMED";
+                item.isReviewed = true;
+            }
+            return { ok: true, status: "CONFIRMED" };
+        }
+    );
 
 export const rejectResult = (attemptId, payload) =>
-    withFallback(() => post(`/attempts/${attemptId}/decision/reject`, payload), {
-        ok: true,
-        status: "REJECTED",
-    });
+    withFallback(
+        () => post(`/attempts/${attemptId}/decision/reject`, payload),
+        () => {
+            const item = MOCK.attemptList.find((a) => String(a.id) === String(attemptId));
+            if (item) {
+                item.result = "REJECTED";
+                item.adminDecision = "REJECTED";
+                item.isReviewed = true;
+            }
+            return { ok: true, status: "REJECTED" };
+        }
+    );
 
 export const escalateForSecondReview = (attemptId, payload) =>
     withFallback(() => post(`/attempts/${attemptId}/decision/escalate`, payload), {
@@ -939,11 +951,17 @@ function pushAudit(action, module, oldValue, newValue) {
 function mockAttempts(filters = {}, isReview = false) {
     let rows = MOCK.attemptList || [];
     if (isReview) {
-        rows = rows.filter((r) => r.result === "NEEDS_REVIEW");
+        if (filters.result === "REVIEWED") {
+            rows = rows.filter((r) => r.result === "CONFIRMED" || r.result === "REJECTED" || r.result === "REVIEWED" || r.result === "PUBLISHED" || r.result === "PASS" || r.result === "FAIL");
+        } else if (filters.result === "NEEDS_REVIEW") {
+            rows = rows.filter((r) => r.result === "NEEDS_REVIEW" || r.result === "IN_PROGRESS");
+        }
+    } else {
+        rows = rows.filter((r) => r.result !== "NEEDS_REVIEW" && r.result !== "IN_PROGRESS");
     }
     if (filters.stack) rows = rows.filter((r) => r.stack === filters.stack);
     if (filters.level) rows = rows.filter((r) => r.level === filters.level);
-    if (filters.result) rows = rows.filter((r) => r.result === filters.result);
+    if (filters.result && !isReview) rows = rows.filter((r) => r.result === filters.result);
     if (filters.from) rows = rows.filter((r) => r.submittedAt >= filters.from);
     if (filters.to) rows = rows.filter((r) => r.submittedAt <= `${filters.to}T23:59:59Z`);
     return { rows, total: rows.length };

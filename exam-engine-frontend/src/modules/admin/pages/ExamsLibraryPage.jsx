@@ -39,16 +39,23 @@ export default function ExamsLibraryPage() {
     const [pendingApprovals, setPendingApprovals] = useState([]);
 
     const load = () => {
-        fetchExams(filters).then((res) => {
-            const list = res?.rows || (Array.isArray(res) ? res : []);
-            const sorted = [...list].sort((a, b) => {
-                const dateA = new Date(a.updatedAt || a.createdAt || 0);
-                const dateB = new Date(b.updatedAt || b.createdAt || 0);
-                return dateB - dateA;
+        fetchExams(filters)
+            .then((res) => {
+                const list = res?.rows || (Array.isArray(res) ? res : []);
+                const sorted = [...list].sort((a, b) => {
+                    const dateA = new Date(a.updatedAt || a.createdAt || 0);
+                    const dateB = new Date(b.updatedAt || b.createdAt || 0);
+                    return dateB - dateA;
+                });
+                setRows(sorted);
+            })
+            .catch((err) => {
+                console.error("Error fetching exams library:", err);
+                setRows([]);
             });
-            setRows(sorted);
-        });
-        fetchPendingApprovals().then((res) => setPendingApprovals(Array.isArray(res) ? res : (res?.rows || [])));
+        fetchPendingApprovals()
+            .then((res) => setPendingApprovals(Array.isArray(res) ? res : (res?.rows || [])))
+            .catch(() => setPendingApprovals([]));
     };
 
     const isExamPending = (exam) => {

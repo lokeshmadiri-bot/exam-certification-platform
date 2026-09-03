@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { useExam } from '../context/ExamContext';
 import { useAutoSave } from '../hooks/useAutoSave';
@@ -7,14 +7,20 @@ export default function Question() {
   const { 
     questions, 
     currentIdx, 
+    setCurrentIdx,
     setVisitedQuestions, 
     markedQuestions, 
     setMarkedQuestions,
     beginnerTimeRemaining,
     intermediateTimeRemaining,
-    advancedTimeRemaining
+    advancedTimeRemaining,
+    submittedSections,
+    setSubmittedSections,
+    setShowConfirmSubmit
   } = useExam();
   const { answers, saving, saveAnswer } = useAutoSave();
+
+  const [confirmingSec, setConfirmingSec] = useState(null);
 
   if (questions.length === 0) {
     return <div className="text-center py-12 text-[#8A99AE]">No questions found for this exam.</div>;
@@ -23,9 +29,40 @@ export default function Question() {
   const currentQuestion = questions[currentIdx];
   const qDiff = currentQuestion?.difficulty ? currentQuestion.difficulty.trim().toUpperCase() : 'EASY';
   const activeSection = qDiff === 'HARD' ? 'HARD' : (qDiff === 'MEDIUM' ? 'MEDIUM' : 'EASY');
+  const secLabel = activeSection === 'HARD' ? 'Section 3 (Advanced)' : (activeSection === 'MEDIUM' ? 'Section 2 (Intermediate)' : 'Section 1 (Beginner)');
   const isExpired = activeSection === 'HARD'
     ? advancedTimeRemaining === 0
     : (activeSection === 'MEDIUM' ? intermediateTimeRemaining === 0 : beginnerTimeRemaining === 0);
+  const isSectionSubmitted = submittedSections && submittedSections.has(activeSection);
+  const isReadOnly = isExpired || isSectionSubmitted;
+
+  const handleConfirmSectionSubmit = (secKey) => {
+    if (setSubmittedSections) {
+      setSubmittedSections(prev => new Set([...prev, secKey]));
+    }
+    setConfirmingSec(null);
+
+    // Auto-navigate to first question of next available un-submitted section
+    const allSecKeys = ['EASY', 'MEDIUM', 'HARD'];
+    const nextKey = allSecKeys.find(k => k !== secKey && (!submittedSections || !submittedSections.has(k)) && questions.some(q => {
+      const d = q.difficulty ? q.difficulty.trim().toUpperCase() : 'EASY';
+      if (k === 'EASY') return d !== 'MEDIUM' && d !== 'HARD';
+      return d === k;
+    }));
+
+    if (nextKey) {
+      const targetIdx = questions.findIndex(q => {
+        const d = q.difficulty ? q.difficulty.trim().toUpperCase() : 'EASY';
+        if (nextKey === 'EASY') return d !== 'MEDIUM' && d !== 'HARD';
+        return d === nextKey;
+      });
+      if (targetIdx !== -1) {
+        setCurrentIdx(targetIdx);
+      }
+    } else {
+      setShowConfirmSubmit(true);
+    }
+  };
 
   // Group and count section relative indexes
   const getSectionInfo = () => {
@@ -94,9 +131,9 @@ export default function Question() {
         <div className="flex items-center gap-4 ml-4">
           <button
             onClick={toggleMarkForReview}
-            disabled={isExpired}
+            disabled={isReadOnly}
             className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all ${
-              isExpired
+              isReadOnly
                 ? 'bg-white/5 text-[#8A99AE]/40 border-white/5 cursor-not-allowed'
                 : isMarked
                 ? 'bg-[#854d0e] text-[#fef08a] border-[#ca8a04]'
@@ -122,11 +159,11 @@ export default function Question() {
         </div>
       </div>
 
-      {isExpired && (
+      {isReadOnly && (
         <div style={{
-          backgroundColor: 'rgba(239, 68, 68, 0.1)',
-          border: '1.5px solid rgba(239, 68, 68, 0.4)',
-          color: '#fca5a5',
+          backgroundColor: isSectionSubmitted ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+          border: `1.5px solid ${isSectionSubmitted ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+          color: isSectionSubmitted ? '#6ee7b7' : '#fca5a5',
           padding: '10px 14px',
           borderRadius: '8px',
           fontSize: '12.5px',
@@ -136,8 +173,12 @@ export default function Question() {
           alignItems: 'center',
           gap: '8px'
         }}>
-          <span>⚠️</span>
-          <span>Section Time Expired: You can no longer select or modify answers in this section.</span>
+          <span>{isSectionSubmitted ? '✓' : '⚠️'}</span>
+          <span>
+            {isSectionSubmitted
+              ? 'Section Submitted: This section has been submitted and cannot be modified further.'
+              : 'Section Time Expired: You can no longer select or modify answers in this section.'}
+          </span>
         </div>
       )}
 
@@ -165,11 +206,11 @@ export default function Question() {
             <div
               key={opt.key}
               onClick={() => {
-                if (isExpired) return;
+                if (isReadOnly) return;
                 saveAnswer(currentQuestion.id, opt.key);
               }}
               className={`opt flex items-center gap-3.5 p-[16px_18px] border-[1.5px] rounded-xl bg-white/5 transition-all ${
-                isExpired 
+                isReadOnly 
                   ? 'cursor-not-allowed opacity-60 border-white/5' 
                   : 'hover:bg-white/10 hover:border-white/20 cursor-pointer'
               } ${isSelected ? 'sel border-[#2F6BFF] bg-[#2f6bff]/10 shadow-[0_0_0_3px_rgba(47,107,255,0.13)]' : 'border-white/10'}`}

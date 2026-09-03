@@ -12,10 +12,11 @@ export default function CandidateDashboard() {
   const [candidate, setCandidate] = useState(null);
 
   const getUniqueBadges = (attemptsList) => {
+    if (!Array.isArray(attemptsList)) return [];
     const uniqueKeys = new Set();
     const uniqueBadges = [];
     for (const attempt of attemptsList) {
-      if (attempt.resultStatus === 'PASSED' && attempt.resultPublishStatus === 'PUBLISHED' && attempt.assignedLevel) {
+      if (attempt && attempt.resultStatus === 'PASSED' && attempt.resultPublishStatus === 'PUBLISHED' && attempt.assignedLevel) {
         const key = `${attempt.stack?.toLowerCase()}-${attempt.assignedLevel?.toLowerCase()}`;
         if (!uniqueKeys.has(key)) {
           uniqueKeys.add(key);
@@ -30,38 +31,63 @@ export default function CandidateDashboard() {
   const filteredUniqueBadges = uniqueBadges.filter(
     (attempt) =>
       !searchQuery ||
-      attempt.examTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (attempt.examTitle && attempt.examTitle.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (attempt.stack && attempt.stack.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const filteredExams = exams.filter(
+  const filteredExams = (Array.isArray(exams) ? exams : []).filter(
     (exam) =>
-      exam.status === 'ACTIVE' &&
+      (!exam.status || exam.status === 'ACTIVE' || exam.status === 'DRAFT') &&
       (!searchQuery ||
-        exam.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (exam.title && exam.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (exam.stack && exam.stack.toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
   useEffect(() => {
+    let isMounted = true;
     async function loadData() {
       try {
         const [profileRes, examsRes, attemptsRes] = await Promise.all([
-          candidateService.getProfile(),
-          examService.getAllExams(),
-          candidateService.getMyAttempts()
+          candidateService.getProfile().catch((err) => {
+            console.error("Profile API error:", err);
+            return null;
+          }),
+          examService.getAllExams().catch((err) => {
+            console.error("Exams API error:", err);
+            return null;
+          }),
+          candidateService.getMyAttempts().catch((err) => {
+            console.error("Attempts API error:", err);
+            return null;
+          })
         ]);
 
-        setCandidate(profileRes.data || null);
-        setExams(examsRes.data || []);
-        setAttempts(attemptsRes.data || []);
+        if (!isMounted) return;
+
+        const profileData = profileRes?.data || profileRes || null;
+
+        const rawExams = examsRes?.data || examsRes || [];
+        const examsList = Array.isArray(rawExams) ? rawExams : (rawExams?.rows || []);
+
+        const rawAttempts = attemptsRes?.data || attemptsRes || [];
+        const attemptsList = Array.isArray(rawAttempts) ? rawAttempts : (rawAttempts?.rows || []);
+
+        setCandidate(profileData);
+        setExams(Array.isArray(examsList) ? examsList : []);
+        setAttempts(Array.isArray(attemptsList) ? attemptsList : []);
       } catch (err) {
-        console.error(err);
+        console.error("Error loading candidate dashboard:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
     loadData();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const getStackIcon = (stack) => {

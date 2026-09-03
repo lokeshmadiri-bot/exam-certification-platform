@@ -59,10 +59,12 @@ export default function AttemptReviewPage() {
     const payload = { note: decision.note, decidedAt: new Date().toISOString() };
     const fn = decision.open === "confirm" ? confirmResult : rejectResult;
     const res = await fn(attemptId, payload);
+    const updatedStatus = decision.open === "confirm" ? "CONFIRMED" : "REJECTED";
+    setAttempt((prev) => prev ? { ...prev, result: updatedStatus, adminDecision: updatedStatus, resultPublishStatus: "PUBLISHED" } : prev);
     setDecision({ open: null, note: "", busy: false, done: res.status });
     setTimeout(() => {
-      navigate("/admin/attempts");
-    }, 1500);
+      navigate("/admin/review");
+    }, 1000);
   };
 
   const fmtTime = (sec) => {
@@ -98,6 +100,12 @@ export default function AttemptReviewPage() {
   }
 
   const sortedFlags = flags?.items ? [...flags.items].sort((a, b) => (a.tSec || 0) - (b.tSec || 0)) : [];
+  const isAlreadyReviewed = attempt && (
+    attempt.isReviewed === true ||
+    attempt.result === "CONFIRMED" || attempt.result === "REJECTED" || attempt.result === "REVIEWED" || attempt.result === "PUBLISHED" || attempt.result === "PASS" || attempt.result === "FAIL" ||
+    (attempt.adminDecision && attempt.adminDecision !== "NONE" && attempt.adminDecision !== "PENDING") ||
+    attempt.resultPublishStatus === "PUBLISHED" || !!decision.done
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0", minHeight: "100vh", backgroundColor: "#060F1D" }}>
@@ -111,7 +119,7 @@ export default function AttemptReviewPage() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <button
-            onClick={() => navigate("/admin/attempts")}
+            onClick={() => navigate(-1)}
             style={{
               display: "inline-flex", alignItems: "center", gap: "6px",
               padding: "8px 14px", borderRadius: "10px",
@@ -123,7 +131,7 @@ export default function AttemptReviewPage() {
             onMouseEnter={e => { e.currentTarget.style.color = "#fff"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
             onMouseLeave={e => { e.currentTarget.style.color = "#8A99AE"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)"; }}
           >
-            ← Attempts
+            ← Back
           </button>
           <div>
             <div style={{ fontSize: "11px", fontFamily: "monospace", color: "#4a6a9e", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "3px" }}>
@@ -137,23 +145,8 @@ export default function AttemptReviewPage() {
             </div>
           </div>
         </div>
-        <ResultPill result={attempt.result} />
+        <ResultPill result={isAlreadyReviewed ? "REVIEWED" : attempt.result} />
       </div>
-
-      {/* ── Decision done banner ── */}
-      {decision.done && (
-        <div style={{
-          padding: "12px 28px",
-          backgroundColor: decision.done === "CONFIRMED" ? "rgba(14,159,110,0.12)" : "rgba(224,79,79,0.12)",
-          borderBottom: `1px solid ${decision.done === "CONFIRMED" ? "rgba(14,159,110,0.3)" : "rgba(224,79,79,0.3)"}`,
-          color: decision.done === "CONFIRMED" ? "#34d27b" : "#E04F4F",
-          fontSize: "13px", fontWeight: "600"
-        }}>
-          {decision.done === "CONFIRMED"
-            ? "✓ Result accepted. The candidate record has been updated."
-            : "✓ Result rejected. The candidate record has been updated to Failed."}
-        </div>
-      )}
 
       <style>{`
         @media (max-width: 900px) {
@@ -181,9 +174,8 @@ export default function AttemptReviewPage() {
             }}>
               <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#E04F4F" }} />
               <span style={{ fontSize: "12px", fontWeight: "700", color: "#4a6a9e", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.8px" }}>
-                Proctored Recording
+                PROCTORING SESSION RECORDING
               </span>
-
             </div>
 
             {recording?.url ? (
@@ -478,43 +470,59 @@ export default function AttemptReviewPage() {
           {/* Decision */}
           <div style={{ backgroundColor: "#0a1628", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", padding: "18px" }}>
             <h2 style={{ fontSize: "13px", fontWeight: "700", color: "#e8eefb", margin: "0 0 8px" }}>Decision</h2>
-            <p style={{ fontSize: "12px", color: "#4a6a9e", lineHeight: "1.6", margin: "0 0 16px" }}>
-              Accept the auto result, or reject the result if the proctoring integrity was breached.
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <button
-                disabled={!!decision.done}
-                onClick={() => setDecision(d => ({ ...d, open: "confirm" }))}
-                style={{
-                  padding: "11px", borderRadius: "10px",
-                  background: decision.done ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg, #2F6BFF, #1D4ED8)",
-                  border: "none", color: decision.done ? "#3d5470" : "#ffffff",
-                  fontWeight: "700", fontSize: "13px", cursor: decision.done ? "not-allowed" : "pointer",
-                  transition: "all 0.18s ease",
-                  boxShadow: decision.done ? "none" : "0 4px 14px rgba(47,107,255,0.35)"
-                }}
-                onMouseEnter={e => { if (!decision.done) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 8px 20px rgba(47,107,255,0.45)"; } }}
-                onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = decision.done ? "none" : "0 4px 14px rgba(47,107,255,0.35)"; }}
-              >
-                Accept Result
-              </button>
-              <button
-                disabled={!!decision.done}
-                onClick={() => setDecision(d => ({ ...d, open: "reject" }))}
-                style={{
-                  padding: "11px", borderRadius: "10px",
-                  background: decision.done ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg, #EF4444, #B91C1C)",
-                  border: "none", color: decision.done ? "#3d5470" : "#ffffff",
-                  fontWeight: "700", fontSize: "13px", cursor: decision.done ? "not-allowed" : "pointer",
-                  transition: "all 0.18s ease",
-                  boxShadow: decision.done ? "none" : "0 4px 14px rgba(239,68,68,0.35)"
-                }}
-                onMouseEnter={e => { if (!decision.done) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 8px 20px rgba(239,68,68,0.45)"; } }}
-                onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = decision.done ? "none" : "0 4px 14px rgba(239,68,68,0.35)"; }}
-              >
-                Reject Result
-              </button>
-            </div>
+            {isAlreadyReviewed ? (
+              <div style={{
+                padding: "14px",
+                backgroundColor: "rgba(22, 163, 74, 0.15)",
+                border: "1px solid rgba(22, 163, 74, 0.35)",
+                borderRadius: "10px",
+                color: "#4ade80",
+                fontSize: "13px",
+                fontWeight: "700",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}>
+                <span style={{ fontSize: "16px" }}>✓</span>
+                <span>Successfully Reviewed</span>
+              </div>
+            ) : (
+              <>
+                <p style={{ fontSize: "12px", color: "#4a6a9e", lineHeight: "1.6", margin: "0 0 16px" }}>
+                  Accept the auto result, or reject the result if the proctoring integrity was breached.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <button
+                    disabled={!!decision.done}
+                    onClick={() => setDecision(d => ({ ...d, open: "confirm" }))}
+                    style={{
+                      padding: "11px", borderRadius: "10px",
+                      background: decision.done ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg, #2F6BFF, #1D4ED8)",
+                      border: "none", color: decision.done ? "#3d5470" : "#ffffff",
+                      fontWeight: "700", fontSize: "13px", cursor: decision.done ? "not-allowed" : "pointer",
+                      transition: "all 0.18s ease",
+                      boxShadow: decision.done ? "none" : "0 4px 14px rgba(47,107,255,0.35)"
+                    }}
+                  >
+                    Accept Result
+                  </button>
+                  <button
+                    disabled={!!decision.done}
+                    onClick={() => setDecision(d => ({ ...d, open: "reject" }))}
+                    style={{
+                      padding: "11px", borderRadius: "10px",
+                      background: decision.done ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg, #EF4444, #B91C1C)",
+                      border: "none", color: decision.done ? "#3d5470" : "#ffffff",
+                      fontWeight: "700", fontSize: "13px", cursor: decision.done ? "not-allowed" : "pointer",
+                      transition: "all 0.18s ease",
+                      boxShadow: decision.done ? "none" : "0 4px 14px rgba(239,68,68,0.35)"
+                    }}
+                  >
+                    Reject Result
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
