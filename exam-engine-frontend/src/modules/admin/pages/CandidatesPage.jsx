@@ -207,6 +207,15 @@ export default function CandidatesPage() {
     const [filters, setFilters] = useState({ q: "", status: "", exam: "", locked: "" });
     const [page, setPage] = useState(1);
     const [overrideFor, setOverrideFor] = useState(null);
+    const [toastMessage, setToastMessage] = useState(null);
+    const [feedbackModal, setFeedbackModal] = useState(null);
+
+    useEffect(() => {
+        if (toastMessage) {
+            const timer = setTimeout(() => setToastMessage(null), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [toastMessage]);
 
     const load = async () => {
         try {
@@ -245,15 +254,23 @@ export default function CandidatesPage() {
         const cId = overrideFor?.candidateId || overrideFor?.userId || overrideFor?.id;
         const eId = overrideFor?.examId;
         if (!cId) {
-            alert("Error: Candidate ID is missing.");
+            setFeedbackModal({
+                title: "Unlock Failed",
+                message: "Candidate ID is missing.",
+                isError: true
+            });
             return;
         }
         try {
             await approveCandidateOverride(cId, eId);
-            alert("Override lock approved successfully! Candidate is now unlocked to retake the exam.");
+            setToastMessage(`Candidate "${overrideFor?.candidateName || 'Candidate'}" unlocked successfully.`);
         } catch (err) {
             console.error("Override lock error:", err);
-            alert("Failed to approve lock override: " + (err.message || "Unknown error"));
+            setFeedbackModal({
+                title: "Unlock Failed",
+                message: err?.message || "Failed to unlock candidate. Please try again.",
+                isError: true
+            });
         } finally {
             setOverrideFor(null);
             await load();
@@ -268,6 +285,15 @@ export default function CandidatesPage() {
                     <p className="a1-sub">Review all exam attempts, candidate responses, and lock status in real time.</p>
                 </div>
             </header>
+
+            {toastMessage && (
+                <div className="a1-banner a1-banner-green" style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "10px", padding: "12px 18px" }}>
+                    <span style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                        <span>✓</span> {toastMessage}
+                    </span>
+                    <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => setToastMessage(null)} style={{ border: "none", background: "none", fontSize: 16, cursor: "pointer" }}>✕</button>
+                </div>
+            )}
 
             <div className="a1-filterbar">
                 <div className="a1-field">
@@ -389,6 +415,24 @@ export default function CandidatesPage() {
                 onCancel={() => setOverrideFor(null)}
                 onConfirm={submitOverride}
             />
+
+            {feedbackModal && (
+                <div className="a1-modal-overlay" onClick={() => setFeedbackModal(null)}>
+                    <div className="a1-modal" onClick={(e) => e.stopPropagation()} style={{ width: "min(450px, 92vw)", borderRadius: "16px", padding: "24px" }}>
+                        <h3 style={{ fontSize: "19px", fontWeight: 700, color: feedbackModal.isError ? "var(--a1-red)" : "var(--a1-navy)", margin: "0 0 10px 0" }}>
+                            {feedbackModal.title}
+                        </h3>
+                        <p style={{ fontSize: "14px", lineHeight: 1.5, color: "var(--a1-mut)", margin: "0 0 20px 0" }}>
+                            {feedbackModal.message}
+                        </p>
+                        <div className="a1-modal-actions" style={{ display: "flex", justifyContent: "flex-end" }}>
+                            <button className="a1-btn a1-btn-primary" onClick={() => setFeedbackModal(null)} style={{ borderRadius: "10px", padding: "8px 20px" }}>
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

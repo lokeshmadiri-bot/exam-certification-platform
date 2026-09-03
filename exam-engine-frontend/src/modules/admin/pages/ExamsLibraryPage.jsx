@@ -24,6 +24,8 @@ export default function ExamsLibraryPage() {
     const [filters, setFilters] = useState({ q: "", stack: "", status: "" });
     const [page, setPage] = useState(1);
     const [availableStacks, setAvailableStacks] = useState(META.STACKS);
+    const [confirmModal, setConfirmModal] = useState(null);
+    const [modalLoading, setModalLoading] = useState(false);
 
     // Load unique stacks from all existing exams on mount
     useEffect(() => {
@@ -88,43 +90,88 @@ export default function ExamsLibraryPage() {
     }, [rows, page]);
     const totalPages = rows ? Math.max(1, Math.ceil(rows.length / PAGE_SIZE)) : 1;
 
-    // Actions
-    const handleDelete = async (exam) => {
-        if (window.confirm(`Are you sure you want to delete exam "${exam.title}"?`)) {
-            await deleteExam(exam.id);
-            load();
-        }
+    // Actions (User-friendly Modals)
+    const handleDelete = (exam) => {
+        setConfirmModal({
+            title: "Delete exam?",
+            description: `"${exam.title}" will be permanently removed from the exams library.`,
+            confirmText: "Delete",
+            confirmVariant: "a1-btn-red",
+            onConfirm: async () => {
+                setModalLoading(true);
+                try {
+                    await deleteExam(exam.id);
+                    load();
+                    setConfirmModal(null);
+                } catch (err) {
+                    setConfirmModal({
+                        title: "Delete Failed",
+                        description: err?.message || "Failed to delete the exam.",
+                        isWarningOnly: true,
+                        confirmText: "Close",
+                        confirmVariant: "a1-btn-primary"
+                    });
+                } finally {
+                    setModalLoading(false);
+                }
+            }
+        });
     };
 
-    const openStatusAction = async (exam, target) => {
-        const actionLabel = target === "ACTIVE" ? "activate" : "deactivate";
+    const openStatusAction = (exam, target) => {
         const poolSize = exam.questionPoolSize ?? exam.questionPool ?? 0;
         const currentCount = exam.currentQuestionCount ?? 0;
         const remaining = exam.remainingQuestionsNeeded ?? Math.max(0, poolSize - currentCount);
 
         if (target === "ACTIVE" && currentCount < poolSize) {
-            alert(
-                `Cannot Activate Exam: "${exam.title}"\n\n` +
-                `• Configured Question Pool Size: ${poolSize}\n` +
-                `• Current Available Questions: ${currentCount}\n` +
-                `• Remaining Questions Needed: ${remaining}\n\n` +
-                `Please add ${remaining} more active question(s) to this exam before requesting activation.`
-            );
+            setConfirmModal({
+                title: "Cannot Activate Exam",
+                isWarningOnly: true,
+                warningDetails: {
+                    examTitle: exam.title,
+                    poolSize,
+                    currentCount,
+                    remaining
+                },
+                confirmText: "Got it",
+                confirmVariant: "a1-btn-primary"
+            });
             return;
         }
 
-        if (window.confirm(`Are you sure you want to ${actionLabel} exam "${exam.title}"?`)) {
-            try {
-                if (target === "ACTIVE") {
-                    await requestExamActivation(exam.id, "Direct activation");
-                } else {
-                    await requestExamDeactivation(exam.id, "Direct deactivation");
+        const actionLabel = target === "ACTIVE" ? "Activate" : "Deactivate";
+        const actionDesc = target === "ACTIVE"
+            ? `Are you sure you want to activate exam "${exam.title}"?`
+            : `Are you sure you want to deactivate exam "${exam.title}"?`;
+
+        setConfirmModal({
+            title: `${actionLabel} exam?`,
+            description: actionDesc,
+            confirmText: actionLabel,
+            confirmVariant: target === "ACTIVE" ? "a1-btn-primary" : "a1-btn-red",
+            onConfirm: async () => {
+                setModalLoading(true);
+                try {
+                    if (target === "ACTIVE") {
+                        await requestExamActivation(exam.id, "Direct activation");
+                    } else {
+                        await requestExamDeactivation(exam.id, "Direct deactivation");
+                    }
+                    load();
+                    setConfirmModal(null);
+                } catch (err) {
+                    setConfirmModal({
+                        title: "Status Update Failed",
+                        description: err?.message || "Failed to update exam status.",
+                        isWarningOnly: true,
+                        confirmText: "Close",
+                        confirmVariant: "a1-btn-primary"
+                    });
+                } finally {
+                    setModalLoading(false);
                 }
-                load();
-            } catch (err) {
-                alert(err?.message || "Failed to update exam status.");
             }
-        }
+        });
     };
 
     return (
@@ -361,6 +408,83 @@ export default function ExamsLibraryPage() {
                 </div>
             )}
 
+            {/* Custom Confirmation / Alert Modal */}
+            {confirmModal && (
+                <div className="a1-modal-overlay" onClick={() => !modalLoading && setConfirmModal(null)}>
+                    <div
+                        className="a1-modal"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            width: "min(480px, 92vw)",
+                            borderRadius: "16px",
+                            padding: "24px 26px",
+                            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+                        }}
+                    >
+                        <h3 style={{ fontSize: "20px", fontWeight: 700, color: "var(--a1-navy)", margin: "0 0 14px 0" }}>
+                            {confirmModal.title}
+                        </h3>
+
+                        {confirmModal.warningDetails ? (
+                            <div style={{ fontSize: "14px", lineHeight: 1.6, color: "var(--a1-ink)", marginBottom: "20px" }}>
+                                <p style={{ margin: "0 0 12px 0", color: "var(--a1-mut)" }}>
+                                    Exam <strong>"{confirmModal.warningDetails.examTitle}"</strong> cannot be activated yet because the question pool is incomplete:
+                                </p>
+                                <div style={{ background: "#f8fafc", border: "1px solid var(--a1-line)", borderRadius: "10px", padding: "12px 16px", marginBottom: "12px", fontSize: "13px" }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                                        <span style={{ color: "var(--a1-mut)" }}>Configured Pool Size:</span>
+                                        <strong style={{ color: "var(--a1-navy)" }}>{confirmModal.warningDetails.poolSize}</strong>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                                        <span style={{ color: "var(--a1-mut)" }}>Current Available Questions:</span>
+                                        <strong style={{ color: "var(--a1-red)" }}>{confirmModal.warningDetails.currentCount}</strong>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed var(--a1-line)", paddingTop: "6px", marginTop: "6px" }}>
+                                        <span style={{ color: "var(--a1-mut)" }}>Remaining Needed:</span>
+                                        <strong style={{ color: "var(--a1-red)" }}>{confirmModal.warningDetails.remaining}</strong>
+                                    </div>
+                                </div>
+                                <p style={{ margin: 0, fontSize: "13px", color: "var(--a1-mut)" }}>
+                                    Please add <strong>{confirmModal.warningDetails.remaining}</strong> more active question(s) to this exam before requesting activation.
+                                </p>
+                            </div>
+                        ) : (
+                            <p style={{ fontSize: "14.5px", lineHeight: 1.5, color: "var(--a1-mut)", margin: "0 0 20px 0" }}>
+                                {confirmModal.description}
+                            </p>
+                        )}
+
+                        <div className="a1-modal-actions" style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                            {!confirmModal.isWarningOnly && (
+                                <button
+                                    type="button"
+                                    className="a1-btn a1-btn-ghost"
+                                    onClick={() => setConfirmModal(null)}
+                                    disabled={modalLoading}
+                                    style={{ borderRadius: "10px", padding: "8px 18px" }}
+                                >
+                                    Cancel
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                className={`a1-btn ${confirmModal.confirmVariant || "a1-btn-primary"}`}
+                                onClick={() => {
+                                    if (confirmModal.isWarningOnly) {
+                                        setConfirmModal(null);
+                                    } else if (confirmModal.onConfirm) {
+                                        confirmModal.onConfirm();
+                                    }
+                                }}
+                                disabled={modalLoading}
+                                style={{ borderRadius: "10px", padding: "8px 20px" }}
+                            >
+                                {modalLoading ? "Processing..." : confirmModal.confirmText || "OK"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );
