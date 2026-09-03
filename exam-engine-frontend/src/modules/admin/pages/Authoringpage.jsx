@@ -232,20 +232,85 @@ export default function AuthoringPage() {
 
     const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
-    const handleNumberChange = (key, val, maxVal) => {
-        if (val === "") {
-            setField(key, "");
-            return;
-        }
-        const num = Number(val);
-        if (num > maxVal) {
-            setField(key, maxVal);
-        } else if (num < 0) {
-            setField(key, 0);
-        } else {
-            setField(key, val);
-        }
+    const handleNumberChange = (key, val) => {
+        setField(key, val);
     };
+
+    const validationErrors = useMemo(() => {
+        const errors = {};
+        
+        const duration = Number(form.durationMin);
+        if (form.durationMin !== "") {
+            if (duration > 1000) {
+                errors.durationMin = "Duration cannot exceed 1000 minutes.";
+            } else if (duration < 1) {
+                errors.durationMin = "Duration must be at least 1 minute.";
+            }
+        }
+        
+        const pool = Number(form.questionPoolSize);
+        if (form.questionPoolSize !== "") {
+            if (pool > 1000) {
+                errors.questionPoolSize = "Question pool size cannot exceed 1000.";
+            } else if (pool < 1) {
+                errors.questionPoolSize = "Question pool size must be at least 1.";
+            }
+        }
+        
+        const attempt = Number(form.questionsPerAttempt);
+        if (form.questionsPerAttempt !== "") {
+            if (attempt > 100) {
+                errors.questionsPerAttempt = "Questions per attempt cannot exceed 100.";
+            } else if (attempt < 1) {
+                errors.questionsPerAttempt = "Questions per attempt must be at least 1.";
+            }
+        }
+        
+        if (attempt > 0 && pool > 0 && attempt > pool) {
+            errors.questionsPerAttemptCompare = "Questions per attempt cannot exceed the question pool size.";
+        }
+        
+        const marks = Number(form.totalMarks);
+        if (form.totalMarks !== "") {
+            if (marks > 100) {
+                errors.totalMarks = "Total marks cannot exceed 100.";
+            } else if (marks < 1) {
+                errors.totalMarks = "Total marks must be at least 1.";
+            }
+        }
+
+        const pass = Number(form.passMark);
+        if (form.passMark !== "") {
+            if (pass > 100) {
+                errors.passMark = "Pass mark cannot exceed 100%.";
+            } else if (pass < 0) {
+                errors.passMark = "Pass mark cannot be negative.";
+            }
+        }
+        
+        if (form.difficultyMode === "MANUAL") {
+            const b = Number(form.beginnerPct) || 0;
+            const i = Number(form.intermediatePct) || 0;
+            const a = Number(form.advancedPct) || 0;
+            
+            if (form.beginnerPct !== "" && b > 100) errors.beginnerPct = "Percentage cannot exceed 100%.";
+            if (form.beginnerPct !== "" && b < 0) errors.beginnerPct = "Percentage cannot be negative.";
+            
+            if (form.intermediatePct !== "" && i > 100) errors.intermediatePct = "Percentage cannot exceed 100%.";
+            if (form.intermediatePct !== "" && i < 0) errors.intermediatePct = "Percentage cannot be negative.";
+            
+            if (form.advancedPct !== "" && a > 100) errors.advancedPct = "Percentage cannot exceed 100%.";
+            if (form.advancedPct !== "" && a < 0) errors.advancedPct = "Percentage cannot be negative.";
+            
+            if (b + i + a !== 100) {
+                errors.manualTotal = `Difficulty distribution must equal exactly 100% (currently ${b + i + a}%).`;
+            }
+        }
+        
+        return errors;
+    }, [form]);
+
+    const hasValidationErrors = Object.keys(validationErrors).length > 0;
 
     const isPoolTooSmall = useMemo(() => {
         const pool = Number(form.questionPoolSize) || 0;
@@ -259,35 +324,8 @@ export default function AuthoringPage() {
     const submitFormatForm = async (e) => {
         e.preventDefault();
 
-        if (Number(form.questionsPerAttempt) > Number(form.questionPoolSize)) {
-            alert("Questions per attempt cannot exceed the question pool size.");
+        if (hasValidationErrors) {
             return;
-        }
-        if (Number(form.durationMin) > 1000) {
-            alert("Duration cannot exceed 1000 minutes.");
-            return;
-        }
-        if (Number(form.questionPoolSize) > 1000) {
-            alert("Question pool size cannot exceed 1000.");
-            return;
-        }
-        if (Number(form.questionsPerAttempt) > 100) {
-            alert("Questions per attempt cannot exceed 100.");
-            return;
-        }
-        if (Number(form.totalMarks) > 100) {
-            alert("Total marks cannot exceed 100.");
-            return;
-        }
-
-        if (form.difficultyMode === "MANUAL") {
-            const bPct = Number(form.beginnerPct) || 0;
-            const iPct = Number(form.intermediatePct) || 0;
-            const aPct = Number(form.advancedPct) || 0;
-            if (bPct + iPct + aPct !== 100) {
-                alert(`Difficulty distribution must equal exactly 100% (currently ${bPct + iPct + aPct}%).`);
-                return;
-            }
         }
 
 
@@ -349,9 +387,6 @@ export default function AuthoringPage() {
                         {examId ? `Editing Exam: ${form.title || "Certification Exam"}` : "Configure a new exam's format, then define its difficulty bands."}
                     </p>
                 </div>
-                <button className="a1-btn a1-btn-ghost" onClick={() => navigate("/admin/exams")}>
-                    ← Back to Exams Library
-                </button>
             </header>
 
             {savedMsg && <div className="a1-banner a1-banner-green a1-banner-slim">{savedMsg}</div>}
@@ -410,45 +445,62 @@ export default function AuthoringPage() {
                                 <label>Pass Mark (%) *</label>
                                 <input 
                                     type="number" 
-                                    min="0" 
-                                    max="100" 
                                     required 
                                     value={form.passMark} 
-                                    onChange={(e) => handleNumberChange("passMark", e.target.value, 100)} 
+                                    onChange={(e) => handleNumberChange("passMark", e.target.value)} 
                                 />
+                                {validationErrors.passMark && (
+                                    <span style={{ color: "#ef4444", fontSize: "11px", marginTop: "4px", display: "block" }}>
+                                        {validationErrors.passMark}
+                                    </span>
+                                )}
                             </div>
                             <div className="a1-field">
                                 <label>Question Pool Size *</label>
                                 <input 
                                     type="number" 
-                                    min="1" 
-                                    max="1000" 
                                     required 
                                     value={form.questionPoolSize} 
-                                    onChange={(e) => handleNumberChange("questionPoolSize", e.target.value, 1000)} 
+                                    onChange={(e) => handleNumberChange("questionPoolSize", e.target.value)} 
                                 />
+                                {validationErrors.questionPoolSize && (
+                                    <span style={{ color: "#ef4444", fontSize: "11px", marginTop: "4px", display: "block" }}>
+                                        {validationErrors.questionPoolSize}
+                                    </span>
+                                )}
                             </div>
                             <div className="a1-field">
                                 <label>Questions Per Attempt *</label>
                                 <input 
                                     type="number" 
-                                    min="1" 
-                                    max="100" 
                                     required 
                                     value={form.questionsPerAttempt} 
-                                    onChange={(e) => handleNumberChange("questionsPerAttempt", e.target.value, 100)} 
+                                    onChange={(e) => handleNumberChange("questionsPerAttempt", e.target.value)} 
                                 />
+                                {validationErrors.questionsPerAttempt && (
+                                    <span style={{ color: "#ef4444", fontSize: "11px", marginTop: "4px", display: "block" }}>
+                                        {validationErrors.questionsPerAttempt}
+                                    </span>
+                                )}
+                                {validationErrors.questionsPerAttemptCompare && (
+                                    <span style={{ color: "#ef4444", fontSize: "11px", marginTop: "4px", display: "block" }}>
+                                        {validationErrors.questionsPerAttemptCompare}
+                                    </span>
+                                )}
                             </div>
                             <div className="a1-field">
                                 <label>Total Marks *</label>
                                 <input 
                                     type="number" 
-                                    min="1" 
-                                    max="100" 
                                     required 
                                     value={form.totalMarks} 
-                                    onChange={(e) => handleNumberChange("totalMarks", e.target.value, 100)} 
+                                    onChange={(e) => handleNumberChange("totalMarks", e.target.value)} 
                                 />
+                                {validationErrors.totalMarks && (
+                                    <span style={{ color: "#ef4444", fontSize: "11px", marginTop: "4px", display: "block" }}>
+                                        {validationErrors.totalMarks}
+                                    </span>
+                                )}
                             </div>
                             <div className="a1-field">
                                 <label>Difficulty Mode</label>
@@ -467,12 +519,15 @@ export default function AuthoringPage() {
                                 <label>Duration (minutes) *</label>
                                 <input 
                                     type="number" 
-                                    min="1" 
-                                    max="1000" 
                                     required 
                                     value={form.durationMin} 
-                                    onChange={(e) => handleNumberChange("durationMin", e.target.value, 1000)} 
+                                    onChange={(e) => handleNumberChange("durationMin", e.target.value)} 
                                 />
+                                {validationErrors.durationMin && (
+                                    <span style={{ color: "#ef4444", fontSize: "11px", marginTop: "4px", display: "block" }}>
+                                        {validationErrors.durationMin}
+                                    </span>
+                                )}
                             </div>
                         </div>
 
@@ -486,31 +541,40 @@ export default function AuthoringPage() {
                                         <label style={{ fontSize: 12 }}>Beginner (%)</label>
                                         <input 
                                             type="number" 
-                                            min="0" 
-                                            max="100" 
                                             value={form.beginnerPct} 
-                                            onChange={(e) => handleNumberChange("beginnerPct", e.target.value, 100)} 
+                                            onChange={(e) => handleNumberChange("beginnerPct", e.target.value)} 
                                         />
+                                        {validationErrors.beginnerPct && (
+                                            <span style={{ color: "#ef4444", fontSize: "10px", marginTop: "4px", display: "block" }}>
+                                                {validationErrors.beginnerPct}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="a1-field">
                                         <label style={{ fontSize: 12 }}>Intermediate (%)</label>
                                         <input 
                                             type="number" 
-                                            min="0" 
-                                            max="100" 
                                             value={form.intermediatePct} 
-                                            onChange={(e) => handleNumberChange("intermediatePct", e.target.value, 100)} 
+                                            onChange={(e) => handleNumberChange("intermediatePct", e.target.value)} 
                                         />
+                                        {validationErrors.intermediatePct && (
+                                            <span style={{ color: "#ef4444", fontSize: "10px", marginTop: "4px", display: "block" }}>
+                                                {validationErrors.intermediatePct}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="a1-field">
                                         <label style={{ fontSize: 12 }}>Advanced (%)</label>
                                         <input 
                                             type="number" 
-                                            min="0" 
-                                            max="100" 
                                             value={form.advancedPct} 
-                                            onChange={(e) => handleNumberChange("advancedPct", e.target.value, 100)} 
+                                            onChange={(e) => handleNumberChange("advancedPct", e.target.value)} 
                                         />
+                                        {validationErrors.advancedPct && (
+                                            <span style={{ color: "#ef4444", fontSize: "10px", marginTop: "4px", display: "block" }}>
+                                                {validationErrors.advancedPct}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
 
@@ -596,13 +660,19 @@ export default function AuthoringPage() {
                             {poolTooSmall && " — pool is smaller than questions per attempt."}
                         </div>
 
+                        {hasValidationErrors && (
+                            <div style={{ color: "#ef4444", fontSize: 13, fontWeight: 600, marginTop: 14 }}>
+                                ⚠ Please correct the validation errors above before saving.
+                            </div>
+                        )}
+
                         <div className="a1-modal-actions" style={{ marginTop: 16, justifyContent: "flex-start" }}>
                             <button 
                                 className="a1-btn a1-btn-primary" 
-                                disabled={savingForm || !isManualTotalValid || isPoolTooSmall}
+                                disabled={savingForm || hasValidationErrors}
                                 style={{
-                                    cursor: (savingForm || !isManualTotalValid || isPoolTooSmall) ? 'not-allowed' : 'pointer',
-                                    opacity: (savingForm || !isManualTotalValid || isPoolTooSmall) ? 0.65 : 1
+                                    cursor: (savingForm || hasValidationErrors) ? 'not-allowed' : 'pointer',
+                                    opacity: (savingForm || hasValidationErrors) ? 0.65 : 1
                                 }}
                             >
                                 {savingForm ? "Saving…" : "Save exam format"}

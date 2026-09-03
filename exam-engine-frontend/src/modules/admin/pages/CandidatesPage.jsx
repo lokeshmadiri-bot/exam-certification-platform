@@ -198,7 +198,7 @@ const LOCK_PILL = {
 
 function fmtDate(dt) {
     if (!dt) return "—";
-    return new Date(dt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+    return new Date(dt).toLocaleDateString("en-IN", { dateStyle: "medium" });
 }
 
 export default function CandidatesPage() {
@@ -207,16 +207,28 @@ export default function CandidatesPage() {
     const [filters, setFilters] = useState({ q: "", status: "", exam: "", locked: "" });
     const [page, setPage] = useState(1);
     const [overrideFor, setOverrideFor] = useState(null);
+    const [toastMessage, setToastMessage] = useState(null);
+    const [feedbackModal, setFeedbackModal] = useState(null);
+
+    useEffect(() => {
+        if (toastMessage) {
+            const timer = setTimeout(() => setToastMessage(null), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [toastMessage]);
 
     const load = async () => {
-        const res = await fetchCandidates(filters);
-        setRows(res?.rows || res || []);
-
         try {
-            const exams = await fetchExams();
+            const [res, exams] = await Promise.all([
+                fetchCandidates(filters),
+                fetchExams().catch(() => ({ rows: [] }))
+            ]);
+            setRows(res?.rows || res || []);
             const examsList = exams?.rows || exams || [];
             setAllExams(examsList.map((e) => e.title || e.name || e));
-        } catch (e) { }
+        } catch (e) {
+            setRows([]);
+        }
     };
 
     useEffect(() => {
@@ -239,10 +251,30 @@ export default function CandidatesPage() {
     const totalPages = rows ? Math.max(1, Math.ceil(rows.length / PAGE_SIZE)) : 1;
 
     const submitOverride = async () => {
-        await approveCandidateOverride(overrideFor.candidateId, overrideFor.examId);
-        alert("Candidate unlocked successfully.");
-        setOverrideFor(null);
-        await load();
+        const cId = overrideFor?.candidateId || overrideFor?.userId || overrideFor?.id;
+        const eId = overrideFor?.examId;
+        if (!cId) {
+            setFeedbackModal({
+                title: "Unlock Failed",
+                message: "Candidate ID is missing.",
+                isError: true
+            });
+            return;
+        }
+        try {
+            await approveCandidateOverride(cId, eId);
+            setToastMessage(`Candidate "${overrideFor?.candidateName || 'Candidate'}" unlocked successfully.`);
+        } catch (err) {
+            console.error("Override lock error:", err);
+            setFeedbackModal({
+                title: "Unlock Failed",
+                message: err?.message || "Failed to unlock candidate. Please try again.",
+                isError: true
+            });
+        } finally {
+            setOverrideFor(null);
+            await load();
+        }
     };
 
     return (
@@ -254,6 +286,15 @@ export default function CandidatesPage() {
                 </div>
             </header>
 
+            {toastMessage && (
+                <div className="a1-banner a1-banner-green" style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: "10px", padding: "12px 18px" }}>
+                    <span style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                        <span>✓</span> {toastMessage}
+                    </span>
+                    <button className="a1-btn a1-btn-ghost a1-btn-sm" onClick={() => setToastMessage(null)} style={{ border: "none", background: "none", fontSize: 16, cursor: "pointer" }}>✕</button>
+                </div>
+            )}
+
             <div className="a1-filterbar">
                 <div className="a1-field">
                     <label>Search</label>
@@ -264,9 +305,9 @@ export default function CandidatesPage() {
                     />
                 </div>
                 <div className="a1-field">
-                    <label>Status</label>
+                    <label>Access</label>
                     <select value={filters.status} onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, status: e.target.value })); }}>
-                        <option value="">All statuses</option>
+                        <option value="">All access status</option>
                         <option value="IN_PROGRESS">In Progress</option>
                         <option value="SUBMITTED">Submitted</option>
                         <option value="PASSED">Passed</option>
@@ -304,9 +345,8 @@ export default function CandidatesPage() {
                                 <th>Candidate</th>
                                 <th>Email</th>
                                 <th>Exam</th>
-                                <th style={{ textAlign: "center" }}>Status</th>
-                                <th>Start Time</th>
-                                <th>End Time</th>
+                                <th style={{ textAlign: "center" }}>Access</th>
+                                <th>Attempted Date</th>
                                 <th>Duration</th>
                                 <th style={{ textAlign: "center" }}>Action</th>
                             </tr>
@@ -314,7 +354,7 @@ export default function CandidatesPage() {
                         <tbody>
                             {pageRows.map((c, i) => {
                                 const statusInfo = STATUS_PILL[c.status] || { label: c.status, cls: "" };
-                                const lockInfo   = LOCK_PILL[c.overrideLockStatus] || LOCK_PILL["UNLOCKED"];
+                                const lockInfo   = LOCK_PILL[c.overrideLockStatus] || LOCK_PILL[c.locked ? "LOCKED" : "UNLOCKED"];
                                 return (
                                     <tr key={`${c.candidateId}-${c.attemptId || i}`}>
                                         <td style={{ fontWeight: 600 }}>{c.candidateName}</td>
@@ -333,8 +373,7 @@ export default function CandidatesPage() {
                                                 <span>{lockInfo.label}</span>
                                             </span>
                                         </td>
-                                        <td style={{ fontSize: 12 }}>{fmtDate(c.startTime)}</td>
-                                        <td style={{ fontSize: 12 }}>{fmtDate(c.endTime)}</td>
+                                        <td style={{ fontSize: 12 }}>{fmtDate(c.startTime || c.lastAttempt || c.endTime)}</td>
                                         <td>
                                             {c.durationMinutes ? `${c.durationMinutes} min` : "—"}
                                         </td>
@@ -342,11 +381,7 @@ export default function CandidatesPage() {
                                             {c.locked ? (
                                                 <button
                                                     className="a1-btn a1-btn-amber a1-btn-sm"
-                                                    disabled={c.status === "SUBMITTED" || c.adminDecision === "PENDING" || c.resultPublishStatus === "PENDING"}
-                                                    style={{
-                                                        cursor: (c.status === "SUBMITTED" || c.adminDecision === "PENDING" || c.resultPublishStatus === "PENDING") ? "not-allowed" : "pointer",
-                                                        opacity: (c.status === "SUBMITTED" || c.adminDecision === "PENDING" || c.resultPublishStatus === "PENDING") ? 0.6 : 1
-                                                    }}
+                                                    style={{ cursor: "pointer", opacity: 1 }}
                                                     onClick={() => setOverrideFor(c)}
                                                 >
                                                     Override Lock
@@ -380,6 +415,24 @@ export default function CandidatesPage() {
                 onCancel={() => setOverrideFor(null)}
                 onConfirm={submitOverride}
             />
+
+            {feedbackModal && (
+                <div className="a1-modal-overlay" onClick={() => setFeedbackModal(null)}>
+                    <div className="a1-modal" onClick={(e) => e.stopPropagation()} style={{ width: "min(450px, 92vw)", borderRadius: "16px", padding: "24px" }}>
+                        <h3 style={{ fontSize: "19px", fontWeight: 700, color: feedbackModal.isError ? "var(--a1-red)" : "var(--a1-navy)", margin: "0 0 10px 0" }}>
+                            {feedbackModal.title}
+                        </h3>
+                        <p style={{ fontSize: "14px", lineHeight: 1.5, color: "var(--a1-mut)", margin: "0 0 20px 0" }}>
+                            {feedbackModal.message}
+                        </p>
+                        <div className="a1-modal-actions" style={{ display: "flex", justifyContent: "flex-end" }}>
+                            <button className="a1-btn a1-btn-primary" onClick={() => setFeedbackModal(null)} style={{ borderRadius: "10px", padding: "8px 20px" }}>
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

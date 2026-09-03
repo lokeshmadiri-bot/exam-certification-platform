@@ -186,9 +186,18 @@ function ExamRunnerContent() {
           else if (diff === 'MEDIUM') iCount++;
           else bCount++;
         });
-        setBeginnerTimeRemaining(data.beginnerTimeRemaining !== undefined && data.beginnerTimeRemaining !== null ? data.beginnerTimeRemaining : (bCount * 2 * 60));
-        setIntermediateTimeRemaining(data.intermediateTimeRemaining !== undefined && data.intermediateTimeRemaining !== null ? data.intermediateTimeRemaining : (iCount * 5 * 60));
-        setAdvancedTimeRemaining(data.advancedTimeRemaining !== undefined && data.advancedTimeRemaining !== null ? data.advancedTimeRemaining : (aCount * 10 * 60));
+
+        // Time segregation strictly based on difficulty level:
+        // Beginner (Easy): 15 minutes (900s) or 90s per question
+        // Intermediate (Medium): 20 minutes (1200s) or 150s per question
+        // Advanced (Hard): 25 minutes (1500s) or 240s per question
+        const bTime = Math.max(900, (bCount > 0 ? bCount : 5) * 90);
+        const iTime = Math.max(1200, (iCount > 0 ? iCount : 5) * 150);
+        const aTime = Math.max(1500, (aCount > 0 ? aCount : 5) * 240);
+
+        setBeginnerTimeRemaining(bTime);
+        setIntermediateTimeRemaining(iTime);
+        setAdvancedTimeRemaining(aTime);
 
         setSections(loadedSections);
         setQuestions(allQuestions);
@@ -514,7 +523,6 @@ function ExamRunnerContent() {
           <LeftSidebar />
 
           <div className="run-main">
-            <SectionStepper />
             <Question />
             <Footer />
           </div>

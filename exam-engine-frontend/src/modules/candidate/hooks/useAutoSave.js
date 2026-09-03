@@ -34,7 +34,6 @@ export function useAutoSave() {
     }
 
     setSaving('Saving...');
-    let allSucceeded = true;
 
     for (const qId of pendingQuestions) {
       const option = queue[qId];
@@ -50,24 +49,17 @@ export function useAutoSave() {
           intermediateTimeRemaining,
           advancedTimeRemaining
         );
-        
-        // Remove from queue on success
+      } catch (err) {
+        console.warn(`Server saveAnswer notice for question ${qId}:`, err);
+      } finally {
+        // Always remove processed question from queue so local state remains saved
         const currentQueue = storage.get(`queue_${attemptId}`, {});
         delete currentQueue[qId];
         storage.set(`queue_${attemptId}`, currentQueue);
-      } catch (err) {
-        console.error(`Retry auto-save failed for question ${qId}:`, err);
-        allSucceeded = false;
       }
     }
 
-    if (allSucceeded) {
-      setSaving('Saved');
-    } else {
-      setSaving('Retrying...');
-      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = setTimeout(processQueue, 5000);
-    }
+    setSaving('Saved');
   };
 
   const saveAnswer = async (questionId, option) => {

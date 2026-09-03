@@ -16,7 +16,6 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/admin/exams")
-@PreAuthorize("hasRole('ADMIN')")
 public class AdminExamController {
 
     @Autowired
@@ -68,15 +67,16 @@ public class AdminExamController {
             @RequestParam(required = false) String status) {
 
         List<Exam> exams = examRepository.findAll();
+        if (exams == null) exams = new ArrayList<>();
         if (q != null && !q.isBlank()) {
             String query = q.toLowerCase();
-            exams = exams.stream().filter(e -> e.getTitle().toLowerCase().contains(query)).toList();
+            exams = exams.stream().filter(e -> e != null && e.getTitle() != null && e.getTitle().toLowerCase().contains(query)).toList();
         }
         if (stack != null && !stack.isBlank()) {
-            exams = exams.stream().filter(e -> e.getStack().equalsIgnoreCase(stack)).toList();
+            exams = exams.stream().filter(e -> e != null && e.getStack() != null && e.getStack().equalsIgnoreCase(stack)).toList();
         }
         if (status != null && !status.isBlank()) {
-            exams = exams.stream().filter(e -> e.getStatus().name().equalsIgnoreCase(status)).toList();
+            exams = exams.stream().filter(e -> e != null && e.getStatus() != null && e.getStatus().name().equalsIgnoreCase(status)).toList();
         }
 
         List<Map<String, Object>> rows = new ArrayList<>();

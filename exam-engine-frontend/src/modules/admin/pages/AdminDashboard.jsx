@@ -30,29 +30,51 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const loadDashboard = (activeMode, startYM, endYM = "") => {
+  const loadDashboard = (activeMode = "all", startYM = "", endYM = "") => {
     setLoading(true);
-    const params = activeMode === "single" 
-      ? { startMonth: startYM, endMonth: startYM }
-      : { startMonth: startYM, endMonth: endYM };
+    let params = {};
+    if (activeMode === "single" && startYM) {
+      params = { startMonth: startYM, endMonth: startYM };
+    } else if (activeMode === "custom" && startYM && endYM) {
+      params = { startMonth: startYM, endMonth: endYM };
+    }
     fetchDashboard(params).then((res) => {
-      setData(res);
+      if (res) {
+        setData(res);
+      } else {
+        setData({
+          kpis: { totalExams: 0, totalAttempts: 0, overallPassRatePercent: 0, avgScorePercent: 0 },
+          levelDistribution: [],
+          passRateSplit: [],
+          attemptsByStack: []
+        });
+      }
       setLoading(false);
-    }).catch(() => {
+    }).catch((err) => {
+      console.error("Failed to load admin dashboard:", err);
+      setData({
+        kpis: { totalExams: 0, totalAttempts: 0, overallPassRatePercent: 0, avgScorePercent: 0 },
+        levelDistribution: [],
+        passRateSplit: [],
+        attemptsByStack: []
+      });
       setLoading(false);
     });
   };
 
-  // On mount: Automatically select and load "This Month" data
+  // On mount: Load all dashboard data by default
   useEffect(() => {
-    const currentYM = getCurrentMonthYM();
-    setSelectedMonth(currentYM);
-    loadDashboard("single", currentYM);
+    loadDashboard("all");
   }, []);
 
   const handleMonthChange = (val) => {
     setSelectedMonth(val);
-    loadDashboard("single", val);
+    if (!val) {
+      loadDashboard("all");
+    } else {
+      setMode("single");
+      loadDashboard("single", val);
+    }
   };
 
   const handleApplyCustom = () => {
@@ -61,12 +83,11 @@ export default function AdminDashboard() {
   };
 
   const handleReset = () => {
-    const currentYM = getCurrentMonthYM();
     setMode("single");
-    setSelectedMonth(currentYM);
+    setSelectedMonth("");
     setCustomFrom("");
     setCustomTo("");
-    loadDashboard("single", currentYM);
+    loadDashboard("all");
   };
 
   if (!data) return <div className="a2-page a2-loading">Loading dashboard…</div>;
@@ -125,6 +146,23 @@ export default function AdminDashboard() {
                 }}
               />
               <button
+                onClick={handleReset}
+                style={{
+                  padding: "6px 12px",
+                  backgroundColor: !selectedMonth && mode === "single" ? "#2F6BFF" : "#fff",
+                  border: "1px solid var(--a2-line)",
+                  color: !selectedMonth && mode === "single" ? "#fff" : "var(--a2-navy)",
+                  borderRadius: "6px",
+                  fontSize: "12.5px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)"
+                }}
+              >
+                All Time
+              </button>
+              <button
                 onClick={() => {
                   setMode("custom");
                   const currentYM = selectedMonth || getCurrentMonthYM();
@@ -133,9 +171,9 @@ export default function AdminDashboard() {
                 }}
                 style={{
                   padding: "6px 12px",
-                  backgroundColor: "#fff",
+                  backgroundColor: mode === "custom" ? "#2F6BFF" : "#fff",
                   border: "1px solid var(--a2-line)",
-                  color: "var(--a2-navy)",
+                  color: mode === "custom" ? "#fff" : "var(--a2-navy)",
                   borderRadius: "6px",
                   fontSize: "12.5px",
                   fontWeight: "600",

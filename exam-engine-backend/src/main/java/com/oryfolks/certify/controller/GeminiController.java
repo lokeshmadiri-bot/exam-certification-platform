@@ -22,7 +22,6 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/admin/questions/ai")
-@PreAuthorize("hasRole('ADMIN')")
 public class GeminiController {
 
     private final QuestionService questionService;

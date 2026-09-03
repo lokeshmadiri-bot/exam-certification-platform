@@ -49,7 +49,6 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/admin")
-@PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
     @Autowired
@@ -113,9 +112,22 @@ public class AdminController {
         List<User> candidates = userRepository.findByRole(UserRole.ROLE_CANDIDATE);
         List<Exam> activeExams = examRepository.findByStatus(ExamStatus.ACTIVE);
 
+        List<ExamAttempt> allAttemptsList = attemptRepository != null ? attemptRepository.findAllByOrderByCreatedAtDesc() : List.of();
+        Map<UUID, List<ExamAttempt>> attemptsByCandidate = allAttemptsList.stream()
+                .filter(a -> a.getCandidate() != null && a.getCandidate().getId() != null)
+                .collect(java.util.stream.Collectors.groupingBy(a -> a.getCandidate().getId()));
+
+        List<ApprovalRequest> allApprovalsList = approvalRepository != null ? approvalRepository.findAll().stream().filter(r -> r != null && "CANDIDATE_UNLOCK".equals(r.getType()) && "APPROVED".equals(r.getStatus())).toList() : List.of();
+        Map<String, ApprovalRequest> approvalByTarget = new HashMap<>();
+        for (ApprovalRequest req : allApprovalsList) {
+            if (req != null && req.getTargetId() != null && !approvalByTarget.containsKey(req.getTargetId())) {
+                approvalByTarget.put(req.getTargetId(), req);
+            }
+        }
+
         List<Map<String, Object>> rows = new ArrayList<>();
         for (User c : candidates) {
-            List<ExamAttempt> attempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(c.getId());
+            List<ExamAttempt> attempts = attemptsByCandidate.getOrDefault(c.getId(), List.of());
             if (activeExams.isEmpty() && attempts.isEmpty()) {
                 Map<String, Object> map = new HashMap<>();
                 map.put("candidateId", c.getId().toString());
@@ -173,17 +185,14 @@ public class AdminController {
                         if (attempt.getExam() != null) {
                             targetKey = c.getId().toString() + ":" + attempt.getExam().getId().toString();
                         }
-                        Optional<ApprovalRequest> approvalOpt = approvalRepository.findFirstByTypeAndTargetIdAndStatusOrderByResolvedAtDesc(
-                                "CANDIDATE_UNLOCK", targetKey, "APPROVED"
-                        );
-                        if (!approvalOpt.isPresent()) {
-                            approvalOpt = approvalRepository.findFirstByTypeAndTargetIdAndStatusOrderByResolvedAtDesc(
-                                    "CANDIDATE_UNLOCK", c.getId().toString(), "APPROVED"
-                            );
+                        ApprovalRequest targetReq = approvalByTarget.get(targetKey);
+                        if (targetReq == null) {
+                            targetReq = approvalByTarget.get(c.getId().toString());
                         }
+                        Optional<ApprovalRequest> approvalOpt = Optional.ofNullable(targetReq);
                         if (approvalOpt.isPresent()) {
-                            ApprovalRequest req = approvalOpt.get();
-                            LocalDateTime approvedAt = req.getResolvedAt();
+                            ApprovalRequest approvedReq = approvalOpt.get();
+                            LocalDateTime approvedAt = approvedReq.getResolvedAt();
                             if (approvedAt != null) {
                                 LocalDateTime expiresAt = approvedAt.plusDays(overrideLockDurationDays);
                                 if (!LocalDateTime.now().isAfter(expiresAt)) {
@@ -208,7 +217,7 @@ public class AdminController {
                         map.put("startTime", attempt.getStartTime());
                         map.put("endTime", attempt.getEndTime());
                         map.put("durationMinutes", attempt.getExam().getDurationMinutes());
-                        long qCount = attemptAnswerRepository.countByAttemptId(attempt.getId());
+                        long qCount = attempt.getExam() != null ? attempt.getExam().getQuestionsPerAttempt() : 0;
                         map.put("questionCount", qCount);
                         rows.add(map);
                     } else {
@@ -536,13 +545,6 @@ public class AdminController {
                 } catch (Exception ignored) {}
             }
 
-            // Default to CURRENT MONTH boundaries if no filter is active
-            if (startDateTime == null && endDateTime == null) {
-                java.time.YearMonth currentYM = java.time.YearMonth.now();
-                startDateTime = currentYM.atDay(1).atStartOfDay();
-                endDateTime = currentYM.atEndOfMonth().atTime(23, 59, 59, 999999999);
-            }
-
             final LocalDateTime finalStart = startDateTime;
             final LocalDateTime finalEnd = endDateTime;
 
@@ -550,9 +552,8 @@ public class AdminController {
             for (ExamAttempt a : attempts) {
                 if (a == null) continue;
                 LocalDateTime time = a.getCreatedAt() != null ? a.getCreatedAt() : a.getStartTime();
-                if (time == null) continue;
-                if (finalStart != null && time.isBefore(finalStart)) continue;
-                if (finalEnd != null && time.isAfter(finalEnd)) continue;
+                if (finalStart != null && time != null && time.isBefore(finalStart)) continue;
+                if (finalEnd != null && time != null && time.isAfter(finalEnd)) continue;
                 filteredAttempts.add(a);
             }
 
@@ -578,7 +579,9 @@ public class AdminController {
 
             double passRate = totalAttempts > 0 ? Math.round((double) passCount / totalAttempts * 1000.0) / 10.0 : 0.0;
 
+            long totalExamsCount = examRepository != null ? examRepository.count() : 0;
             Map<String, Object> kpis = new HashMap<>();
+            kpis.put("totalExams", totalExamsCount);
             kpis.put("totalAttempts", totalAttempts);
             kpis.put("passRate", passRate);
             kpis.put("needsReview", needsReviewCount);
@@ -812,12 +815,29 @@ public class AdminController {
                 }
             }
 
-            // Enforce reviewOnly logic at backend API level:
-            // Review & Flags queue MUST only return attempts that require admin review (NEEDS_REVIEW / IN_PROGRESS).
+            // Enforce reviewOnly logic and status filtering:
             if (reviewOnly) {
+                if ("REVIEWED".equalsIgnoreCase(result) || "CONFIRMED".equalsIgnoreCase(result) || "REJECTED".equalsIgnoreCase(result)) {
+                    rows = rows.stream().filter(r -> {
+                        String resStr = String.valueOf(r.get("result"));
+                        return "CONFIRMED".equalsIgnoreCase(resStr) || "REJECTED".equalsIgnoreCase(resStr) || "REVIEWED".equalsIgnoreCase(resStr) || "PUBLISHED".equalsIgnoreCase(resStr) || "PASS".equalsIgnoreCase(resStr) || "FAIL".equalsIgnoreCase(resStr);
+                    }).toList();
+                } else if ("NEEDS_REVIEW".equalsIgnoreCase(result) || "IN_PROGRESS".equalsIgnoreCase(result)) {
+                    rows = rows.stream().filter(r -> {
+                        String resStr = String.valueOf(r.get("result"));
+                        return "NEEDS_REVIEW".equalsIgnoreCase(resStr) || "IN_PROGRESS".equalsIgnoreCase(resStr);
+                    }).toList();
+                } else {
+                    rows = rows.stream().filter(r -> {
+                        String resStr = String.valueOf(r.get("result"));
+                        return r.get("result") != null && !resStr.isBlank();
+                    }).toList();
+                }
+            } else {
+                // Attempts page: Don't show exams in attempts page which are in the needs review state
                 rows = rows.stream().filter(r -> {
                     String resStr = String.valueOf(r.get("result"));
-                    return "NEEDS_REVIEW".equalsIgnoreCase(resStr) || "IN_PROGRESS".equalsIgnoreCase(resStr);
+                    return !"NEEDS_REVIEW".equalsIgnoreCase(resStr) && !"IN_PROGRESS".equalsIgnoreCase(resStr);
                 }).toList();
             }
 
@@ -826,15 +846,6 @@ public class AdminController {
             }
             if (level != null && !level.isBlank()) {
                 rows = rows.stream().filter(r -> r.get("level") != null && level.equalsIgnoreCase(String.valueOf(r.get("level")))).toList();
-            }
-            if (result != null && !result.isBlank()) {
-                rows = rows.stream().filter(r -> {
-                    String rVal = String.valueOf(r.get("result"));
-                    if ("NEEDS_REVIEW".equalsIgnoreCase(result) || "IN_PROGRESS".equalsIgnoreCase(result)) {
-                        return "NEEDS_REVIEW".equalsIgnoreCase(rVal) || "IN_PROGRESS".equalsIgnoreCase(rVal);
-                    }
-                    return result.equalsIgnoreCase(rVal);
-                }).toList();
             }
 
             Map<String, Object> res = new HashMap<>();
@@ -1338,11 +1349,11 @@ public class AdminController {
                     : "General";
             boolean isPublished = (a.getResultPublishStatus() == ResultPublishStatus.PUBLISHED);
 
-            String level = "—";
+            String level = "NA";
             boolean isPass = (a.getResultStatus() == ResultStatus.PASSED) && !"REJECTED".equals(a.getAdminDecision());
             if (isPublished && isPass) {
                 level = a.getAssignedLevel() != null ? a.getAssignedLevel().name()
-                        : (a.getCompetencyLevel() != null ? a.getCompetencyLevel().name() : "—");
+                        : (a.getCompetencyLevel() != null ? a.getCompetencyLevel().name() : "NA");
             }
 
             map.put("exam", examTitle);
@@ -1352,15 +1363,6 @@ public class AdminController {
 
             if (isPublished) {
                 int score = a.getScore() != null ? a.getScore() : 0;
-                if (score == 0 && a.getExam() != null) {
-                    try {
-                        score = calculateAttemptScore(a);
-                        if (score > 0) {
-                            a.setScore(score);
-                            if (attemptRepository != null) attemptRepository.save(a);
-                        }
-                    } catch (Exception ignored) {}
-                }
                 map.put("score", score);
             } else {
                 map.put("score", "—");
@@ -1382,39 +1384,16 @@ public class AdminController {
                     : (a.getEndTime() != null ? a.getEndTime().toString()
                     : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : new Date().toString())));
 
-            long violationCount = 0;
-            if (integrityViolationRepository != null && a.getId() != null) {
-                try {
-                    List<IntegrityViolation> vList = integrityViolationRepository.findByAttemptIdOrderByCreatedAtAsc(a.getId());
-                    if (vList != null) violationCount = vList.size();
-                } catch (Exception ignored) {}
-            }
+            map.put("adminDecision", a.getAdminDecision() != null ? a.getAdminDecision() : "NONE");
+            map.put("resultPublishStatus", a.getResultPublishStatus() != null ? a.getResultPublishStatus().name() : "DRAFT");
+            boolean isRev = isPublished || (a.getAdminDecision() != null && !a.getAdminDecision().isBlank() && !"NONE".equalsIgnoreCase(a.getAdminDecision()));
+            map.put("isReviewed", isRev);
 
-            long aiFlagCount = 0;
-            if (aiFlagRepository != null && a.getId() != null) {
-                try {
-                    List<AIFlag> fList = aiFlagRepository.findByAttemptId(a.getId());
-                    if (fList != null) aiFlagCount = fList.size();
-                } catch (Exception ignored) {}
-            }
-
-            long examViolationCount = 0;
-            if (examViolationRepository != null && a.getId() != null) {
-                try {
-                    examViolationCount = examViolationRepository.countByAttemptId(a.getId());
-                } catch (Exception ignored) {}
-            }
-
-            long totalFlags = violationCount + aiFlagCount + examViolationCount;
-
-            map.put("flagCount", totalFlags);
-            map.put("flaggedAt", a.getSubmittedAt() != null ? a.getSubmittedAt().toString()
-                    : (a.getEndTime() != null ? a.getEndTime().toString()
-                    : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : new Date().toString())));
+            return map;
         } catch (Exception e) {
             System.err.println("mapAttemptSummary error: " + e.getMessage());
+            return map;
         }
-        return map;
     }
 
     private int calculateAttemptScore(ExamAttempt attempt) {

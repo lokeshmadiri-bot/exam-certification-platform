@@ -25,6 +25,7 @@ export function ExamProvider({ children }) {
   const [attemptId, setAttemptId] = useState(null);
   const [saving, setSaving] = useState('Saved');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedSections, setSubmittedSections] = useState(new Set());
   const [examDuration, setExamDuration] = useState(45 * 60);
   
   // Modals & Warnings
@@ -60,6 +61,7 @@ export function ExamProvider({ children }) {
     attemptId, setAttemptId,
     saving, setSaving,
     isSubmitting, setIsSubmitting,
+    submittedSections, setSubmittedSections,
     examDuration, setExamDuration,
     warningToast, setWarningToast,
     toastMsg, setToastMsg,

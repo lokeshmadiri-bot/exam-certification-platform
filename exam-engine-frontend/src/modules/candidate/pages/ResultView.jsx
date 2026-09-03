@@ -226,9 +226,7 @@ export default function CandidateResultView() {
                 </div>
                 <div className="txt text-left">
                   <b className="font-display font-bold text-lg text-white block">{attempt.assignedLevelTitle || `${attempt.assignedLevel} Competency Level`}</b>
-                  {attempt.score !== null && attempt.score !== undefined && (
-                    <span className="text-xs font-mono" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Exam Score: {attempt.score} / {attempt.totalMarks || attempt.answers?.length || 10}</span>
-                  )}
+                  <span className="text-xs font-mono" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Assigned Competency Level</span>
                 </div>
               </div>
             )}
@@ -280,20 +278,20 @@ export default function CandidateResultView() {
             className="bg-white border border-[#E4EAF2] rounded-2xl flex flex-col shadow-sm"
             style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px' }}
           >
-            <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#5C6B82] mb-2" style={{ fontSize: '11px' }}>Attempt Outcome</span>
+            <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#5C6B82] mb-2" style={{ fontSize: '11px' }}>Assigned Level</span>
             <div className="font-display text-lg font-bold text-[#0E1B2E] capitalize" style={{ fontSize: '18px', fontWeight: '700' }}>
               {!isPublished ? (
                 <span className="text-[#D97706]" style={{ color: '#D97706' }}>Under Review</span>
               ) : (
-                <span className={isPassed ? 'text-[#0E9F6E]' : 'text-[#E04F4F]'} style={{ color: isPassed ? '#0E9F6E' : '#E04F4F' }}>
-                  {attempt.resultStatus ? attempt.resultStatus.replace('_', ' ').toLowerCase() : 'Submitted'}
+                <span className="text-[#0E9F6E]" style={{ color: '#0E9F6E' }}>
+                  {attempt.assignedLevel ? `${attempt.assignedLevel} - ${attempt.assignedLevelTitle || 'Assigned'}` : 'Level Assigned'}
                 </span>
               )}
             </div>
             <p className="text-[13px] text-[#5C6B82] leading-relaxed mt-3" style={{ color: '#5C6B82', fontSize: '13px', lineHeight: '1.6', marginTop: '12px' }}>
               {isPublished
-                ? 'Official level certification and badge have been added to your profile.'
-                : 'Detailed score breakdown and level badge will be unlocked upon admin approval.'}
+                ? 'Official level certification badge has been assigned to your candidate profile.'
+                : 'Level certification badge will be unlocked upon admin approval.'}
             </p>
           </div>
         </div>
