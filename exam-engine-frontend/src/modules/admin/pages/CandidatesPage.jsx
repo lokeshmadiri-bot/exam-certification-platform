@@ -198,7 +198,7 @@ const LOCK_PILL = {
 
 function fmtDate(dt) {
     if (!dt) return "—";
-    return new Date(dt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+    return new Date(dt).toLocaleDateString("en-IN", { dateStyle: "medium" });
 }
 
 export default function CandidatesPage() {
@@ -218,14 +218,17 @@ export default function CandidatesPage() {
     }, [toastMessage]);
 
     const load = async () => {
-        const res = await fetchCandidates(filters);
-        setRows(res?.rows || res || []);
-
         try {
-            const exams = await fetchExams();
+            const [res, exams] = await Promise.all([
+                fetchCandidates(filters),
+                fetchExams().catch(() => ({ rows: [] }))
+            ]);
+            setRows(res?.rows || res || []);
             const examsList = exams?.rows || exams || [];
             setAllExams(examsList.map((e) => e.title || e.name || e));
-        } catch (e) { }
+        } catch (e) {
+            setRows([]);
+        }
     };
 
     useEffect(() => {
@@ -248,18 +251,29 @@ export default function CandidatesPage() {
     const totalPages = rows ? Math.max(1, Math.ceil(rows.length / PAGE_SIZE)) : 1;
 
     const submitOverride = async () => {
+        const cId = overrideFor?.candidateId || overrideFor?.userId || overrideFor?.id;
+        const eId = overrideFor?.examId;
+        if (!cId) {
+            setFeedbackModal({
+                title: "Unlock Failed",
+                message: "Candidate ID is missing.",
+                isError: true
+            });
+            return;
+        }
         try {
-            await approveCandidateOverride(overrideFor.candidateId, overrideFor.examId);
-            setToastMessage(`Candidate "${overrideFor.candidateName || 'Candidate'}" unlocked successfully.`);
-            setOverrideFor(null);
-            await load();
+            await approveCandidateOverride(cId, eId);
+            setToastMessage(`Candidate "${overrideFor?.candidateName || 'Candidate'}" unlocked successfully.`);
         } catch (err) {
+            console.error("Override lock error:", err);
             setFeedbackModal({
                 title: "Unlock Failed",
                 message: err?.message || "Failed to unlock candidate. Please try again.",
                 isError: true
             });
+        } finally {
             setOverrideFor(null);
+            await load();
         }
     };
 
@@ -291,9 +305,9 @@ export default function CandidatesPage() {
                     />
                 </div>
                 <div className="a1-field">
-                    <label>Status</label>
+                    <label>Access</label>
                     <select value={filters.status} onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, status: e.target.value })); }}>
-                        <option value="">All statuses</option>
+                        <option value="">All access status</option>
                         <option value="IN_PROGRESS">In Progress</option>
                         <option value="SUBMITTED">Submitted</option>
                         <option value="PASSED">Passed</option>
@@ -331,9 +345,8 @@ export default function CandidatesPage() {
                                 <th>Candidate</th>
                                 <th>Email</th>
                                 <th>Exam</th>
-                                <th style={{ textAlign: "center" }}>Status</th>
-                                <th>Start Time</th>
-                                <th>End Time</th>
+                                <th style={{ textAlign: "center" }}>Access</th>
+                                <th>Attempted Date</th>
                                 <th>Duration</th>
                                 <th style={{ textAlign: "center" }}>Action</th>
                             </tr>
@@ -341,7 +354,7 @@ export default function CandidatesPage() {
                         <tbody>
                             {pageRows.map((c, i) => {
                                 const statusInfo = STATUS_PILL[c.status] || { label: c.status, cls: "" };
-                                const lockInfo   = LOCK_PILL[c.overrideLockStatus] || LOCK_PILL["UNLOCKED"];
+                                const lockInfo   = LOCK_PILL[c.overrideLockStatus] || LOCK_PILL[c.locked ? "LOCKED" : "UNLOCKED"];
                                 return (
                                     <tr key={`${c.candidateId}-${c.attemptId || i}`}>
                                         <td style={{ fontWeight: 600 }}>{c.candidateName}</td>
@@ -360,8 +373,7 @@ export default function CandidatesPage() {
                                                 <span>{lockInfo.label}</span>
                                             </span>
                                         </td>
-                                        <td style={{ fontSize: 12 }}>{fmtDate(c.startTime)}</td>
-                                        <td style={{ fontSize: 12 }}>{fmtDate(c.endTime)}</td>
+                                        <td style={{ fontSize: 12 }}>{fmtDate(c.startTime || c.lastAttempt || c.endTime)}</td>
                                         <td>
                                             {c.durationMinutes ? `${c.durationMinutes} min` : "—"}
                                         </td>
@@ -369,11 +381,7 @@ export default function CandidatesPage() {
                                             {c.locked ? (
                                                 <button
                                                     className="a1-btn a1-btn-amber a1-btn-sm"
-                                                    disabled={c.status === "SUBMITTED" || c.adminDecision === "PENDING" || c.resultPublishStatus === "PENDING"}
-                                                    style={{
-                                                        cursor: (c.status === "SUBMITTED" || c.adminDecision === "PENDING" || c.resultPublishStatus === "PENDING") ? "not-allowed" : "pointer",
-                                                        opacity: (c.status === "SUBMITTED" || c.adminDecision === "PENDING" || c.resultPublishStatus === "PENDING") ? 0.6 : 1
-                                                    }}
+                                                    style={{ cursor: "pointer", opacity: 1 }}
                                                     onClick={() => setOverrideFor(c)}
                                                 >
                                                     Override Lock

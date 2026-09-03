@@ -23,7 +23,6 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/admin/questions")
-@PreAuthorize("hasRole('ADMIN')")
 public class AdminQuestionController {
 
     @Autowired

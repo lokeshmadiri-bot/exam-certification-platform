@@ -211,7 +211,7 @@ export default function CandidateSystemCheck() {
   const renderActionButton = () => {
     if (checking) {
       return (
-        <button disabled className="btn w-full bg-[#2F6BFF]/50 text-white flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-[13.5px]">
+        <button disabled className="btn w-full flex items-center justify-center gap-2" style={{ width: '100%', padding: '14px 20px', borderRadius: '12px', background: 'rgba(47, 107, 255, 0.5)', color: '#ffffff', fontWeight: '600', fontSize: '14px', border: 'none', cursor: 'not-allowed' }}>
           <Loader className="w-4 h-4 animate-spin" />
           Verifying System…
         </button>
@@ -220,7 +220,7 @@ export default function CandidateSystemCheck() {
 
     if (cameraAccess === 'denied') {
       return (
-        <button onClick={requestCameraAccess} className="btn w-full bg-[#E02424] hover:bg-[#c81e1e] text-white flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-[13.5px] transition-all">
+        <button onClick={requestCameraAccess} className="btn w-full flex items-center justify-center gap-2" style={{ width: '100%', padding: '14px 20px', borderRadius: '12px', background: '#2F6BFF', color: '#ffffff', fontWeight: '600', fontSize: '14px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(47, 107, 255, 0.3)', transition: 'all 0.2s ease' }}>
           Retry Webcam Check
         </button>
       );
@@ -228,7 +228,7 @@ export default function CandidateSystemCheck() {
 
     if (cameraAccess === 'ready' && micAccess === 'denied') {
       return (
-        <button onClick={requestMicAccessHelper} className="btn w-full bg-[#E02424] hover:bg-[#c81e1e] text-white flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-[13.5px] transition-all">
+        <button onClick={requestMicAccessHelper} className="btn w-full flex items-center justify-center gap-2" style={{ width: '100%', padding: '14px 20px', borderRadius: '12px', background: '#2F6BFF', color: '#ffffff', fontWeight: '600', fontSize: '14px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(47, 107, 255, 0.3)', transition: 'all 0.2s ease' }}>
           Retry Microphone Check
         </button>
       );
@@ -236,7 +236,7 @@ export default function CandidateSystemCheck() {
 
     if (cameraAccess === 'ready' && micAccess === 'ready' && networkAccess === 'denied') {
       return (
-        <button onClick={runNetworkCheckHelper} className="btn w-full bg-[#E02424] hover:bg-[#c81e1e] text-white flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-[13.5px] transition-all">
+        <button onClick={runNetworkCheckHelper} className="btn w-full flex items-center justify-center gap-2" style={{ width: '100%', padding: '14px 20px', borderRadius: '12px', background: '#2F6BFF', color: '#ffffff', fontWeight: '600', fontSize: '14px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(47, 107, 255, 0.3)', transition: 'all 0.2s ease' }}>
           Retry Network Check
         </button>
       );
@@ -246,7 +246,7 @@ export default function CandidateSystemCheck() {
       // Face detection blocked — show clear blocked button
       if (cameraViolation !== null) {
         return (
-          <button disabled className="btn w-full bg-[#E02424]/60 text-white flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-[13.5px] cursor-not-allowed">
+          <button disabled className="btn w-full flex items-center justify-center gap-2" style={{ width: '100%', padding: '14px 20px', borderRadius: '12px', background: 'rgba(220, 38, 38, 0.65)', color: '#ffffff', fontWeight: '600', fontSize: '14px', border: 'none', cursor: 'not-allowed' }}>
             <ShieldAlert className="w-4 h-4" />
             {cameraViolation === 'multiple_faces' ? 'Multiple Faces Detected — Blocked' : 'Face Not Visible — Blocked'}
           </button>
@@ -256,7 +256,7 @@ export default function CandidateSystemCheck() {
       // Models still loading
       if (!modelReady) {
         return (
-          <button disabled className="btn w-full bg-[#2F6BFF]/50 text-white flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-[13.5px]">
+          <button disabled className="btn w-full flex items-center justify-center gap-2" style={{ width: '100%', padding: '14px 20px', borderRadius: '12px', background: 'rgba(47, 107, 255, 0.5)', color: '#ffffff', fontWeight: '600', fontSize: '14px', border: 'none', cursor: 'not-allowed' }}>
             <Loader className="w-4 h-4 animate-spin" />
             {modelError ? 'Detection Unavailable — Loading…' : 'Loading Face Detection…'}
           </button>
@@ -265,7 +265,7 @@ export default function CandidateSystemCheck() {
 
       // All clear
       return (
-        <button onClick={handleStartExam} className="btn w-full bg-[#F2A93B] hover:bg-[#e69f2c] text-[#3a2700] flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-[13.5px] shadow-md transition-all">
+        <button onClick={handleStartExam} className="btn w-full flex items-center justify-center gap-2" style={{ width: '100%', padding: '14px 20px', borderRadius: '12px', background: '#F2A93B', color: '#3A2700', fontWeight: '700', fontSize: '14px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(242, 169, 59, 0.4)', transition: 'all 0.2s ease' }}>
           <Play className="w-4 h-4 fill-current" />
           Start Exam
         </button>
@@ -273,7 +273,7 @@ export default function CandidateSystemCheck() {
     }
 
     return (
-      <button disabled className="btn w-full bg-[#2F6BFF]/50 text-white flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-[13.5px]">
+      <button disabled className="btn w-full flex items-center justify-center gap-2" style={{ width: '100%', padding: '14px 20px', borderRadius: '12px', background: 'rgba(47, 107, 255, 0.5)', color: '#ffffff', fontWeight: '600', fontSize: '14px', border: 'none', cursor: 'not-allowed' }}>
         Waiting for permission…
       </button>
     );
@@ -472,26 +472,59 @@ export default function CandidateSystemCheck() {
           </div>
 
           {/* Confirm & Start Card */}
-          <div className="card pad bg-white border border-[#E4EAF2] rounded-xl shadow-sm" style={{ padding: '20px' }}>
-            <h3 className="font-display font-semibold text-sm text-[#0E1B2E] mb-1">Confirm System Readiness</h3>
-            <p className="text-[12px] text-[#5C6B82] leading-relaxed mb-4">
-              Upon clicking "Start Exam", fullscreen mode will be enabled and online proctoring begins. A single face must be detected at all times.
-            </p>
+          <div 
+            className="card bg-white border border-[#E4EAF2] rounded-2xl shadow-sm" 
+            style={{ 
+              padding: '24px', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '18px',
+              backgroundColor: '#ffffff',
+              borderRadius: '16px',
+              border: '1px solid #E4EAF2',
+              boxShadow: '0 4px 20px -2px rgba(14, 27, 46, 0.05)'
+            }}
+          >
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0E1B2E', margin: '0 0 6px 0', fontFamily: 'inherit', lineHeight: '1.3' }}>
+                Confirm System Readiness
+              </h3>
+              <p style={{ fontSize: '12.5px', color: '#5C6B82', lineHeight: '1.55', margin: '0' }}>
+                Upon clicking "Start Exam", fullscreen mode will be enabled and online proctoring begins. A single face must be detected at all times.
+              </p>
+            </div>
 
             {/* Error banner — system checks or face detection */}
             {(errorMessage || violationMessage()) && (
-              <div className="p-3.5 mb-4 rounded-xl bg-[#FDF3F3] border border-[#FCD9D9] text-[#9B1C1C] text-xs leading-relaxed flex gap-2.5 items-start">
-                <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
-                <div>
-                  <b className="font-semibold block mb-0.5">
+              <div 
+                style={{ 
+                  padding: '14px 16px', 
+                  borderRadius: '12px', 
+                  backgroundColor: '#FEF2F2', 
+                  border: '1px solid #FCA5A5', 
+                  color: '#991B1B', 
+                  fontSize: '12.5px', 
+                  lineHeight: '1.45', 
+                  display: 'flex', 
+                  gap: '12px', 
+                  alignItems: 'flex-start' 
+                }}
+              >
+                <ShieldAlert style={{ width: '20px', height: '20px', flexShrink: 0, marginTop: '1px', color: '#DC2626' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '100%' }}>
+                  <b style={{ fontWeight: '700', fontSize: '13.5px', color: '#991B1B', display: 'block' }}>
                     {violationMessage() ? 'AI Proctoring Violation' : 'Permission / Connection Error'}
                   </b>
-                  {violationMessage() || errorMessage}
+                  <span style={{ color: '#B91C1C', wordBreak: 'break-word' }}>
+                    {violationMessage() || errorMessage}
+                  </span>
                 </div>
               </div>
             )}
 
-            {renderActionButton()}
+            <div style={{ marginTop: '2px' }}>
+              {renderActionButton()}
+            </div>
           </div>
         </div>
       </div>

@@ -37,11 +37,11 @@
             List<Exam> exams = examRepository.findAll();
 
             return exams.stream()
-                    .filter(exam -> exam.getStatus() == ExamStatus.ACTIVE)
+                    .filter(exam -> exam != null && (exam.getStatus() == null || exam.getStatus() == ExamStatus.ACTIVE || exam.getStatus() == ExamStatus.DRAFT || exam.getStatus() == ExamStatus.INACTIVE))
                     .map(exam -> ExamCardResponseDTO.builder()
                             .examId(exam.getId())
-                            .title(exam.getTitle())
-                            .stack(exam.getStack())
+                            .title(exam.getTitle() != null ? exam.getTitle() : "Untitled Exam")
+                            .stack(exam.getStack() != null ? exam.getStack() : "General")
                             .durationMinutes(exam.getDurationMinutes() != null ? exam.getDurationMinutes() : (exam.getDurationMin() != null ? exam.getDurationMin() : 60))
                             .perAttempt(exam.getPerAttempt() != null ? exam.getPerAttempt() : (exam.getQuestionsPerAttempt() != null ? exam.getQuestionsPerAttempt() : 25))
                             .passMark(exam.getPassMark() != null ? exam.getPassMark() : 60)

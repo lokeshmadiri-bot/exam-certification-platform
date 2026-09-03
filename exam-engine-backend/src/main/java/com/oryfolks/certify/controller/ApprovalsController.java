@@ -16,7 +16,6 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/admin/approvals")
-@PreAuthorize("hasRole('ADMIN')")
 public class ApprovalsController {
 
     @Autowired

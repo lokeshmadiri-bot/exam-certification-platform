@@ -146,7 +146,7 @@ export default function CandidateResults() {
           My Results
         </h1>
         <p style={{ fontSize: '13.5px', color: '#5C6B82', margin: 0, lineHeight: '1.6' }}>
-          Review your earned certification levels, score breakdowns, and exam attempt history.
+          Review your earned certification levels and exam attempt history.
         </p>
       </div>
 
@@ -165,7 +165,7 @@ export default function CandidateResults() {
           },
           {
             icon: <TrendingUp style={{ width: '18px', height: '18px' }} />,
-            value: attempts.filter(a => a.resultStatus === 'PASSED').length, label: 'Exams Passed',
+            value: attempts.filter(a => a.assignedLevel).length, label: 'Levels Assigned',
             accent: '#57B85A', bg: 'rgba(87,184,90,0.06)', border: 'rgba(87,184,90,0.12)'
           },
           {

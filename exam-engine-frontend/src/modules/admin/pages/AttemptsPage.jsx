@@ -2,7 +2,7 @@
 // Attempts: Full audit/history page (PASS, FAIL, NEEDS_REVIEW, IN_PROGRESS, etc.)
 // Review & Flags: Dedicated review queue (NEEDS_REVIEW & IN_PROGRESS attempts only)
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fetchAttempts, fetchReviewAttempts, fetchExams, META } from "../services/api";
 import "../components/a2.css";
@@ -34,12 +34,30 @@ export default function AttemptsPage() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
     setLoading(true);
     const fetchFn = isReviewPage ? fetchReviewAttempts : fetchAttempts;
-    fetchFn(filters).then((d) => {
-      setData(d?.rows ? d : { rows: Array.isArray(d) ? d : [], total: Array.isArray(d) ? d.length : 0 });
-      setLoading(false);
-    });
+    fetchFn(filters)
+      .then((d) => {
+        if (isMounted) {
+          const rowsList = d?.rows || (Array.isArray(d) ? d : []);
+          setData({ rows: rowsList, total: rowsList.length });
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching attempts:", err);
+        if (isMounted) {
+          setData({ rows: [], total: 0 });
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params, isReviewPage]);
 
@@ -55,13 +73,36 @@ export default function AttemptsPage() {
   
   const hasFilters = Object.values(filters).some(Boolean);
 
-  const resultOptions = ["PASS", "FAIL", "NEEDS_REVIEW"];
+  const resultOptions = ["PASS", "FAIL"];
 
   const resultLabels = {
     PASS: "Pass",
     FAIL: "Fail",
-    NEEDS_REVIEW: "Needs review",
   };
+
+  const displayRows = useMemo(() => {
+    let rows = data.rows || [];
+    if (!isReviewPage) {
+      rows = rows.filter((r) => {
+        const res = (r.result || "").toUpperCase();
+        return res !== "NEEDS_REVIEW" && res !== "IN_PROGRESS";
+      });
+    } else {
+      const reviewStatus = filters.result;
+      if (reviewStatus === "NEEDS_REVIEW") {
+        rows = rows.filter((r) => {
+          const res = (r.result || "").toUpperCase();
+          return res === "NEEDS_REVIEW" || res === "IN_PROGRESS";
+        });
+      } else if (reviewStatus === "REVIEWED") {
+        rows = rows.filter((r) => {
+          const res = (r.result || "").toUpperCase();
+          return res === "CONFIRMED" || res === "REJECTED" || res === "REVIEWED" || res === "PUBLISHED" || res === "PASS" || res === "FAIL";
+        });
+      }
+    }
+    return rows;
+  }, [data.rows, isReviewPage, filters.result]);
 
   return (
     <div className="a2-page">
@@ -69,8 +110,8 @@ export default function AttemptsPage() {
         <h1>{isReviewPage ? "Reviews & Flags" : "Attempts"}</h1>
         <p className="a2-sub">
           {isReviewPage
-            ? `${data.total} attempt${data.total === 1 ? "" : "s"} requiring review`
-            : `${data.total} attempt${data.total === 1 ? "" : "s"} matching current filters`}
+            ? `${displayRows.length} attempt${displayRows.length === 1 ? "" : "s"} ${filters.result === "REVIEWED" ? "reviewed" : (filters.result === "NEEDS_REVIEW" ? "requiring review" : "total")}`
+            : `${displayRows.length} attempt${displayRows.length === 1 ? "" : "s"} matching current filters`}
         </p>
       </header>
 
@@ -80,12 +121,23 @@ export default function AttemptsPage() {
         {!isReviewPage && (
           <Select label="Level" value={filters.level} options={META.LEVELS} onChange={(v) => setFilter("level", v)} />
         )}
-        {!isReviewPage && (
+        {!isReviewPage ? (
           <Select
             label="Status"
             value={filters.result}
             options={resultOptions}
             labels={resultLabels}
+            onChange={(v) => setFilter("result", v)}
+          />
+        ) : (
+          <Select
+            label="Status"
+            value={filters.result}
+            options={["NEEDS_REVIEW", "REVIEWED"]}
+            labels={{
+              NEEDS_REVIEW: "Needs review",
+              REVIEWED: "Reviewed",
+            }}
             onChange={(v) => setFilter("result", v)}
           />
         )}
@@ -106,10 +158,10 @@ export default function AttemptsPage() {
       <section className="a2-card">
         {loading ? (
           <div className="a2-loading">Loading attempts…</div>
-        ) : data.rows.length === 0 ? (
+        ) : displayRows.length === 0 ? (
           <div className="a2-empty">
             {isReviewPage
-              ? "No attempts currently require review."
+              ? (filters.result === "REVIEWED" ? "No reviewed attempts found." : "No attempts currently require review.")
               : "No attempts match these filters. Adjust or clear the filters to see results."}
           </div>
         ) : (
@@ -129,7 +181,7 @@ export default function AttemptsPage() {
                 )}
               </thead>
               <tbody>
-                {data.rows.map((r) => (
+                {displayRows.map((r) => (
                   <React.Fragment key={r.id}>
                     <tr
                       className={isReviewPage ? "a2-clickable" : ""}
@@ -143,13 +195,31 @@ export default function AttemptsPage() {
                           {["L1", "L2", "L3", "L4", "L5"].includes(r.level) ? (
                             <span className={`a2-pill a2-lvl-${r.level}`}>{r.level}</span>
                           ) : (
-                            "—"
+                            <span style={{ color: "var(--a2-sub-color)", fontSize: "13px" }}>NA</span>
                           )}
                         </td>
                       )}
-                      <td style={{ textAlign: "center" }}><ResultPill result={r.result} /></td>
+                      <td style={{ textAlign: "center" }}>
+                        {isReviewPage ? (
+                          (filters.result === "REVIEWED" || ["CONFIRMED", "REJECTED", "REVIEWED", "PUBLISHED", "PASS", "FAIL"].includes((r.result || "").toUpperCase())) ? (
+                            <span className="a2-pill a2-pill-green">Reviewed</span>
+                          ) : (
+                            <span className="a2-pill a2-pill-amber">Needs review</span>
+                          )
+                        ) : (
+                          <ResultPill result={r.result} />
+                        )}
+                      </td>
                       {!isReviewPage && <td style={{ textAlign: "center" }}>{r.score}</td>}
-                      {!isReviewPage && <td style={{ textAlign: "center" }}>{r.flagCount > 0 ? <span className="a2-pill a2-pill-amber">{r.flagCount}</span> : "—"}</td>}
+                      {!isReviewPage && (
+                        <td style={{ textAlign: "center" }}>
+                          {r.flagCount > 0 ? (
+                            <span className="a2-pill a2-pill-amber">{r.flagCount}</span>
+                          ) : (
+                            <span style={{ color: "var(--a2-sub-color)", fontSize: "13px" }}>0</span>
+                          )}
+                        </td>
+                      )}
                       <td>{new Date(r.submittedAt).toLocaleString()}</td>
                     </tr>
 
@@ -161,7 +231,7 @@ export default function AttemptsPage() {
                             <div className="a2-drill-facts">
                               <Fact label="Duration" value={`${r.durationMin || 60} min`} />
                               <Fact label="Integrity flags" value={r.flagCount} />
-                              <Fact label="Status" value={(r.result || "").replace("_", " ")} />
+                              <Fact label="Status" value={filters.result === "REVIEWED" || ["CONFIRMED", "REJECTED", "REVIEWED", "PUBLISHED", "PASS", "FAIL"].includes((r.result || "").toUpperCase()) ? "Reviewed" : "Needs review"} />
                             </div>
                             <div className="a2-drill-actions">
                               <button
@@ -215,7 +285,15 @@ export function ResultPill({ result }) {
     FAIL: ["a2-pill-red", "Fail"],
     NEEDS_REVIEW: ["a2-pill-amber", "Needs review"],
     IN_PROGRESS: ["a2-pill-amber", "Needs review"],
+    REVIEWED: ["a2-pill-green", "Reviewed"],
+    CONFIRMED: ["a2-pill-green", "Reviewed"],
+    REJECTED: ["a2-pill-green", "Reviewed"],
+    PUBLISHED: ["a2-pill-green", "Reviewed"],
   };
-  const [cls, text] = map[result] || ["", result ? result.replace("_", " ") : "—"];
+  const upper = (result || "").toUpperCase();
+  const [cls, text] = map[upper] || [
+    (upper === "CONFIRMED" || upper === "REJECTED" || upper === "REVIEWED" || upper === "PUBLISHED") ? "a2-pill-green" : "",
+    (upper === "CONFIRMED" || upper === "REJECTED" || upper === "REVIEWED" || upper === "PUBLISHED") ? "Reviewed" : (result ? result.replace("_", " ") : "—")
+  ];
   return <span className={`a2-pill ${cls}`}>{text}</span>;
 }

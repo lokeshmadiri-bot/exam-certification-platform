@@ -31,28 +31,15 @@ export function useExamTimer(onTimeUp) {
     ? advancedTimeRemaining
     : (activeSection === 'MEDIUM' ? intermediateTimeRemaining : beginnerTimeRemaining);
 
-  // Fetch timer from server
+  // Check timer expiry without overwriting active local section timers
   const syncTimerWithServer = async () => {
     if (!onTimeUp) return;
     if (attemptId && !loading && !offline) {
       try {
-        const res = await examService.getRemainingTime(attemptId);
-        const data = res.data;
-        if (data) {
-          if (typeof data.beginnerTimeRemaining === 'number') {
-            setBeginnerTimeRemaining(data.beginnerTimeRemaining);
-          }
-          if (typeof data.intermediateTimeRemaining === 'number') {
-            setIntermediateTimeRemaining(data.intermediateTimeRemaining);
-          }
-          if (typeof data.advancedTimeRemaining === 'number') {
-            setAdvancedTimeRemaining(data.advancedTimeRemaining);
-          }
-          const total = (data.beginnerTimeRemaining || 0) + (data.intermediateTimeRemaining || 0) + (data.advancedTimeRemaining || 0);
-          if (total <= 0) {
-            setShowTimeUp(true);
-            if (onTimeUp) onTimeUp();
-          }
+        const total = (beginnerTimeRemaining || 0) + (intermediateTimeRemaining || 0) + (advancedTimeRemaining || 0);
+        if (total <= 0 && beginnerTimeRemaining !== null && beginnerTimeRemaining !== undefined) {
+          setShowTimeUp(true);
+          if (onTimeUp) onTimeUp();
         }
       } catch (err) {
         console.error('Failed to sync timer with server:', err);
@@ -60,26 +47,17 @@ export function useExamTimer(onTimeUp) {
     }
   };
 
-  // Sync on load, periodically, and on focus/visibility change
+  // Periodically check expiration
   useEffect(() => {
     if (!onTimeUp) return;
     syncTimerWithServer();
 
-    const intervalId = setInterval(syncTimerWithServer, 60000);
-
-    const handleFocus = () => {
-      syncTimerWithServer();
-    };
-
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleFocus);
+    const intervalId = setInterval(syncTimerWithServer, 30000);
 
     return () => {
       clearInterval(intervalId);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleFocus);
     };
-  }, [attemptId, loading, offline, onTimeUp]);
+  }, [attemptId, loading, offline, onTimeUp, beginnerTimeRemaining, intermediateTimeRemaining, advancedTimeRemaining]);
 
   // Local second-by-second countdown for the active section
   useEffect(() => {
@@ -115,6 +93,17 @@ export function useExamTimer(onTimeUp) {
 
     return () => clearInterval(interval);
   }, [loading, offline, activeSection, onTimeUp, setBeginnerTimeRemaining, setIntermediateTimeRemaining, setAdvancedTimeRemaining]);
+
+  const [warnedSections, setWarnedSections] = useState(new Set());
+
+  // Handle last minute (60 seconds) warning message
+  useEffect(() => {
+    if (loading) return;
+    if (activeTimeRemaining === 60 && !warnedSections.has(activeSection)) {
+      setWarnedSections((prev) => new Set([...prev, activeSection]));
+      alert("You have only 60 seconds to submit the answers for this section.");
+    }
+  }, [activeTimeRemaining, activeSection, warnedSections, loading]);
 
   // Handle section expiration alerts
   useEffect(() => {
