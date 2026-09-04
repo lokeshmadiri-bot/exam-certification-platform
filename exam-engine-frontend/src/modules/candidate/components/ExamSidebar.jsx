@@ -36,7 +36,7 @@ export default function Sidebar({ durationSeconds }) {
 
   const totalTimeRemaining = (beginnerTimeRemaining || 0) + (intermediateTimeRemaining || 0) + (advancedTimeRemaining || 0);
 
-  const activeSectionLabel = activeSection === 'HARD' ? 'Advanced' : (activeSection === 'MEDIUM' ? 'Intermediate' : 'Beginner');
+  const activeSectionLabel = activeSection === 'HARD' ? 'Sec 3' : (activeSection === 'MEDIUM' ? 'Sec 2' : 'Sec 1');
   const activeTimeRemaining = activeSection === 'HARD'
     ? advancedTimeRemaining
     : (activeSection === 'MEDIUM' ? intermediateTimeRemaining : beginnerTimeRemaining);
@@ -72,25 +72,25 @@ export default function Sidebar({ durationSeconds }) {
         <div 
           style={{
             padding: '16px 20px',
-            backgroundColor: 'rgba(255, 255, 255, 0.02)',
+            backgroundColor: '#f8fafc',
             borderRadius: '12px',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
+            border: '1px solid #e2e8f0',
             display: 'flex',
             flexDirection: 'column',
             gap: '12px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
             userSelect: 'none'
           }}
         >
           <div 
             style={{
               fontSize: '11px',
-              color: '#8A99AE',
+              color: '#475569',
               fontWeight: '700',
               textTransform: 'uppercase',
               letterSpacing: '1px',
               fontFamily: 'monospace',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              borderBottom: '1px solid #e2e8f0',
               paddingBottom: '8px',
               marginBottom: '2px'
             }}
@@ -107,17 +107,36 @@ export default function Sidebar({ durationSeconds }) {
           ].map(({ className, label }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span className={`w-3.5 h-3.5 rounded-sm shrink-0 border ${className}`} style={{ display: 'inline-block' }} />
-              <span style={{ fontSize: '11.5px', color: '#cbd5e1', fontWeight: '600', fontFamily: 'sans-serif' }}>{label}</span>
+              <span style={{ fontSize: '11.5px', color: '#1e293b', fontWeight: '600', fontFamily: 'sans-serif' }}>{label}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* Action Row - Pinned to bottom of the sidebar container */}
-      <div className="shrink-0 pt-4 border-t border-white/10 flex flex-col">
+      <div className="shrink-0 pt-4 border-t border-slate-200 flex flex-col">
         <button
           onClick={() => setShowConfirmSubmit(true)}
-          className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-slate-950 font-extrabold text-[15px] shadow-[0_4px_18px_rgba(234,179,8,0.45)] transition-all duration-200 active:scale-[0.98] border border-yellow-300/50 tracking-wide cursor-pointer flex items-center justify-center gap-2"
+          style={{
+            width: '100%',
+            padding: '8px 16px',
+            borderRadius: '9999px',
+            background: '#F5A623',
+            backgroundColor: '#F5A623',
+            color: '#2C1A00',
+            fontWeight: '800',
+            fontSize: '12.5px',
+            border: '1px solid #f7b64a',
+            boxShadow: '0 3px 10px rgba(245, 166, 35, 0.4)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#e09518'; }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#F5A623'; }}
         >
           Submit All
         </button>

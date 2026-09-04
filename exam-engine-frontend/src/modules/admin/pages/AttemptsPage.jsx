@@ -82,27 +82,38 @@ export default function AttemptsPage() {
 
   const displayRows = useMemo(() => {
     let rows = data.rows || [];
-    if (!isReviewPage) {
+
+    const reviewStatus = filters.result ? filters.result.toUpperCase() : "";
+    if (reviewStatus === "NEEDS_REVIEW") {
       rows = rows.filter((r) => {
         const res = (r.result || "").toUpperCase();
-        return res !== "NEEDS_REVIEW" && res !== "IN_PROGRESS";
+        return res === "NEEDS_REVIEW" || res === "IN_PROGRESS" || !r.isReviewed;
       });
-    } else {
-      const reviewStatus = filters.result;
-      if (reviewStatus === "NEEDS_REVIEW") {
-        rows = rows.filter((r) => {
-          const res = (r.result || "").toUpperCase();
-          return res === "NEEDS_REVIEW" || res === "IN_PROGRESS";
-        });
-      } else if (reviewStatus === "REVIEWED") {
-        rows = rows.filter((r) => {
-          const res = (r.result || "").toUpperCase();
-          return res === "CONFIRMED" || res === "REJECTED" || res === "REVIEWED" || res === "PUBLISHED" || res === "PASS" || res === "FAIL";
-        });
-      }
+    } else if (reviewStatus === "REVIEWED") {
+      rows = rows.filter((r) => {
+        const res = (r.result || "").toUpperCase();
+        return r.isReviewed || ["CONFIRMED", "REJECTED", "REVIEWED", "PUBLISHED", "PASS", "FAIL"].includes(res);
+      });
+    } else if (reviewStatus) {
+      rows = rows.filter((r) => (r.result || "").toUpperCase() === reviewStatus);
     }
-    return rows;
-  }, [data.rows, isReviewPage, filters.result]);
+
+    // Sort: First all Needs Review exams display at the top, then all Reviewed exams display below
+    return [...rows].sort((a, b) => {
+      const resA = (a.result || "").toUpperCase();
+      const resB = (b.result || "").toUpperCase();
+
+      const isReviewedA = a.isReviewed === true || ["CONFIRMED", "REJECTED", "REVIEWED", "PUBLISHED", "PASS", "FAIL"].includes(resA);
+      const isReviewedB = b.isReviewed === true || ["CONFIRMED", "REJECTED", "REVIEWED", "PUBLISHED", "PASS", "FAIL"].includes(resB);
+
+      if (!isReviewedA && isReviewedB) return -1;
+      if (isReviewedA && !isReviewedB) return 1;
+
+      const dateA = new Date(a.submittedAt || a.createdAt || 0).getTime();
+      const dateB = new Date(b.submittedAt || b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
+  }, [data.rows, filters.result]);
 
   return (
     <div className="a2-page">
@@ -171,7 +182,9 @@ export default function AttemptsPage() {
                 {isReviewPage ? (
                   <tr>
                     <th>Exam</th><th>Candidate</th><th>Stack</th>
-                    <th style={{ textAlign: "center" }}>Status</th><th>Submitted</th>
+                    <th style={{ textAlign: "center" }}>Status</th>
+                    <th>Submitted</th>
+                    <th>Reviewed Date</th>
                   </tr>
                 ) : (
                   <tr>
@@ -201,37 +214,54 @@ export default function AttemptsPage() {
                       )}
                       <td style={{ textAlign: "center" }}>
                         {isReviewPage ? (
-                          (filters.result === "REVIEWED" || ["CONFIRMED", "REJECTED", "REVIEWED", "PUBLISHED", "PASS", "FAIL"].includes((r.result || "").toUpperCase())) ? (
-                            <span className="a2-pill a2-pill-green">Reviewed</span>
+                          (filters.result === "REVIEWED" || r.isReviewed || ["CONFIRMED", "ACCEPTED", "REJECTED", "REVIEWED", "PUBLISHED", "PASS", "FAIL"].includes((r.result || "").toUpperCase())) ? (
+                            r.adminDecision === "REJECTED" ? (
+                              <span className="a2-pill a2-pill-red">Rejected</span>
+                            ) : (r.adminDecision === "CONFIRMED" || r.adminDecision === "ACCEPTED") ? (
+                              <span className="a2-pill a2-pill-green">Accepted</span>
+                            ) : (
+                              <span className="a2-pill a2-pill-green">Reviewed</span>
+                            )
                           ) : (
                             <span className="a2-pill a2-pill-amber">Needs review</span>
                           )
                         ) : (
-                          <ResultPill result={r.result} />
+                          <ResultPill result={r.adminDecision === "REJECTED" ? "REJECTED" : (r.adminDecision === "CONFIRMED" || r.adminDecision === "ACCEPTED") ? "CONFIRMED" : r.result} />
                         )}
                       </td>
                       {!isReviewPage && <td style={{ textAlign: "center" }}>{r.score}</td>}
                       {!isReviewPage && (
                         <td style={{ textAlign: "center" }}>
-                          {r.flagCount > 0 ? (
-                            <span className="a2-pill a2-pill-amber">{r.flagCount}</span>
+                          {(r.flagCount || r.flagsCount || r.flags || 0) > 0 ? (
+                            <span className="a2-pill a2-pill-amber">{r.flagCount || r.flagsCount || r.flags}</span>
                           ) : (
                             <span style={{ color: "var(--a2-sub-color)", fontSize: "13px" }}>0</span>
                           )}
                         </td>
                       )}
-                      <td>{new Date(r.submittedAt).toLocaleString()}</td>
+                      <td>{r.submittedAt ? new Date(r.submittedAt).toLocaleString() : "—"}</td>
+                      {isReviewPage && (
+                        <td>
+                          {r.reviewedDate || r.publishedAt ? new Date(r.reviewedDate || r.publishedAt).toLocaleString() : "—"}
+                        </td>
+                      )}
                     </tr>
 
                     {/* Row drill-down - Only available on Review & Flags page */}
                     {isReviewPage && expanded === r.id && (
                       <tr className="a2-drill">
-                        <td colSpan={5}>
+                        <td colSpan={6}>
                           <div className="a2-drill-body">
                             <div className="a2-drill-facts">
                               <Fact label="Duration" value={`${r.durationMin || 60} min`} />
                               <Fact label="Integrity flags" value={r.flagCount} />
-                              <Fact label="Status" value={filters.result === "REVIEWED" || ["CONFIRMED", "REJECTED", "REVIEWED", "PUBLISHED", "PASS", "FAIL"].includes((r.result || "").toUpperCase()) ? "Reviewed" : "Needs review"} />
+                              <Fact label="Status" value={
+                                r.adminDecision === "REJECTED" ? "Rejected" :
+                                (r.adminDecision === "CONFIRMED" || r.adminDecision === "ACCEPTED") ? "Accepted" :
+                                (filters.result === "REVIEWED" || r.isReviewed || ["CONFIRMED", "REJECTED", "REVIEWED", "PUBLISHED", "PASS", "FAIL"].includes((r.result || "").toUpperCase())) ? "Reviewed" : "Needs review"
+                              } />
+                              <Fact label="Submitted date" value={r.submittedAt ? new Date(r.submittedAt).toLocaleString() : "—"} />
+                              <Fact label="Reviewed date" value={r.reviewedDate || r.publishedAt ? new Date(r.reviewedDate || r.publishedAt).toLocaleString() : "—"} />
                             </div>
                             <div className="a2-drill-actions">
                               <button
@@ -286,14 +316,15 @@ export function ResultPill({ result }) {
     NEEDS_REVIEW: ["a2-pill-amber", "Needs review"],
     IN_PROGRESS: ["a2-pill-amber", "Needs review"],
     REVIEWED: ["a2-pill-green", "Reviewed"],
-    CONFIRMED: ["a2-pill-green", "Reviewed"],
-    REJECTED: ["a2-pill-green", "Reviewed"],
+    CONFIRMED: ["a2-pill-green", "Accepted"],
+    ACCEPTED: ["a2-pill-green", "Accepted"],
+    REJECTED: ["a2-pill-red", "Rejected"],
     PUBLISHED: ["a2-pill-green", "Reviewed"],
   };
   const upper = (result || "").toUpperCase();
   const [cls, text] = map[upper] || [
-    (upper === "CONFIRMED" || upper === "REJECTED" || upper === "REVIEWED" || upper === "PUBLISHED") ? "a2-pill-green" : "",
-    (upper === "CONFIRMED" || upper === "REJECTED" || upper === "REVIEWED" || upper === "PUBLISHED") ? "Reviewed" : (result ? result.replace("_", " ") : "—")
+    upper === "REJECTED" ? "a2-pill-red" : (upper === "CONFIRMED" || upper === "ACCEPTED" || upper === "REVIEWED" || upper === "PUBLISHED") ? "a2-pill-green" : "",
+    upper === "REJECTED" ? "Rejected" : (upper === "CONFIRMED" || upper === "ACCEPTED") ? "Accepted" : (upper === "REVIEWED" || upper === "PUBLISHED") ? "Reviewed" : (result ? result.replace("_", " ") : "—")
   ];
   return <span className={`a2-pill ${cls}`}>{text}</span>;
 }

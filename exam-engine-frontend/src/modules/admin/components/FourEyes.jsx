@@ -17,8 +17,8 @@ export function TwoPersonRuleBanner({ text }) {
                 <line x1="12" y1="17" x2="12.01" y2="17" />
             </svg>
             <div>
-                <strong>Two-person rule.</strong>{" "}
-                {text || "This action requires approval from another administrator."}
+                <strong>Approval Required.</strong>{" "}
+                {text || "This action requires administrator approval."}
             </div>
         </div>
     );

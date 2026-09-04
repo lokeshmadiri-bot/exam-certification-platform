@@ -195,9 +195,9 @@ function ExamRunnerContent() {
         const iTime = Math.max(1200, (iCount > 0 ? iCount : 5) * 150);
         const aTime = Math.max(1500, (aCount > 0 ? aCount : 5) * 240);
 
-        setBeginnerTimeRemaining(bTime);
-        setIntermediateTimeRemaining(iTime);
-        setAdvancedTimeRemaining(aTime);
+        setBeginnerTimeRemaining(prev => (prev !== null && prev !== undefined ? prev : bTime));
+        setIntermediateTimeRemaining(prev => (prev !== null && prev !== undefined ? prev : iTime));
+        setAdvancedTimeRemaining(prev => (prev !== null && prev !== undefined ? prev : aTime));
 
         setSections(loadedSections);
         setQuestions(allQuestions);
@@ -210,7 +210,7 @@ function ExamRunnerContent() {
       }
     }
     loadAttempt();
-  }, [attemptId, setQuestions, setLoading, setAttemptId, setSections, setAnswers, navigate, setStrikes, setBeginnerTimeRemaining, setIntermediateTimeRemaining, setAdvancedTimeRemaining]);
+  }, [attemptId]);
 
   const handleGradingSubmit = async (forceSubmit = false) => {
     if (terminatedState) {
@@ -261,7 +261,7 @@ function ExamRunnerContent() {
     }
   };
 
-  useExamTimer(terminatedState ? null : () => handleGradingSubmit(true));
+  const { renderTimerModals } = useExamTimer(terminatedState ? null : () => handleGradingSubmit(true));
 
   // Maintain refs for unload/sendBeacon handlers to access latest values
   const answersRef = React.useRef(answers);
@@ -454,8 +454,8 @@ function ExamRunnerContent() {
   }
 
   return (
-    <div ref={runnerRef} className="runner fixed inset-0 z-50 bg-[#081322] flex items-center justify-center p-5 sm:p-6 overflow-hidden select-none">
-      <div className="w-full h-full max-w-[1600px] bg-gradient-to-br from-[#081627] to-[#102a4d] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden relative">
+    <div ref={runnerRef} className="runner fixed inset-0 z-50 bg-white flex items-center justify-center p-5 sm:p-6 overflow-hidden select-none" style={{ backgroundColor: '#ffffff' }}>
+      <div className="w-full h-full max-w-[1600px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden relative text-slate-800" style={{ backgroundColor: '#ffffff' }}>
         {/* Proctoring Active Violation Overlay */}
         {activeViolationOverlay && (
           <div className="run-overlay absolute inset-0 z-[9999] bg-[#061222]/95 backdrop-blur-md flex items-center justify-center select-none">
@@ -491,6 +491,7 @@ function ExamRunnerContent() {
         <OfflineOverlay isOpen={!online || offline} />
         <ReconnectLoader isOpen={syncing || reconnecting} />
         <TimeUpModal isOpen={isTimeUp} />
+        {renderTimerModals && renderTimerModals()}
         <ViolationSummaryModal
           isOpen={showViolationSummary}
           summary={summaryData}
@@ -498,6 +499,20 @@ function ExamRunnerContent() {
           onClose={() => setShowViolationSummary(false)}
         />
         <ThankYouPage isOpen={showThankYouPage} attemptId={attemptId} />
+        
+        {/* Instant full-screen submission overlay (prevents 1-2s flash of questions) */}
+        {submittingState && !showThankYouPage && (
+          <div className="fixed inset-0 z-[999999] bg-[#040a16]/98 backdrop-blur-xl flex flex-col items-center justify-center text-center p-6 select-none animate-in fade-in duration-200">
+            <div className="relative mb-6">
+              <div className="w-20 h-20 border-4 border-sky-500/20 border-t-sky-400 rounded-full animate-spin shadow-[0_0_30px_rgba(56,189,248,0.3)]"></div>
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-2 font-display tracking-tight">Finalizing Exam Submission</h3>
+            <p className="text-sky-200/70 text-sm max-w-[380px] leading-relaxed">
+              Please wait while your responses and proctoring integrity record are securely processed...
+            </p>
+          </div>
+        )}
+
         <Reconnect />
         <SubmitConfirmation onConfirm={handleInitialSubmitTrigger} />
         <SubmitErrorModal isOpen={!!submitError} message={submitError} onClose={() => setSubmitError('')} />

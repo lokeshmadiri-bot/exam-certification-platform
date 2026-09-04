@@ -91,11 +91,14 @@ public class CandidateService {
                                 ResultPublishStatus.PUBLISHED);
 
                 // Recent Attempts
-                List<AttemptHistoryResponseDTO> recentAttempts = attemptRepository
-                                .findByCandidateIdOrderByCreatedAtDesc(candidate.getId())
+                List<ExamAttempt> attempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(candidate.getId());
+                Map<String, ApprovalRequest> approvalMap = loadApprovalMap();
+                Map<UUID, List<CompetencyBand>> bandsMap = loadBandsMap();
+
+                List<AttemptHistoryResponseDTO> recentAttempts = attempts
                                 .stream()
                                 .limit(5)
-                                .map(this::mapAttemptHistory)
+                                .map(a -> mapAttemptHistory(a, attempts, approvalMap, bandsMap))
                                 .toList();
 
                 return CandidateDashboardResponseDTO.builder()
@@ -128,9 +131,11 @@ public class CandidateService {
                                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found."));
 
                 List<ExamAttempt> attempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(candidate.getId());
+                Map<String, ApprovalRequest> approvalMap = loadApprovalMap();
+                Map<UUID, List<CompetencyBand>> bandsMap = loadBandsMap();
 
                 return attempts.stream()
-                                .map(this::mapAttemptHistory)
+                                .map(a -> mapAttemptHistory(a, attempts, approvalMap, bandsMap))
                                 .toList();
         }
 
@@ -273,42 +278,77 @@ public class CandidateService {
                                  .toList();
         }
 
+        private Map<String, ApprovalRequest> loadApprovalMap() {
+                List<ApprovalRequest> candidateApprovals = approvalRepository != null 
+                        ? approvalRepository.findAll().stream().filter(r -> r != null && "CANDIDATE_UNLOCK".equals(r.getType()) && "APPROVED".equals(r.getStatus())).toList() 
+                        : List.of();
+                Map<String, ApprovalRequest> map = new HashMap<>();
+                for (ApprovalRequest req : candidateApprovals) {
+                        if (req != null && req.getTargetId() != null && !map.containsKey(req.getTargetId())) {
+                                map.put(req.getTargetId(), req);
+                        }
+                }
+                return map;
+        }
+
+        private Map<UUID, List<CompetencyBand>> loadBandsMap() {
+                Map<UUID, List<CompetencyBand>> map = new HashMap<>();
+                if (competencyBandRepository != null) {
+                        for (CompetencyBand cb : competencyBandRepository.findAll()) {
+                                if (cb != null && cb.getExam() != null && cb.getExam().getId() != null) {
+                                        map.computeIfAbsent(cb.getExam().getId(), k -> new ArrayList<>()).add(cb);
+                                }
+                        }
+                }
+                return map;
+        }
+
         private AttemptHistoryResponseDTO mapAttemptHistory(ExamAttempt attempt) {
- 
+                return mapAttemptHistory(attempt, List.of(attempt), loadApprovalMap(), loadBandsMap());
+        }
+
+        private AttemptHistoryResponseDTO mapAttemptHistory(
+                ExamAttempt attempt,
+                List<ExamAttempt> candidateAttempts,
+                Map<String, ApprovalRequest> approvalMap,
+                Map<UUID, List<CompetencyBand>> bandsMap) {
+
                 boolean canAttempt = true;
                 int retryDaysLeft = 0;
 
                 boolean overrideExpired = false;
                 boolean overrideActive = false;
+                if (Boolean.TRUE.equals(attempt.getRetryOverrideApproved()) && attempt.getCandidate() != null) {
+                        Optional<ExamAttempt> newerAttempt = candidateAttempts.stream()
+                                        .filter(a -> a.getResultStatus() != ResultStatus.IN_PROGRESS 
+                                                  && AttemptService.isSameExam(a.getExam(), attempt.getExam())
+                                                  && a.getCreatedAt().isAfter(attempt.getCreatedAt()))
+                                        .findFirst();
+                        if (!newerAttempt.isPresent()) {
+                                overrideActive = true;
+                        }
+                }
 
-                if (Boolean.TRUE.equals(attempt.getRetryOverrideApproved())) {
-                        String targetKey = attempt.getCandidate().getId().toString();
-                        if (attempt.getExam() != null) {
-                                targetKey = attempt.getCandidate().getId().toString() + ":" + attempt.getExam().getId().toString();
+                if (!overrideActive && attempt.getCandidate() != null) {
+                        String candidateIdStr = attempt.getCandidate().getId().toString();
+                        String targetKey = attempt.getExam() != null ? candidateIdStr + ":" + attempt.getExam().getId().toString() : candidateIdStr;
+
+                        ApprovalRequest req = approvalMap.get(targetKey);
+                        if (req == null) {
+                                req = approvalMap.get(candidateIdStr);
                         }
-                        Optional<ApprovalRequest> approvalOpt = approvalRepository.findFirstByTypeAndTargetIdAndStatusOrderByResolvedAtDesc(
-                                "CANDIDATE_UNLOCK", targetKey, "APPROVED"
-                        );
-                        if (!approvalOpt.isPresent()) {
-                                approvalOpt = approvalRepository.findFirstByTypeAndTargetIdAndStatusOrderByResolvedAtDesc(
-                                        "CANDIDATE_UNLOCK", attempt.getCandidate().getId().toString(), "APPROVED"
-                                );
-                        }
-                        if (approvalOpt.isPresent()) {
-                                ApprovalRequest req = approvalOpt.get();
+                        if (req != null) {
                                 LocalDateTime approvedAt = req.getResolvedAt();
-                                if (approvedAt != null) {
-                                        LocalDateTime expiresAt = approvedAt.plusDays(overrideLockDurationDays);
+                                LocalDateTime refTime = attempt.getEndTime() != null ? attempt.getEndTime() : attempt.getCreatedAt();
+                                if (approvedAt != null && refTime != null && !refTime.isAfter(approvedAt)) {
+                                        int overrideDays = overrideLockDurationDays > 0 ? overrideLockDurationDays : 7;
+                                        LocalDateTime expiresAt = approvedAt.plusDays(overrideDays);
                                         if (LocalDateTime.now().isAfter(expiresAt)) {
                                                 overrideExpired = true;
                                         } else {
                                                 overrideActive = true;
                                         }
-                                } else {
-                                        overrideActive = true;
                                 }
-                        } else {
-                                overrideActive = true;
                         }
                 }
 
@@ -316,24 +356,41 @@ public class CandidateService {
                         canAttempt = true;
                         retryDaysLeft = 0;
                 } else {
-                        if (attempt.getEndTime() != null) {
-                                LocalDateTime retryDate = attempt.getEndTime().plusDays(retryLockDurationDays);
-                                canAttempt = !LocalDateTime.now().isBefore(retryDate);
-                                if (!canAttempt) {
-                                        retryDaysLeft = (int) ChronoUnit.DAYS.between(
-                                                        LocalDate.now(),
-                                                        retryDate.toLocalDate());
+                        ExamAttempt evalAttempt = attempt;
+                        if (attempt.getResultStatus() == ResultStatus.IN_PROGRESS && attempt.getCandidate() != null && attempt.getExam() != null) {
+                                Optional<ExamAttempt> completedOpt = candidateAttempts.stream()
+                                                .filter(a -> a.getResultStatus() != ResultStatus.IN_PROGRESS && AttemptService.isSameExam(a.getExam(), attempt.getExam()))
+                                                .findFirst();
+                                if (completedOpt.isPresent()) {
+                                        evalAttempt = completedOpt.get();
+                                }
+                        }
+
+                        if (evalAttempt.getResultStatus() != ResultStatus.IN_PROGRESS) {
+                                LocalDateTime refTime = evalAttempt.getEndTime() != null ? evalAttempt.getEndTime() : evalAttempt.getCreatedAt();
+                                if (refTime != null) {
+                                        int lockDays = retryLockDurationDays > 0 ? retryLockDurationDays : 30;
+                                        LocalDateTime retryDate = refTime.plusDays(lockDays);
+                                        canAttempt = !LocalDateTime.now().isBefore(retryDate);
+                                        if (!canAttempt) {
+                                                retryDaysLeft = (int) ChronoUnit.DAYS.between(
+                                                                LocalDate.now(),
+                                                                retryDate.toLocalDate());
+                                                if (retryDaysLeft <= 0) retryDaysLeft = 1;
+                                        }
                                 }
                         }
                 }
  
                 CompetencyBand band = null;
                 if (attempt.getExam() != null && attempt.getAssignedLevel() != null) {
-                    List<CompetencyBand> bands = competencyBandRepository.findByExamId(attempt.getExam().getId());
-                    band = bands.stream()
-                            .filter(cb -> cb.getLevelName() == attempt.getAssignedLevel())
-                            .findFirst()
-                            .orElse(null);
+                    List<CompetencyBand> bands = bandsMap.get(attempt.getExam().getId());
+                    if (bands != null) {
+                        band = bands.stream()
+                                .filter(cb -> cb.getLevelName() == attempt.getAssignedLevel())
+                                .findFirst()
+                                .orElse(null);
+                    }
                 }
  
                 boolean isDecided = attempt.getAdminDecision() != null &&
@@ -365,9 +422,9 @@ public class CandidateService {
 
                 return AttemptHistoryResponseDTO.builder()
                                 .attemptId(attempt.getId())
-                                .examId(attempt.getExam().getId())
-                                .examTitle(attempt.getExam().getTitle())
-                                .stack(attempt.getExam().getStack())
+                                .examId(attempt.getExam() != null ? attempt.getExam().getId() : null)
+                                .examTitle(attempt.getExam() != null ? attempt.getExam().getTitle() : "Certification Exam")
+                                .stack(attempt.getExam() != null ? attempt.getExam().getStack() : "General")
                                 .startedAt(attempt.getStartTime())
                                 .submittedAt(attempt.getEndTime())
                                 .resultStatus(finalStatus)

@@ -58,15 +58,68 @@ export default function CandidateCatalog() {
       </div>
 
       <div className="grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
-        {exams.filter(e => e.status === 'ACTIVE' && (!searchQuery || e.title.toLowerCase().includes(searchQuery.toLowerCase()) || (e.stack && e.stack.toLowerCase().includes(searchQuery.toLowerCase())))).map((exam) => {
+        {exams.filter(e => {
+          if (!e) return false;
+          const st = e.status ? String(e.status).toUpperCase() : 'ACTIVE';
+          const isStatusMatch = !e.status || st === 'ACTIVE' || st === 'DRAFT' || st === 'PUBLISHED' || st === 'INACTIVE';
+          const isSearchMatch = !searchQuery ||
+            (e.title && e.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            (e.stack && e.stack.toLowerCase().includes(searchQuery.toLowerCase()));
+          return isStatusMatch && isSearchMatch;
+        }).map((exam) => {
+          const currentExamId = exam.examId || exam.id;
           const styleIcon = getStackIcon(exam.stack);
-          const lastAttempt = attempts.find(a => a.examId === exam.examId);
-          const canAttempt = lastAttempt?.canAttempt ?? true;
-          const daysLeft = lastAttempt?.retryDaysLeft ?? 0;
+
+          const isSameExam = (a, e) => {
+            if (!a || !e) return false;
+            const aId = String(a.examId || a.id || a.exam?.id || '').toLowerCase().trim();
+            const eId = String(e.examId || e.id || '').toLowerCase().trim();
+            if (aId && eId && aId === eId) return true;
+
+            const aTitle = String(a.examTitle || a.title || '').toLowerCase().trim();
+            const eTitle = String(e.title || '').toLowerCase().trim();
+            if (aTitle && eTitle) {
+              if (aTitle === eTitle || aTitle.includes(eTitle) || eTitle.includes(aTitle)) return true;
+              if ((aTitle.includes('react') || aTitle.includes('frontend')) && (eTitle.includes('react') || eTitle.includes('frontend'))) return true;
+              if ((aTitle.includes('java') || aTitle.includes('full stack') || aTitle.includes('fullstack')) && (eTitle.includes('java') || eTitle.includes('full stack') || eTitle.includes('fullstack'))) return true;
+              if ((aTitle.includes('python') || aTitle.includes('backend')) && (eTitle.includes('python') || eTitle.includes('backend'))) return true;
+            }
+
+            const aStack = String(a.stack || '').toLowerCase().trim();
+            const eStack = String(e.stack || '').toLowerCase().trim();
+            if (aStack && eStack) {
+              if (aStack === eStack || aStack.includes(eStack) || eStack.includes(aStack)) return true;
+              if ((aStack.includes('react') || aStack.includes('frontend')) && (eStack.includes('react') || eStack.includes('frontend'))) return true;
+              if ((aStack.includes('java') || aStack.includes('fullstack') || aStack.includes('full stack')) && (eStack.includes('java') || eStack.includes('fullstack') || eStack.includes('full stack'))) return true;
+              if ((aStack.includes('python') || aStack.includes('backend')) && (eStack.includes('python') || eStack.includes('backend'))) return true;
+            }
+
+            return false;
+          };
+
+          const matchingAttempts = attempts.filter(a => isSameExam(a, exam));
+          let canAttempt = true;
+          let daysLeft = 0;
+
+          const lockedAttempt = matchingAttempts.find(a => a && (a.canAttempt === false || (a.canAttempt === undefined && ['PASSED', 'FAILED', 'SUBMITTED', 'TERMINATED'].includes(String(a.resultStatus || '').toUpperCase()))));
+
+          if (lockedAttempt) {
+            canAttempt = false;
+            daysLeft = lockedAttempt.retryDaysLeft || 30;
+          } else if (matchingAttempts.length > 0) {
+            const first = matchingAttempts[0];
+            if (first.canAttempt !== undefined && first.canAttempt !== null) {
+              canAttempt = Boolean(first.canAttempt);
+            } else {
+              const isFinished = ['PASSED', 'FAILED', 'SUBMITTED', 'TERMINATED'].includes(String(first.resultStatus || '').toUpperCase());
+              canAttempt = !isFinished;
+            }
+            daysLeft = first.retryDaysLeft || 0;
+          }
 
           return (
             <div
-              key={exam.examId}
+              key={currentExamId}
               className="group relative bg-white border border-[#E4EAF2] hover:border-[#2F6BFF]/40 rounded-2xl p-6 shadow-sm hover:shadow-[0_12px_28px_rgba(47,107,255,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col"
               style={{
                 display: 'flex',
@@ -121,7 +174,7 @@ export default function CandidateCatalog() {
                       Ready
                     </span>
                     <button
-                      onClick={() => navigate(`/candidate/instructions/${exam.examId}`)}
+                      onClick={() => navigate(`/candidate/instructions/${currentExamId}`)}
                       className="inline-flex items-center gap-1.5 bg-[#2F6BFF] hover:bg-[#1a56e8] text-white px-4.5 py-2.5 text-[12.5px] font-bold rounded-xl shadow-[0_4px_12px_rgba(47,107,255,0.15)] hover:shadow-[0_6px_20px_rgba(47,107,255,0.25)] transition-all duration-200"
                       style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#2F6BFF', color: '#ffffff', padding: '10px 18px', borderRadius: '12px', fontWeight: '700' }}
                     >
