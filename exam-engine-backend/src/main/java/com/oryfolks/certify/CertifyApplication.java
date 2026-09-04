@@ -93,8 +93,7 @@ public class CertifyApplication {
                         }
 
 
-                        // 2. Remove seeded dummy exams — only show admin-created exams in library.
-                        // Uses native SQL for correct FK cascade ordering across all dependent tables.
+                        // 2. Remove seeded dummy exams — only show active exams in library.
                         String[] dummyTitles = { "Selenium Certification", "API Testing", "DevOps" };
                         for (String title : dummyTitles) {
                                 String findExamSql = "SELECT id FROM exams WHERE title = ?";
@@ -127,6 +126,57 @@ public class CertifyApplication {
                                                         examId);
                                         jdbc.update("DELETE FROM exams WHERE id = CAST(? AS uuid)", examId);
                                 }
+                        }
+
+                        // 3. Ensure default active certification exams exist if database has no active exams
+                        if (examRepository.count() == 0) {
+                                com.oryfolks.certify.entity.Exam javaExam = com.oryfolks.certify.entity.Exam.builder()
+                                                .id(java.util.UUID.randomUUID())
+                                                .title("Java Full Stack Certification")
+                                                .stack("Java")
+                                                .durationMinutes(60)
+                                                .questionPool(25)
+                                                .perAttempt(25)
+                                                .passMark(60)
+                                                .totalMarks(100)
+                                                .version("1")
+                                                .status(com.oryfolks.certify.enums.ExamStatus.ACTIVE)
+                                                .difficultyMode("NONE")
+                                                .instructions("Ensure stable internet connection and webcam access during the examination.")
+                                                .build();
+                                examRepository.save(javaExam);
+
+                                com.oryfolks.certify.entity.Exam reactExam = com.oryfolks.certify.entity.Exam.builder()
+                                                .id(java.util.UUID.randomUUID())
+                                                .title("React.js Frontend Certification")
+                                                .stack("React")
+                                                .durationMinutes(45)
+                                                .questionPool(20)
+                                                .perAttempt(20)
+                                                .passMark(60)
+                                                .totalMarks(100)
+                                                .version("1")
+                                                .status(com.oryfolks.certify.enums.ExamStatus.ACTIVE)
+                                                .difficultyMode("NONE")
+                                                .instructions("Frontend proctored examination covering React fundamentals, hooks, and state management.")
+                                                .build();
+                                examRepository.save(reactExam);
+
+                                com.oryfolks.certify.entity.Exam pythonExam = com.oryfolks.certify.entity.Exam.builder()
+                                                .id(java.util.UUID.randomUUID())
+                                                .title("Python Backend Engineering")
+                                                .stack("Python")
+                                                .durationMinutes(50)
+                                                .questionPool(20)
+                                                .perAttempt(20)
+                                                .passMark(60)
+                                                .totalMarks(100)
+                                                .version("1")
+                                                .status(com.oryfolks.certify.enums.ExamStatus.ACTIVE)
+                                                .difficultyMode("NONE")
+                                                .instructions("Proctored assessment covering Python syntax, data structures, OOP, and backend services.")
+                                                .build();
+                                examRepository.save(pythonExam);
                         }
                 };
         }

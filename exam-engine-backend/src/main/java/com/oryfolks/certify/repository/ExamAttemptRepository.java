@@ -15,17 +15,17 @@ import java.util.UUID;
 @Repository
 public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> {
     
-    @Query("SELECT ea FROM ExamAttempt ea JOIN FETCH ea.exam WHERE ea.candidate.id = :candidateId ORDER BY ea.createdAt DESC")
+    @Query("SELECT ea FROM ExamAttempt ea LEFT JOIN FETCH ea.exam WHERE ea.candidate.id = :candidateId ORDER BY ea.createdAt DESC")
     List<ExamAttempt> findByCandidateIdOrderByCreatedAtDesc(@Param("candidateId") UUID candidateId);
 
     List<ExamAttempt> findByExamId(UUID examId);
 
     Optional<ExamAttempt> findFirstByCandidateIdAndExamIdOrderByCreatedAtDesc(UUID candidateId, UUID examId);
 
-    @Query("SELECT ea FROM ExamAttempt ea JOIN FETCH ea.exam ORDER BY ea.createdAt DESC")
+    @Query("SELECT DISTINCT ea FROM ExamAttempt ea LEFT JOIN FETCH ea.exam LEFT JOIN FETCH ea.candidate ORDER BY ea.createdAt DESC")
     List<ExamAttempt> findAllByOrderByCreatedAtDesc();
 
-    @Query("SELECT ea FROM ExamAttempt ea JOIN FETCH ea.exam WHERE ea.candidate.id = :candidateId ORDER BY ea.createdAt DESC")
+    @Query("SELECT ea FROM ExamAttempt ea LEFT JOIN FETCH ea.exam WHERE ea.candidate.id = :candidateId ORDER BY ea.createdAt DESC")
     List<ExamAttempt> findFirstByCandidateIdOrderByCreatedAtDescList(@Param("candidateId") UUID candidateId);
 
     default Optional<ExamAttempt> findFirstByCandidateIdOrderByCreatedAtDesc(UUID candidateId) {
@@ -43,6 +43,6 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> 
             UUID candidateId,
             ResultPublishStatus resultPublishStatus);
 
-    @Query("SELECT ea FROM ExamAttempt ea JOIN FETCH ea.exam WHERE ea.candidate.id = :candidateId ORDER BY ea.endTime DESC")
+    @Query("SELECT ea FROM ExamAttempt ea LEFT JOIN FETCH ea.exam WHERE ea.candidate.id = :candidateId ORDER BY ea.endTime DESC")
     List<ExamAttempt> findByCandidateIdOrderByEndTimeDesc(@Param("candidateId") UUID candidateId);
 }

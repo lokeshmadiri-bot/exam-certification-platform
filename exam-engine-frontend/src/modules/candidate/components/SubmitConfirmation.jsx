@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { useExam } from '../context/ExamContext';
 import { FileText, ArrowRight, X } from 'lucide-react';
 
@@ -12,11 +13,32 @@ export default function SubmitConfirmation({ onConfirm }) {
   const unansweredCount = totalQuestions - answeredQuestions;
   const progressPct = totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0;
 
-  return (
+  const easyQs = (questions || []).filter(q => {
+    const d = q.difficulty ? q.difficulty.trim().toUpperCase() : 'EASY';
+    return d !== 'MEDIUM' && d !== 'HARD';
+  });
+  const mediumQs = (questions || []).filter(q => q.difficulty?.trim().toUpperCase() === 'MEDIUM');
+  const hardQs = (questions || []).filter(q => q.difficulty?.trim().toUpperCase() === 'HARD');
+
+  const sectionBreakdown = [];
+  if (easyQs.length > 0) {
+    const unans = easyQs.filter(q => !answers || answers[q.id] === undefined || answers[q.id] === null || answers[q.id] === '').length;
+    sectionBreakdown.push({ label: 'Section 1', shortLabel: 'Sec 1', unanswered: unans, total: easyQs.length });
+  }
+  if (mediumQs.length > 0) {
+    const unans = mediumQs.filter(q => !answers || answers[q.id] === undefined || answers[q.id] === null || answers[q.id] === '').length;
+    sectionBreakdown.push({ label: 'Section 2', shortLabel: 'Sec 2', unanswered: unans, total: mediumQs.length });
+  }
+  if (hardQs.length > 0) {
+    const unans = hardQs.filter(q => !answers || answers[q.id] === undefined || answers[q.id] === null || answers[q.id] === '').length;
+    sectionBreakdown.push({ label: 'Section 3', shortLabel: 'Sec 3', unanswered: unans, total: hardQs.length });
+  }
+
+  return createPortal(
     <div
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        zIndex: 9999,
+        zIndex: 99999999,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         backgroundColor: 'rgba(6, 18, 34, 0.88)',
         backdropFilter: 'blur(8px)',
@@ -27,7 +49,7 @@ export default function SubmitConfirmation({ onConfirm }) {
       <div
         style={{
           backgroundColor: '#0c1f3a',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '20px',
           padding: '0',
           maxWidth: '480px',
@@ -144,15 +166,63 @@ export default function SubmitConfirmation({ onConfirm }) {
             </div>
           </div>
 
+          {/* Section-wise Unanswered Breakdown */}
           {unansweredCount > 0 && (
             <div style={{
-              marginTop: '14px',
-              padding: '10px 14px', borderRadius: '10px',
-              backgroundColor: 'rgba(242, 169, 59, 0.06)',
-              border: '1px solid rgba(242, 169, 59, 0.18)',
-              fontSize: '12.5px', color: '#c49535', lineHeight: '1.5'
+              marginTop: '16px',
+              padding: '14px 16px',
+              borderRadius: '12px',
+              backgroundColor: 'rgba(242, 169, 59, 0.05)',
+              border: '1px solid rgba(242, 169, 59, 0.2)'
             }}>
-              ⚠ {unansweredCount} question{unansweredCount > 1 ? 's are' : ' is'} unanswered. Unanswered questions will be marked as incorrect.
+              <div style={{
+                fontSize: '11px',
+                color: '#F2A93B',
+                fontWeight: '700',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                fontFamily: 'monospace',
+                marginBottom: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>⚠</span>
+                <span>Unanswered Breakdown by Section</span>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${Math.min(sectionBreakdown.length, 3)}, 1fr)`,
+                gap: '8px',
+                marginBottom: '10px'
+              }}>
+                {sectionBreakdown.map((sec) => (
+                  <div
+                    key={sec.label}
+                    style={{
+                      padding: '10px 8px',
+                      borderRadius: '10px',
+                      backgroundColor: sec.unanswered > 0 ? 'rgba(242, 169, 59, 0.12)' : 'rgba(16, 185, 129, 0.08)',
+                      border: `1px solid ${sec.unanswered > 0 ? 'rgba(242, 169, 59, 0.3)' : 'rgba(16, 185, 129, 0.25)'}`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <span style={{ fontSize: '11.5px', color: '#cdddf6', fontWeight: '600', marginBottom: '2px' }}>
+                      {sec.shortLabel}
+                    </span>
+                    <span style={{ fontSize: '16px', fontWeight: '800', fontFamily: 'monospace', color: sec.unanswered > 0 ? '#F2A93B' : '#34d27b' }}>
+                      {sec.unanswered} {sec.unanswered === 0 ? '✓' : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <p style={{ fontSize: '12px', color: '#c49535', margin: 0, lineHeight: '1.4' }}>
+                Unanswered questions will be marked as incorrect upon submission.
+              </p>
             </div>
           )}
         </div>
@@ -181,22 +251,23 @@ export default function SubmitConfirmation({ onConfirm }) {
             onClick={onConfirm}
             style={{
               flex: 1.5,
-              padding: '12px 24px', borderRadius: '12px',
-              border: 'none',
-              background: 'linear-gradient(135deg, #2F6BFF 0%, #1D4ED8 100%)',
-              color: '#ffffff', fontWeight: '700', fontSize: '13.5px',
+              padding: '12px 24px', borderRadius: '9999px',
+              border: '1px solid #f7b64a',
+              background: '#F5A623',
+              color: '#2C1A00', fontWeight: '800', fontSize: '13.5px',
               cursor: 'pointer', transition: 'all 0.18s ease',
-              boxShadow: '0 4px 16px rgba(47, 107, 255, 0.35)',
+              boxShadow: '0 4px 16px rgba(245, 166, 35, 0.45)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
             }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(47, 107, 255, 0.45)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(47, 107, 255, 0.35)'; }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(245, 166, 35, 0.6)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(245, 166, 35, 0.45)'; }}
           >
             <span>Submit Exam</span>
             <ArrowRight style={{ width: '15px', height: '15px' }} />
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.fullscreenElement || document.body
   );
 }

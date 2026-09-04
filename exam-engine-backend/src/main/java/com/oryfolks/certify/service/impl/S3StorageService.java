@@ -81,10 +81,10 @@ public class S3StorageService implements StorageService {
                 s3Client.createBucket(CreateBucketRequest.builder().bucket(bucketName).build());
                 System.out.println("Successfully created storage bucket: " + bucketName);
             } catch (Exception ex) {
-                throw new IllegalStateException("MinIO/S3 Configuration Error: Failed to auto-create required storage bucket '" + bucketName + "' on endpoint '" + endpoint + "': " + ex.getMessage(), ex);
+                System.err.println("Warning: Failed to auto-create storage bucket '" + bucketName + "': " + ex.getMessage());
             }
         } catch (Exception e) {
-            throw new IllegalStateException("MinIO/S3 Connection/Configuration Error: Storage bucket '" + bucketName + "' on endpoint '" + endpoint + "' is missing or inaccessible: " + e.getMessage(), e);
+            System.err.println("Warning: MinIO/S3 Storage endpoint '" + endpoint + "' is currently unreachable: " + e.getMessage() + ". Backend server will continue startup in resilient mode.");
         }
 
         // Set public read bucket policy to allow anonymous access to uploaded recordings/snapshots

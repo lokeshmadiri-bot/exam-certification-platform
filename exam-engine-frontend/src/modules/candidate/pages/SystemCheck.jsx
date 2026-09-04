@@ -15,6 +15,7 @@ export default function CandidateSystemCheck() {
   const [checking, setChecking] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [bypassAI, setBypassAI] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -178,7 +179,8 @@ export default function CandidateSystemCheck() {
 
   // ── Start exam ──────────────────────────────────────────────────────────────
   const handleStartExam = async () => {
-    if (!canStartExam) return;
+    if (!canStartExam || starting) return;
+    setStarting(true);
     setErrorMessage('');
     try {
       const res = await attemptService.startAttempt(examId);
@@ -187,9 +189,11 @@ export default function CandidateSystemCheck() {
         if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
         navigate(`/candidate/exam-runner/${res.data.attemptId}`);
       } else {
+        setStarting(false);
         setErrorMessage(res?.message || 'Failed to start the exam. Please try again.');
       }
     } catch (err) {
+      setStarting(false);
       const msg =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
@@ -209,6 +213,15 @@ export default function CandidateSystemCheck() {
   };
 
   const renderActionButton = () => {
+    if (starting) {
+      return (
+        <button disabled className="btn w-full flex items-center justify-center gap-2" style={{ width: '100%', padding: '14px 20px', borderRadius: '12px', background: '#F2A93B', color: '#3A2700', fontWeight: '700', fontSize: '14px', border: 'none', opacity: 0.85, cursor: 'wait' }}>
+          <Loader className="w-4 h-4 animate-spin text-[#3A2700]" />
+          Starting…
+        </button>
+      );
+    }
+
     if (checking) {
       return (
         <button disabled className="btn w-full flex items-center justify-center gap-2" style={{ width: '100%', padding: '14px 20px', borderRadius: '12px', background: 'rgba(47, 107, 255, 0.5)', color: '#ffffff', fontWeight: '600', fontSize: '14px', border: 'none', cursor: 'not-allowed' }}>
@@ -265,7 +278,7 @@ export default function CandidateSystemCheck() {
 
       // All clear
       return (
-        <button onClick={handleStartExam} className="btn w-full flex items-center justify-center gap-2" style={{ width: '100%', padding: '14px 20px', borderRadius: '12px', background: '#F2A93B', color: '#3A2700', fontWeight: '700', fontSize: '14px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(242, 169, 59, 0.4)', transition: 'all 0.2s ease' }}>
+        <button onClick={handleStartExam} className="btn w-full flex items-center justify-center gap-2" style={{ width: '100%', padding: '14px 20px', borderRadius: '9999px', background: '#F5A623', color: '#2C1A00', fontWeight: '800', fontSize: '14px', border: '1px solid #f7b64a', cursor: 'pointer', boxShadow: '0 4px 14px rgba(245, 166, 35, 0.4)', transition: 'all 0.2s ease' }}>
           <Play className="w-4 h-4 fill-current" />
           Start Exam
         </button>

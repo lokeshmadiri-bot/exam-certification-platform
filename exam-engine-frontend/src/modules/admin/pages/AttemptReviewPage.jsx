@@ -22,6 +22,8 @@ export default function AttemptReviewPage() {
   const [decision, setDecision] = useState({ open: null, note: "", busy: false, done: null });
   const [videoTime, setVideoTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
 
   useEffect(() => {
     fetchAttempt(attemptId).then(setAttempt);
@@ -30,23 +32,56 @@ export default function AttemptReviewPage() {
     fetchScore(attemptId).then(setScore);
   }, [attemptId]);
 
+  const handleTimeUpdate = (e) => {
+    const cur = e.target.currentTime;
+    setVideoTime(cur);
+    const dur = e.target.duration;
+    if (isFinite(dur) && dur > 0) {
+      setVideoDuration(dur);
+    } else if (e.target.seekable && e.target.seekable.length > 0) {
+      const sEnd = e.target.seekable.end(e.target.seekable.length - 1);
+      if (isFinite(sEnd) && sEnd > 0) {
+        setVideoDuration(sEnd);
+      }
+    }
+  };
+
   const seekTo = (tSec, flagId) => {
-    setActiveFlag(flagId);
+    if (flagId) setActiveFlag(flagId);
     if (videoRef.current) {
       videoRef.current.currentTime = tSec;
+      setVideoTime(tSec);
       videoRef.current.play().catch(() => { });
+      setIsPlaying(true);
     }
   };
 
   const togglePlay = () => {
     if (videoRef.current) {
       if (videoRef.current.paused) {
-        videoRef.current.play().catch((err) => {
+        videoRef.current.play().then(() => setIsPlaying(true)).catch((err) => {
           console.warn("Failed to play video via click:", err);
         });
       } else {
         videoRef.current.pause();
+        setIsPlaying(false);
       }
+    }
+  };
+
+  const toggleMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted;
+      setIsMuted(videoRef.current.muted);
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (!videoRef.current) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      videoRef.current.requestFullscreen().catch(() => {});
     }
   };
 
@@ -60,7 +95,15 @@ export default function AttemptReviewPage() {
     const fn = decision.open === "confirm" ? confirmResult : rejectResult;
     const res = await fn(attemptId, payload);
     const updatedStatus = decision.open === "confirm" ? "CONFIRMED" : "REJECTED";
-    setAttempt((prev) => prev ? { ...prev, result: updatedStatus, adminDecision: updatedStatus, resultPublishStatus: "PUBLISHED" } : prev);
+    setAttempt((prev) => prev ? {
+      ...prev,
+      result: updatedStatus,
+      adminDecision: updatedStatus,
+      rejectionReason: decision.open === "reject" ? decision.note : prev.rejectionReason,
+      resultPublishStatus: "PUBLISHED",
+      publishedAt: new Date().toISOString(),
+      reviewedDate: new Date().toISOString()
+    } : prev);
     setDecision({ open: null, note: "", busy: false, done: res.status });
     setTimeout(() => {
       navigate("/admin/review");
@@ -100,6 +143,11 @@ export default function AttemptReviewPage() {
   }
 
   const sortedFlags = flags?.items ? [...flags.items].sort((a, b) => (a.tSec || 0) - (b.tSec || 0)) : [];
+  const maxFlagSec = sortedFlags.reduce((max, f) => Math.max(max, f.tSec || 0), 0);
+  const effectiveDuration = (isFinite(videoDuration) && videoDuration > 0)
+    ? videoDuration
+    : (maxFlagSec > 0 ? maxFlagSec + 10 : (attempt?.durationMin ? attempt.durationMin * 60 : 60));
+
   const isAlreadyReviewed = attempt && (
     attempt.isReviewed === true ||
     attempt.result === "CONFIRMED" || attempt.result === "REJECTED" || attempt.result === "REVIEWED" || attempt.result === "PUBLISHED" || attempt.result === "PASS" || attempt.result === "FAIL" ||
@@ -138,14 +186,15 @@ export default function AttemptReviewPage() {
               ATTEMPT REVIEW
             </div>
             <h1 style={{ fontSize: "17px", fontWeight: "700", color: "#ffffff", margin: 0, letterSpacing: "-0.2px" }}>
-              {attempt.exam || attempt.examTitle || "Exam Attempt"} · {attempt.candidate || "Candidate"} · {attempt.stack} · {attempt.level}
+              {attempt.exam || attempt.examTitle || "Exam Attempt"} / {attempt.candidate || "Candidate"}
             </h1>
-            <div style={{ fontSize: "11.5px", color: "#4a6a9e", fontFamily: "monospace", marginTop: "2px" }}>
-              {attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleString() : "—"}
-            </div>
           </div>
         </div>
-        <ResultPill result={isAlreadyReviewed ? "REVIEWED" : attempt.result} />
+        <ResultPill result={
+          attempt.adminDecision === "REJECTED" ? "REJECTED" :
+          (attempt.adminDecision === "CONFIRMED" || attempt.adminDecision === "ACCEPTED") ? "CONFIRMED" :
+          (isAlreadyReviewed ? "REVIEWED" : attempt.result)
+        } />
       </div>
 
       <style>{`
@@ -179,25 +228,158 @@ export default function AttemptReviewPage() {
             </div>
 
             {recording?.url ? (
-              <video
-                key={recording.url}
-                ref={videoRef}
-                controls
-                preload="auto"
-                onTimeUpdate={e => setVideoTime(e.target.currentTime)}
-                onLoadedMetadata={e => {
-                  const dur = e.target.duration;
-                  if (isFinite(dur) && dur > 0) setVideoDuration(dur);
-                }}
-                onDurationChange={e => {
-                  const dur = e.target.duration;
-                  if (isFinite(dur) && dur > 0) setVideoDuration(dur);
-                }}
-                style={{ width: "100%", height: "auto", aspectRatio: "1.3333 / 1", maxHeight: "360px", objectFit: "contain", backgroundColor: "#000", display: "block" }}
-              >
-                <source src={getFullVideoUrl(recording.url)} type="video/webm" />
-                Your browser does not support HTML5 WebM video.
-              </video>
+              <div style={{ position: "relative", backgroundColor: "#000" }}>
+                <video
+                  key={recording.url}
+                  ref={videoRef}
+                  preload="auto"
+                  onClick={togglePlay}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onEnded={() => setIsPlaying(false)}
+                  onTimeUpdate={handleTimeUpdate}
+                  onLoadedMetadata={handleTimeUpdate}
+                  onDurationChange={handleTimeUpdate}
+                  style={{ width: "100%", height: "auto", aspectRatio: "1.3333 / 1", maxHeight: "360px", objectFit: "contain", backgroundColor: "#000", display: "block", cursor: "pointer" }}
+                >
+                  <source src={getFullVideoUrl(recording.url)} type="video/webm" />
+                  Your browser does not support HTML5 WebM video.
+                </video>
+
+                {/* Single Unified Player Control Bar with White Line & Flag Markers */}
+                <div style={{ padding: "12px 18px 14px", backgroundColor: "#061224", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {/* The White Line track */}
+                  <div
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                      const targetSec = pct * effectiveDuration;
+                      if (videoRef.current) {
+                        videoRef.current.currentTime = targetSec;
+                        setVideoTime(targetSec);
+                      }
+                    }}
+                    style={{
+                      position: "relative",
+                      height: "6px",
+                      backgroundColor: "rgba(255,255,255,0.2)",
+                      borderRadius: "3px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center"
+                    }}
+                  >
+                    {/* Progress Fill (White Line) */}
+                    <div
+                      style={{
+                        height: "100%",
+                        borderRadius: "3px",
+                        backgroundColor: "#FFFFFF",
+                        width: `${Math.min(100, (videoTime / effectiveDuration) * 100)}%`,
+                        pointerEvents: "none"
+                      }}
+                    />
+                    {/* Scrubber handle */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: `${Math.min(100, (videoTime / effectiveDuration) * 100)}%`,
+                        width: "12px",
+                        height: "12px",
+                        borderRadius: "50%",
+                        backgroundColor: "#FFFFFF",
+                        transform: "translateX(-50%)",
+                        boxShadow: "0 0 6px rgba(255,255,255,0.9)",
+                        pointerEvents: "none",
+                        zIndex: 4
+                      }}
+                    />
+                    {/* Violation Flag Markers directly on the White Line */}
+                    {sortedFlags.map((f) => {
+                      const posPct = Math.min(99, Math.max(0, ((f.tSec || 0) / effectiveDuration) * 100));
+                      return (
+                        <div
+                          key={f.id}
+                          title={`${f.type?.replace(/_/g, " ")} @ ${fmtTime(f.tSec)}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            seekTo(f.tSec, f.id);
+                          }}
+                          style={{
+                            position: "absolute",
+                            left: `${posPct}%`,
+                            top: "-4px",
+                            width: "4px",
+                            height: "14px",
+                            backgroundColor: "#E04F4F",
+                            borderRadius: "2px",
+                            cursor: "pointer",
+                            transform: "translateX(-50%)",
+                            zIndex: 5,
+                            boxShadow: "0 0 6px rgba(224, 79, 79, 0.9)"
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  {/* Player Controls Bar */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <button
+                        onClick={togglePlay}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#FFFFFF",
+                          fontSize: "14px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justify: "center",
+                          padding: "5px 10px",
+                          borderRadius: "6px",
+                          backgroundColor: "rgba(255,255,255,0.1)"
+                        }}
+                      >
+                        {isPlaying ? "❚❚" : "▶"}
+                      </button>
+                      <button
+                        onClick={toggleMute}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#8A99AE",
+                          fontSize: "14px",
+                          cursor: "pointer",
+                          padding: "4px 6px"
+                        }}
+                      >
+                        {isMuted ? "🔇" : "🔊"}
+                      </button>
+                      <span style={{ fontSize: "12px", color: "#FFFFFF", fontFamily: "monospace", fontWeight: "600" }}>
+                        {fmtTime(videoTime)} / {fmtTime(effectiveDuration)}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <button
+                        onClick={toggleFullscreen}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#8A99AE",
+                          fontSize: "14px",
+                          cursor: "pointer",
+                          padding: "4px 6px"
+                        }}
+                        title="Fullscreen"
+                      >
+                        ⛶
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div style={{
                 height: "300px", display: "flex", flexDirection: "column",
@@ -211,41 +393,6 @@ export default function AttemptReviewPage() {
                 {recording?.status && (
                   <div style={{ fontSize: "11px", color: "#2d4060", fontFamily: "monospace" }}>Status: {recording.status}</div>
                 )}
-              </div>
-            )}
-
-            {/* Scrub timeline bar */}
-            {videoDuration > 0 && (
-              <div style={{ padding: "10px 18px 14px", borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-                <div style={{ position: "relative", height: "4px", backgroundColor: "rgba(255,255,255,0.06)", borderRadius: "2px", cursor: "pointer" }}
-                  onClick={e => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const pct = (e.clientX - rect.left) / rect.width;
-                    if (videoRef.current) videoRef.current.currentTime = pct * videoDuration;
-                  }}
-                >
-                  <div style={{ height: "100%", borderRadius: "2px", backgroundColor: "#2F6BFF", width: `${(videoTime / videoDuration) * 100}%`, pointerEvents: "none" }} />
-                  {/* Violation markers */}
-                  {sortedFlags.map(f => (
-                    <div
-                      key={f.id}
-                      title={`${f.type?.replace(/_/g, " ")} @ ${fmtTime(f.tSec)}`}
-                      onClick={e => { e.stopPropagation(); seekTo(f.tSec, f.id); }}
-                      style={{
-                        position: "absolute", top: "-4px",
-                        left: `${Math.min(((f.tSec || 0) / videoDuration) * 100, 98)}%`,
-                        width: "3px", height: "12px",
-                        backgroundColor: "#E04F4F",
-                        borderRadius: "1px", cursor: "pointer",
-                        transform: "translateX(-50%)"
-                      }}
-                    />
-                  ))}
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "10px", color: "#3d5470", fontFamily: "monospace" }}>
-                  <span>{fmtTime(videoTime)}</span>
-                  <span>{fmtTime(videoDuration)}</span>
-                </div>
               </div>
             )}
           </div>
@@ -469,23 +616,54 @@ export default function AttemptReviewPage() {
 
           {/* Decision */}
           <div style={{ backgroundColor: "#0a1628", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", padding: "18px" }}>
-            <h2 style={{ fontSize: "13px", fontWeight: "700", color: "#e8eefb", margin: "0 0 8px" }}>Decision</h2>
+            <h2 style={{ fontSize: "13px", fontWeight: "700", color: "#e8eefb", margin: "0 0 12px" }}>Decision</h2>
             {isAlreadyReviewed ? (
-              <div style={{
-                padding: "14px",
-                backgroundColor: "rgba(22, 163, 74, 0.15)",
-                border: "1px solid rgba(22, 163, 74, 0.35)",
-                borderRadius: "10px",
-                color: "#4ade80",
-                fontSize: "13px",
-                fontWeight: "700",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px"
-              }}>
-                <span style={{ fontSize: "16px" }}>✓</span>
-                <span>Successfully Reviewed</span>
-              </div>
+              (attempt.adminDecision === "REJECTED" || attempt.result === "REJECTED") ? (
+                <div style={{
+                  padding: "16px",
+                  backgroundColor: "rgba(239, 68, 68, 0.12)",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  borderRadius: "10px",
+                  color: "#f87171",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "700", fontSize: "14px" }}>
+                    <span style={{ fontSize: "16px" }}>✕</span>
+                    <span>Rejected</span>
+                  </div>
+                  <div style={{ fontSize: "12.5px", color: "#fca5a5", lineHeight: "1.5" }}>
+                    <strong>Rejection Reason:</strong> {attempt.rejectionReason || "No reason specified"}
+                  </div>
+                  {(attempt.publishedAt || attempt.reviewedDate) && (
+                    <div style={{ fontSize: "11px", color: "#ef4444", opacity: 0.85, fontFamily: "monospace", marginTop: "4px" }}>
+                      Reviewed on: {new Date(attempt.publishedAt || attempt.reviewedDate).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{
+                  padding: "16px",
+                  backgroundColor: "rgba(22, 163, 74, 0.12)",
+                  border: "1px solid rgba(22, 163, 74, 0.3)",
+                  borderRadius: "10px",
+                  color: "#4ade80",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "700", fontSize: "14px" }}>
+                    <span style={{ fontSize: "16px" }}>✓</span>
+                    <span>Accepted</span>
+                  </div>
+                  {(attempt.publishedAt || attempt.reviewedDate) && (
+                    <div style={{ fontSize: "11px", color: "#22c55e", opacity: 0.85, fontFamily: "monospace", marginTop: "4px" }}>
+                      Reviewed on: {new Date(attempt.publishedAt || attempt.reviewedDate).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              )
             ) : (
               <>
                 <p style={{ fontSize: "12px", color: "#4a6a9e", lineHeight: "1.6", margin: "0 0 16px" }}>
