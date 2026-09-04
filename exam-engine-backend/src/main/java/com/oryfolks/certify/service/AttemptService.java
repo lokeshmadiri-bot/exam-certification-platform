@@ -109,8 +109,8 @@ public class AttemptService {
                                         );
                                 }
                                 if (approvalOpt.isPresent()) {
-                                        ApprovalRequest req = approvalOpt.get();
-                                        LocalDateTime approvedAt = req.getResolvedAt();
+                                         ApprovalRequest req = approvalOpt.get();
+                                        LocalDateTime approvedAt = req.getResolvedAt() != null ? req.getResolvedAt() : (req.getRequestedAt() != null ? req.getRequestedAt() : req.getCreatedAt());
                                         LocalDateTime refTime = lastCompleted.getEndTime() != null ? lastCompleted.getEndTime() : lastCompleted.getCreatedAt();
                                         if (approvedAt != null && refTime != null && !refTime.isAfter(approvedAt)) {
                                                 int overrideDays = overrideLockDurationDays > 0 ? overrideLockDurationDays : 7;

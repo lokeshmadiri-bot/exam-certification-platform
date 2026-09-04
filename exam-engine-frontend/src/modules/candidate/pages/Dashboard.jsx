@@ -256,20 +256,16 @@ export default function CandidateDashboard() {
               let canAttempt = true;
               let daysLeft = 0;
 
-              const lockedAttempt = matchingAttempts.find(a => a && (a.canAttempt === false || (a.canAttempt === undefined && ['PASSED', 'FAILED', 'SUBMITTED', 'TERMINATED'].includes(String(a.resultStatus || '').toUpperCase()))));
-
-              if (lockedAttempt) {
-                canAttempt = false;
-                daysLeft = lockedAttempt.retryDaysLeft || 30;
-              } else if (matchingAttempts.length > 0) {
-                const first = matchingAttempts[0];
-                if (first.canAttempt !== undefined && first.canAttempt !== null) {
-                  canAttempt = Boolean(first.canAttempt);
+              if (matchingAttempts.length > 0) {
+                const latest = matchingAttempts[0];
+                if (latest.canAttempt !== undefined && latest.canAttempt !== null) {
+                  canAttempt = Boolean(latest.canAttempt);
+                  daysLeft = latest.retryDaysLeft || 0;
                 } else {
-                  const isFinished = ['PASSED', 'FAILED', 'SUBMITTED', 'TERMINATED'].includes(String(first.resultStatus || '').toUpperCase());
+                  const isFinished = ['PASSED', 'FAILED', 'SUBMITTED', 'TERMINATED'].includes(String(latest.resultStatus || '').toUpperCase());
                   canAttempt = !isFinished;
+                  daysLeft = isFinished ? (latest.retryDaysLeft || 30) : 0;
                 }
-                daysLeft = first.retryDaysLeft || 0;
               }
 
               return (
