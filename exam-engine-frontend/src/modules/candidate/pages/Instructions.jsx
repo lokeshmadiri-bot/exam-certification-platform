@@ -54,11 +54,19 @@ export default function CandidateInstructions() {
           };
 
           const matchingAttempts = attemptsList.filter(a => isSameExam(a, examData));
-          const lockedAttempt = matchingAttempts.find(a => a && (a.canAttempt === false || (a.canAttempt === undefined && ['PASSED', 'FAILED', 'SUBMITTED', 'TERMINATED'].includes(String(a.resultStatus || '').toUpperCase()))));
-
-          if (lockedAttempt) {
-            setIsLocked(true);
-            setDaysLeft(lockedAttempt.retryDaysLeft || 30);
+          if (matchingAttempts.length > 0) {
+            const latest = matchingAttempts[0];
+            if (latest.canAttempt !== undefined && latest.canAttempt !== null) {
+              setIsLocked(!latest.canAttempt);
+              setDaysLeft(latest.retryDaysLeft || 0);
+            } else {
+              const isFinished = ['PASSED', 'FAILED', 'SUBMITTED', 'TERMINATED'].includes(String(latest.resultStatus || '').toUpperCase());
+              setIsLocked(isFinished);
+              setDaysLeft(isFinished ? (latest.retryDaysLeft || 30) : 0);
+            }
+          } else {
+            setIsLocked(false);
+            setDaysLeft(0);
           }
         }
       } catch (err) {

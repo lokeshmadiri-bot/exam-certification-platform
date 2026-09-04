@@ -280,7 +280,17 @@ public class CandidateService {
 
         private Map<String, ApprovalRequest> loadApprovalMap() {
                 List<ApprovalRequest> candidateApprovals = approvalRepository != null 
-                        ? approvalRepository.findAll().stream().filter(r -> r != null && "CANDIDATE_UNLOCK".equals(r.getType()) && "APPROVED".equals(r.getStatus())).toList() 
+                        ? approvalRepository.findAll().stream()
+                            .filter(r -> r != null && "CANDIDATE_UNLOCK".equals(r.getType()) && "APPROVED".equals(r.getStatus()))
+                            .sorted((a, b) -> {
+                                LocalDateTime tA = a.getResolvedAt() != null ? a.getResolvedAt() : a.getRequestedAt();
+                                LocalDateTime tB = b.getResolvedAt() != null ? b.getResolvedAt() : b.getRequestedAt();
+                                if (tA == null && tB == null) return 0;
+                                if (tA == null) return 1;
+                                if (tB == null) return -1;
+                                return tB.compareTo(tA);
+                            })
+                            .toList() 
                         : List.of();
                 Map<String, ApprovalRequest> map = new HashMap<>();
                 for (ApprovalRequest req : candidateApprovals) {
@@ -338,7 +348,7 @@ public class CandidateService {
                                 req = approvalMap.get(candidateIdStr);
                         }
                         if (req != null) {
-                                LocalDateTime approvedAt = req.getResolvedAt();
+                                LocalDateTime approvedAt = req.getResolvedAt() != null ? req.getResolvedAt() : (req.getRequestedAt() != null ? req.getRequestedAt() : req.getCreatedAt());
                                 LocalDateTime refTime = attempt.getEndTime() != null ? attempt.getEndTime() : attempt.getCreatedAt();
                                 if (approvedAt != null && refTime != null && !refTime.isAfter(approvedAt)) {
                                         int overrideDays = overrideLockDurationDays > 0 ? overrideLockDurationDays : 7;
