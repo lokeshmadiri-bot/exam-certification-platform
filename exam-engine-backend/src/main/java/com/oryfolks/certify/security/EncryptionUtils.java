@@ -32,8 +32,8 @@ public class EncryptionUtils {
             byte[] decrypted = cipher.doFinal(decoded);
             return new String(decrypted, StandardCharsets.UTF_8);
         } catch (Exception e) {
-            // Base64 decoded successfully but decryption failed, return decoded string
-            return new String(decoded, StandardCharsets.UTF_8);
+            // Base64 decoded successfully but decryption failed (e.g. plain text), return original input
+            return encryptedBase64;
         }
     }
 }

@@ -117,7 +117,19 @@ public class AdminController {
                 .filter(a -> a.getCandidate() != null && a.getCandidate().getId() != null)
                 .collect(java.util.stream.Collectors.groupingBy(a -> a.getCandidate().getId()));
 
-        List<ApprovalRequest> allApprovalsList = approvalRepository != null ? approvalRepository.findAll().stream().filter(r -> r != null && "CANDIDATE_UNLOCK".equals(r.getType()) && "APPROVED".equals(r.getStatus())).toList() : List.of();
+        List<ApprovalRequest> allApprovalsList = approvalRepository != null 
+                ? approvalRepository.findAll().stream()
+                        .filter(r -> r != null && "CANDIDATE_UNLOCK".equals(r.getType()) && "APPROVED".equals(r.getStatus()))
+                        .sorted((a, b) -> {
+                            LocalDateTime tA = a.getResolvedAt() != null ? a.getResolvedAt() : (a.getRequestedAt() != null ? a.getRequestedAt() : a.getCreatedAt());
+                            LocalDateTime tB = b.getResolvedAt() != null ? b.getResolvedAt() : (b.getRequestedAt() != null ? b.getRequestedAt() : b.getCreatedAt());
+                            if (tA == null && tB == null) return 0;
+                            if (tA == null) return 1;
+                            if (tB == null) return -1;
+                            return tB.compareTo(tA);
+                        })
+                        .toList() 
+                : List.of();
         Map<String, ApprovalRequest> approvalByTarget = new HashMap<>();
         for (ApprovalRequest req : allApprovalsList) {
             if (req != null && req.getTargetId() != null && !approvalByTarget.containsKey(req.getTargetId())) {
@@ -209,7 +221,7 @@ public class AdminController {
                                 targetReq = approvalByTarget.get(c.getId().toString());
                             }
                             if (targetReq != null && "APPROVED".equalsIgnoreCase(targetReq.getStatus())) {
-                                LocalDateTime approvedAt = targetReq.getResolvedAt();
+                                LocalDateTime approvedAt = targetReq.getResolvedAt() != null ? targetReq.getResolvedAt() : (targetReq.getRequestedAt() != null ? targetReq.getRequestedAt() : targetReq.getCreatedAt());
                                 LocalDateTime refTime = attempt.getEndTime() != null ? attempt.getEndTime() : attempt.getCreatedAt();
                                 if (approvedAt != null && refTime != null && !refTime.isAfter(approvedAt)) {
                                     int overrideDays = overrideLockDurationDays > 0 ? overrideLockDurationDays : 7;
@@ -347,18 +359,19 @@ public class AdminController {
         User candidate = userRepository.findById(candidateId)
                 .orElseThrow(() -> new RuntimeException("Candidate not found: " + candidateId));
 
-        Optional<ExamAttempt> attemptOpt = Optional.empty();
+        List<ExamAttempt> candAttempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(candidateId);
         if (examId != null) {
-            attemptOpt = attemptRepository.findFirstByCandidateIdAndExamIdOrderByCreatedAtDesc(candidateId, examId);
-        }
-        if (!attemptOpt.isPresent()) {
-            attemptOpt = attemptRepository.findFirstByCandidateIdOrderByCreatedAtDesc(candidateId);
-        }
-
-        if (attemptOpt.isPresent()) {
-            ExamAttempt latestAttempt = attemptOpt.get();
-            latestAttempt.setRetryOverrideApproved(true);
-            attemptRepository.save(latestAttempt);
+            for (ExamAttempt a : candAttempts) {
+                if (a.getExam() != null && examId.equals(a.getExam().getId())) {
+                    a.setRetryOverrideApproved(true);
+                    attemptRepository.save(a);
+                }
+            }
+        } else {
+            for (ExamAttempt a : candAttempts) {
+                a.setRetryOverrideApproved(true);
+                attemptRepository.save(a);
+            }
         }
 
         String targetIdStr = (examId != null) ? (candidateId.toString() + ":" + examId.toString()) : candidateId.toString();

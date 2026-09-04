@@ -122,15 +122,15 @@ public class ApprovalsController {
 
                 User candidate = userRepository.findById(candidateId).orElse(null);
                 if (candidate != null) {
+                    List<ExamAttempt> candidateAttempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(candidate.getId());
                     if (examId != null) {
-                        Optional<ExamAttempt> attemptOpt = attemptRepository.findFirstByCandidateIdAndExamIdOrderByCreatedAtDesc(candidate.getId(), examId);
-                        if (attemptOpt.isPresent()) {
-                            ExamAttempt a = attemptOpt.get();
-                            a.setRetryOverrideApproved(true);
-                            attemptRepository.save(a);
+                        for (ExamAttempt a : candidateAttempts) {
+                            if (a.getExam() != null && examId.equals(a.getExam().getId())) {
+                                a.setRetryOverrideApproved(true);
+                                attemptRepository.save(a);
+                            }
                         }
                     } else {
-                        List<ExamAttempt> candidateAttempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(candidate.getId());
                         for (ExamAttempt a : candidateAttempts) {
                             a.setRetryOverrideApproved(true);
                             attemptRepository.save(a);
