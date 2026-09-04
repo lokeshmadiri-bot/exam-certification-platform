@@ -424,6 +424,7 @@ public class ExamController {
         finalScore = Math.min(finalScore, totMarksVal);
         attempt.setScore(finalScore);
         attempt.setEndTime(LocalDateTime.now());
+        attempt.setSubmittedAt(LocalDateTime.now());
 
         int percentScore = totMarksVal > 0 ? (int) Math.round((correctMarksSum / totMarksVal) * 100) : 0;
         percentScore = Math.min(percentScore, 100);

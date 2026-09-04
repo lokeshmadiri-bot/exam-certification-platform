@@ -45,6 +45,14 @@ public class AttemptService {
 
         private final CompetencyBandRepository competencyBandRepository;
 
+        private final ApprovalRequestRepository approvalRepository;
+
+        @org.springframework.beans.factory.annotation.Value("${app.retry-lock-duration-days:30}")
+        private int retryLockDurationDays = 30;
+
+        @org.springframework.beans.factory.annotation.Value("${app.override-lock-duration-days:7}")
+        private int overrideLockDurationDays = 7;
+
         public StartExamResponseDTO startExam(
                         StartExamRequestDTO request,
                         String username) {
@@ -59,15 +67,82 @@ public class AttemptService {
                         throw new BadRequestException("Exam is not active.");
                 }
 
-                Optional<ExamAttempt> existingAttempt = attemptRepository
-                                .findFirstByCandidateIdAndExamIdOrderByCreatedAtDesc(
-                                                candidate.getId(),
-                                                exam.getId());
+                List<ExamAttempt> allCandidateAttempts = attemptRepository.findByCandidateIdOrderByCreatedAtDesc(candidate.getId());
 
-                if (existingAttempt.isPresent()
-                                && existingAttempt.get().getResultStatus() == ResultStatus.IN_PROGRESS) {
+                // 1. Check if candidate has ANY completed attempt for this exam/stack/title within the 30-day lock period
+                Optional<ExamAttempt> completedAttemptOpt = allCandidateAttempts.stream()
+                                .filter(a -> a.getResultStatus() != ResultStatus.IN_PROGRESS && isSameExam(a.getExam(), exam))
+                                .findFirst();
 
-                        ExamAttempt attempt = existingAttempt.get();
+                if (completedAttemptOpt.isPresent()) {
+                        ExamAttempt lastCompleted = completedAttemptOpt.get();
+
+                        LocalDateTime referenceDate = lastCompleted.getEndTime() != null
+                                        ? lastCompleted.getEndTime()
+                                        : lastCompleted.getCreatedAt();
+
+                        int lockDays = retryLockDurationDays > 0 ? retryLockDurationDays : 30;
+                        LocalDateTime nextEligibleDate = referenceDate != null ? referenceDate.plusDays(lockDays) : LocalDateTime.now();
+
+                        boolean overrideActive = false;
+                        if (Boolean.TRUE.equals(lastCompleted.getRetryOverrideApproved())) {
+                                Optional<ExamAttempt> newerAttempt = allCandidateAttempts.stream()
+                                                .filter(a -> a.getResultStatus() != ResultStatus.IN_PROGRESS 
+                                                          && isSameExam(a.getExam(), lastCompleted.getExam())
+                                                          && a.getCreatedAt().isAfter(lastCompleted.getCreatedAt()))
+                                                .findFirst();
+                                if (!newerAttempt.isPresent()) {
+                                        overrideActive = true;
+                                }
+                        }
+
+                        if (!overrideActive && candidate != null) {
+                                String candidateIdStr = candidate.getId().toString();
+                                String targetKey = exam != null ? candidateIdStr + ":" + exam.getId().toString() : candidateIdStr;
+
+                                Optional<ApprovalRequest> approvalOpt = approvalRepository.findFirstByTypeAndTargetIdAndStatusOrderByResolvedAtDesc(
+                                                "CANDIDATE_UNLOCK", targetKey, "APPROVED"
+                                );
+                                if (!approvalOpt.isPresent()) {
+                                        approvalOpt = approvalRepository.findFirstByTypeAndTargetIdAndStatusOrderByResolvedAtDesc(
+                                                        "CANDIDATE_UNLOCK", candidateIdStr, "APPROVED"
+                                        );
+                                }
+                                if (approvalOpt.isPresent()) {
+                                        ApprovalRequest req = approvalOpt.get();
+                                        LocalDateTime approvedAt = req.getResolvedAt();
+                                        LocalDateTime refTime = lastCompleted.getEndTime() != null ? lastCompleted.getEndTime() : lastCompleted.getCreatedAt();
+                                        if (approvedAt != null && refTime != null && !refTime.isAfter(approvedAt)) {
+                                                int overrideDays = overrideLockDurationDays > 0 ? overrideLockDurationDays : 7;
+                                                LocalDateTime expiresAt = approvedAt.plusDays(overrideDays);
+                                                if (!LocalDateTime.now().isAfter(expiresAt)) {
+                                                        overrideActive = true;
+                                                }
+                                        }
+                                }
+                        }
+
+                        if (!overrideActive && LocalDateTime.now().isBefore(nextEligibleDate)) {
+                                long remainingDays = java.time.Duration
+                                                .between(LocalDateTime.now(), nextEligibleDate)
+                                                .toDays();
+                                long displayDays = Math.max(1, remainingDays);
+
+                                throw new BadRequestException(
+                                                "You have already attempted this exam (" + exam.getTitle() + "). "
+                                                                + "You can retake it after "
+                                                                + nextEligibleDate.toLocalDate()
+                                                                + " (" + displayDays + " day(s) remaining).");
+                        }
+                }
+
+                // 2. If unlocked and an in-progress attempt exists, resume it
+                Optional<ExamAttempt> existingInProgress = allCandidateAttempts.stream()
+                                .filter(a -> a.getResultStatus() == ResultStatus.IN_PROGRESS && a.getExam() != null && a.getExam().getId().equals(exam.getId()))
+                                .findFirst();
+
+                if (existingInProgress.isPresent()) {
+                        ExamAttempt attempt = existingInProgress.get();
 
                         return StartExamResponseDTO.builder()
                                         .attemptId(attempt.getId())
@@ -76,39 +151,6 @@ public class AttemptService {
                                         .durationMinutes(exam.getDurationMinutes())
                                         .startTime(attempt.getStartTime())
                                         .build();
-                }
-
-                if (existingAttempt.isPresent()) {
-
-                        ExamAttempt lastAttempt = existingAttempt.get();
-
-                        LocalDateTime referenceDate = lastAttempt.getEndTime() != null
-                                        ? lastAttempt.getEndTime()
-                                        : lastAttempt.getCreatedAt();
-
-                        LocalDateTime nextEligibleDate = referenceDate.plusDays(30);
-
-                        System.out.println("==================================");
-                        System.out.println("Attempt ID      : " + lastAttempt.getId());
-                        System.out.println("Created At      : " + lastAttempt.getCreatedAt());
-                        System.out.println("End Time        : " + lastAttempt.getEndTime());
-                        System.out.println("Reference Date  : " + referenceDate);
-                        System.out.println("Next Eligible   : " + nextEligibleDate);
-                        System.out.println("Current Time    : " + LocalDateTime.now());
-                        System.out.println("==================================");
-
-                        if (false && LocalDateTime.now().isBefore(nextEligibleDate)) {
-
-                                long remainingDays = java.time.Duration
-                                                .between(LocalDateTime.now(), nextEligibleDate)
-                                                .toDays();
-
-                                throw new BadRequestException(
-                                                "You have already attempted this exam. "
-                                                                + "You can retake it after "
-                                                                + nextEligibleDate.toLocalDate()
-                                                                + " (" + remainingDays + " day(s) remaining).");
-                        }
                 }
 
                 List<Question> activeQuestions = fetchQuestionsForExam(exam);
@@ -705,5 +747,30 @@ public class AttemptService {
                 seeded.add(q5);
 
                 return questionRepository.saveAll(seeded);
+        }
+
+        public static boolean isSameExam(Exam e1, Exam e2) {
+                if (e1 == null || e2 == null) return false;
+                if (e1.getId() != null && e2.getId() != null && e1.getId().equals(e2.getId())) return true;
+                
+                String t1 = e1.getTitle() != null ? e1.getTitle().toLowerCase().trim() : "";
+                String t2 = e2.getTitle() != null ? e2.getTitle().toLowerCase().trim() : "";
+                if (!t1.isEmpty() && !t2.isEmpty()) {
+                        if (t1.equals(t2) || t1.contains(t2) || t2.contains(t1)) return true;
+                        if ((t1.contains("react") || t1.contains("frontend")) && (t2.contains("react") || t2.contains("frontend"))) return true;
+                        if ((t1.contains("java") || t1.contains("full stack") || t1.contains("fullstack")) && (t2.contains("java") || t2.contains("full stack") || t2.contains("fullstack"))) return true;
+                        if ((t1.contains("python") || t1.contains("backend")) && (t2.contains("python") || t2.contains("backend"))) return true;
+                }
+
+                String s1 = e1.getStack() != null ? e1.getStack().toLowerCase().trim() : "";
+                String s2 = e2.getStack() != null ? e2.getStack().toLowerCase().trim() : "";
+                if (!s1.isEmpty() && !s2.isEmpty()) {
+                        if (s1.equals(s2) || s1.contains(s2) || s2.contains(s1)) return true;
+                        if ((s1.contains("react") || s1.contains("frontend")) && (s2.contains("react") || s2.contains("frontend"))) return true;
+                        if ((s1.contains("java") || s1.contains("full stack") || s1.contains("fullstack")) && (s2.contains("java") || s2.contains("full stack") || s2.contains("fullstack"))) return true;
+                        if ((s1.contains("python") || s1.contains("backend")) && (s2.contains("python") || s2.contains("backend"))) return true;
+                }
+
+                return false;
         }
 }

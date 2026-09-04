@@ -1,24 +1,71 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ShieldCheck, Monitor, RefreshCw, ChevronRight } from 'lucide-react';
-import { examService } from '../services/api';
+import { ShieldCheck, Monitor, RefreshCw, ChevronRight, Lock } from 'lucide-react';
+import { examService, candidateService } from '../services/api';
 
 export default function CandidateInstructions() {
   const { examId } = useParams();
   const navigate = useNavigate();
   const [exam, setExam] = useState(null);
   const [agreed, setAgreed] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [daysLeft, setDaysLeft] = useState(0);
 
   useEffect(() => {
-    async function loadExam() {
+    async function loadData() {
       try {
-        const res = await examService.getExamById(examId);
-        setExam(res.data);
+        const [examRes, attemptsRes] = await Promise.all([
+          examService.getExamById(examId).catch(() => null),
+          candidateService.getMyAttempts().catch(() => null)
+        ]);
+
+        const examData = examRes?.data || examRes || null;
+        setExam(examData);
+
+        const rawAttempts = attemptsRes?.data !== undefined ? attemptsRes.data : (attemptsRes?.rows !== undefined ? attemptsRes.rows : (attemptsRes || []));
+        const attemptsList = Array.isArray(rawAttempts) ? rawAttempts : [];
+
+        if (examData && attemptsList.length > 0) {
+          const isSameExam = (a, e) => {
+            if (!a || !e) return false;
+            const aId = String(a.examId || a.id || a.exam?.id || '').toLowerCase().trim();
+            const eId = String(e.examId || e.id || examId || '').toLowerCase().trim();
+            if (aId && eId && aId === eId) return true;
+
+            const aTitle = String(a.examTitle || a.title || '').toLowerCase().trim();
+            const eTitle = String(e.title || '').toLowerCase().trim();
+            if (aTitle && eTitle) {
+              if (aTitle === eTitle || aTitle.includes(eTitle) || eTitle.includes(aTitle)) return true;
+              if ((aTitle.includes('react') || aTitle.includes('frontend')) && (eTitle.includes('react') || eTitle.includes('frontend'))) return true;
+              if ((aTitle.includes('java') || aTitle.includes('full stack') || aTitle.includes('fullstack')) && (eTitle.includes('java') || eTitle.includes('full stack') || eTitle.includes('fullstack'))) return true;
+              if ((aTitle.includes('python') || aTitle.includes('backend')) && (eTitle.includes('python') || eTitle.includes('backend'))) return true;
+            }
+
+            const aStack = String(a.stack || '').toLowerCase().trim();
+            const eStack = String(e.stack || '').toLowerCase().trim();
+            if (aStack && eStack) {
+              if (aStack === eStack || aStack.includes(eStack) || eStack.includes(aStack)) return true;
+              if ((aStack.includes('react') || aStack.includes('frontend')) && (eStack.includes('react') || eStack.includes('frontend'))) return true;
+              if ((aStack.includes('java') || aStack.includes('fullstack') || aStack.includes('full stack')) && (eStack.includes('java') || eStack.includes('fullstack') || eStack.includes('full stack'))) return true;
+              if ((aStack.includes('python') || aStack.includes('backend')) && (eStack.includes('python') || eStack.includes('backend'))) return true;
+            }
+
+            return false;
+          };
+
+          const matchingAttempts = attemptsList.filter(a => isSameExam(a, examData));
+          const lockedAttempt = matchingAttempts.find(a => a && (a.canAttempt === false || (a.canAttempt === undefined && ['PASSED', 'FAILED', 'SUBMITTED', 'TERMINATED'].includes(String(a.resultStatus || '').toUpperCase()))));
+
+          if (lockedAttempt) {
+            setIsLocked(true);
+            setDaysLeft(lockedAttempt.retryDaysLeft || 30);
+          }
+        }
       } catch (err) {
         console.error(err);
       }
     }
-    loadExam();
+    loadData();
   }, [examId]);
 
   const I18N = {
@@ -35,7 +82,7 @@ export default function CandidateInstructions() {
       q: "Questions",
       dur: "Duration",
       autos: "Your answers are saved automatically while you progress through the exam. You may review and modify your answers before submitting the exam.",
-      agt: "I have read and agree to the rules",
+      agt: "I have read and agree to the terms & conditions",
       ag: "Including online proctoring, webcam recording, exam integrity monitoring and automatic termination conditions.",
       proceed: "Proceed to system check"
     }
@@ -142,7 +189,6 @@ export default function CandidateInstructions() {
           {/* Consent and Action Card */}
           <div className="card pad" style={{ backgroundColor: '#ffffff', border: '1px solid #E4EAF2', borderRadius: '16px', padding: '24px', boxShadow: '0 1px 3px rgba(11,31,56,.06)' }}>
             <div 
-              onClick={() => setAgreed(!agreed)}
               style={{
                 display: 'flex',
                 alignItems: 'start',
@@ -151,7 +197,6 @@ export default function CandidateInstructions() {
                 border: agreed ? '1.5px solid #2F6BFF' : '1px solid #E4EAF2',
                 backgroundColor: agreed ? 'rgba(47,107,255,0.03)' : '#ffffff',
                 borderRadius: '12px',
-                cursor: 'pointer',
                 transition: 'all 0.15s ease',
                 marginBottom: '16px'
               }}
@@ -161,37 +206,72 @@ export default function CandidateInstructions() {
                 <p style={{ fontSize: '11px', color: '#5C6B82', lineHeight: '1.4', marginTop: '4px' }}>{t.ag}</p>
               </div>
               <div 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAgreed(!agreed);
+                }}
                 className={`toggle shrink-0 ${agreed ? '' : 'off'}`}
-                style={{ marginTop: '2px', flexShrink: 0 }}
+                style={{ marginTop: '2px', flexShrink: 0, cursor: 'pointer' }}
               >
                 <i />
               </div>
             </div>
 
-            <button
-              disabled={!agreed}
-              onClick={() => navigate(`/candidate/check/${examId}`)}
-              className="btn bg-[#2F6BFF] hover:bg-[#2256d6] disabled:opacity-50 disabled:cursor-not-allowed text-white flex items-center justify-center gap-1.5 w-full font-semibold text-[13.5px] py-3 rounded-xl shadow-md transition-all"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                width: '100%',
-                backgroundColor: agreed ? '#2F6BFF' : '#a0aec0',
-                color: '#ffffff',
-                fontWeight: '600',
-                fontSize: '13.5px',
-                padding: '12.5px',
-                borderRadius: '10px',
-                cursor: agreed ? 'pointer' : 'not-allowed',
-                boxShadow: agreed ? '0 4px 6px rgba(47,107,255,0.2)' : 'none',
-                transition: 'all 0.15s'
-              }}
-            >
-              <span>{t.proceed}</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
+            {isLocked ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ padding: '14px', backgroundColor: '#fff3df', border: '1px solid #f5e2b3', borderRadius: '12px', color: '#c9831a', fontSize: '12.5px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Lock className="w-5 h-5 shrink-0 text-[#c9831a]" />
+                  <span>Exam locked. Candidates must wait 30 days between retakes unless an admin approves an override ({daysLeft} day(s) remaining).</span>
+                </div>
+                <button
+                  disabled
+                  className="btn bg-[#eef2f8] text-[#8fa3c4] border border-[#d2dfef] flex items-center justify-center gap-1.5 w-full font-bold text-[13.5px] py-3 rounded-xl cursor-not-allowed opacity-60"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    width: '100%',
+                    backgroundColor: '#eef2f8',
+                    color: '#8fa3c4',
+                    fontWeight: '700',
+                    fontSize: '13.5px',
+                    padding: '12.5px',
+                    borderRadius: '10px',
+                    cursor: 'not-allowed',
+                    border: '1px solid #d2dfef'
+                  }}
+                >
+                  <Lock className="w-4 h-4 text-[#8fa3c4]" />
+                  <span>Locked · {daysLeft}d left</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                disabled={!agreed}
+                onClick={() => navigate(`/candidate/check/${examId}`)}
+                className="btn bg-[#2F6BFF] hover:bg-[#2256d6] disabled:opacity-50 disabled:cursor-not-allowed text-white flex items-center justify-center gap-1.5 w-full font-semibold text-[13.5px] py-3 rounded-xl shadow-md transition-all"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  width: '100%',
+                  backgroundColor: agreed ? '#2F6BFF' : '#a0aec0',
+                  color: '#ffffff',
+                  fontWeight: '600',
+                  fontSize: '13.5px',
+                  padding: '12.5px',
+                  borderRadius: '10px',
+                  cursor: agreed ? 'pointer' : 'not-allowed',
+                  boxShadow: agreed ? '0 4px 6px rgba(47,107,255,0.2)' : 'none',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <span>{t.proceed}</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>

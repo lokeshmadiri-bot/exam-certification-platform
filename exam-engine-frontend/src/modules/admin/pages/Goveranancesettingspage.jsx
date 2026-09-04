@@ -83,7 +83,7 @@ export default function GovernanceSettingsPage() {
                 <div className="a1-loading">Loading governance settings…</div>
             ) : (
                 <>
-                    {tab === "Retention" && <RetentionTab gov={gov} onSaved={() => { loadGov(); flash("Retention change requested — awaiting a second admin."); }} />}
+                    {tab === "Retention" && <RetentionTab gov={gov} onSaved={() => { loadGov(); flash("Retention change requested."); }} />}
                     {tab === "Security" && <SecurityTab gov={gov} onSaved={(s) => { setGov((g) => ({ ...g, security: s })); flash("Security settings saved."); }} />}
                     {tab === "AI Settings" && (
                         <AISettingsTab
@@ -146,26 +146,20 @@ function RetentionTab({ gov, onSaved }) {
                 ))}
             </div>
 
-            {gov.pendingRetentionChange && (
-                <div className="a1-banner a1-banner-amber a1-banner-slim" style={{ marginTop: 12 }}>
-                    A retention change is already pending a second administrator's approval.
-                </div>
-            )}
-
             <div className="a1-modal-actions" style={{ justifyContent: "flex-start", marginTop: 14 }}>
                 <button
                     className="a1-btn a1-btn-primary"
-                    disabled={days === gov.retentionDays || !!gov.pendingRetentionChange}
+                    disabled={days === gov.retentionDays}
                     onClick={() => setConfirmOpen(true)}
                 >
-                    {gov.pendingRetentionChange ? "Approval Pending…" : "Request retention change"}
+                    Request retention change
                 </button>
             </div>
 
             <RequestApprovalModal
                 open={confirmOpen}
                 title={`Change retention to ${days} days?`}
-                description={`Current policy: ${gov.retentionDays} days. This will take effect once a second administrator approves.`}
+                description={`Current policy: ${gov.retentionDays} days.`}
                 confirmLabel="Request change"
                 tone="primary"
                 onCancel={() => setConfirmOpen(false)}
