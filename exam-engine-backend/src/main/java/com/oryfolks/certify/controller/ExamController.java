@@ -272,6 +272,57 @@ public class ExamController {
             }
         }
 
+        int bCount = 0;
+        int iCount = 0;
+        int aCount = 0;
+        for (Question q : questions) {
+            String diff = q.getDifficulty() != null ? q.getDifficulty().trim().toUpperCase() : "EASY";
+            if ("HARD".equals(diff)) {
+                aCount++;
+            } else if ("MEDIUM".equals(diff)) {
+                iCount++;
+            } else {
+                bCount++;
+            }
+        }
+
+        long beginnerTimeMax = bCount * 2L * 60L;
+        long intermediateTimeMax = iCount * 5L * 60L;
+        long advancedTimeMax = aCount * 10L * 60L;
+        if (beginnerTimeMax == 0 && intermediateTimeMax == 0 && advancedTimeMax == 0) {
+            long totalSec = (long) (exam.getDurationMin() != null ? exam.getDurationMin() : 45) * 60L;
+            beginnerTimeMax = totalSec / 3;
+            intermediateTimeMax = totalSec / 3;
+            advancedTimeMax = totalSec - beginnerTimeMax - intermediateTimeMax;
+        }
+
+        Long bRem = attempt.getBeginnerTimeRemaining();
+        Long iRem = attempt.getIntermediateTimeRemaining();
+        Long aRem = attempt.getAdvancedTimeRemaining();
+
+        boolean updated = false;
+        if (bRem == null || bRem > beginnerTimeMax) {
+            bRem = beginnerTimeMax;
+            attempt.setBeginnerTimeRemaining(bRem);
+            updated = true;
+        }
+        if (iRem == null || iRem > intermediateTimeMax) {
+            iRem = intermediateTimeMax;
+            attempt.setIntermediateTimeRemaining(iRem);
+            updated = true;
+        }
+        if (aRem == null || aRem > advancedTimeMax) {
+            aRem = advancedTimeMax;
+            attempt.setAdvancedTimeRemaining(aRem);
+            updated = true;
+        }
+
+        if (updated) {
+            long remainingSecs = bRem + iRem + aRem;
+            attempt.setRemainingSeconds(remainingSecs);
+            examAttemptRepository.save(attempt);
+        }
+
         Map<String, Object> data = new HashMap<>();
         data.put("attemptId", attempt.getId());
         data.put("examTitle", exam.getTitle());
