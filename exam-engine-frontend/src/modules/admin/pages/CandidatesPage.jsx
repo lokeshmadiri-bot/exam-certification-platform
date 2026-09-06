@@ -204,7 +204,7 @@ function fmtDate(dt) {
 export default function CandidatesPage() {
     const [rows, setRows] = useState(null);
     const [allExams, setAllExams] = useState([]);
-    const [filters, setFilters] = useState({ q: "", status: "", exam: "", locked: "" });
+    const [filters, setFilters] = useState({ q: "", access: "", exam: "" });
     const [page, setPage] = useState(1);
     const [overrideFor, setOverrideFor] = useState(null);
     const [toastMessage, setToastMessage] = useState(null);
@@ -223,7 +223,26 @@ export default function CandidatesPage() {
                 fetchCandidates(filters),
                 fetchExams().catch(() => ({ rows: [] }))
             ]);
-            setRows(res?.rows || res || []);
+            let fetchedRows = res?.rows || res || [];
+            if (Array.isArray(fetchedRows)) {
+                fetchedRows = [...fetchedRows].sort((a, b) => {
+                    const dtA = a.lastAttempt || a.attemptedDate || a.endTime || a.startTime || null;
+                    const dtB = b.lastAttempt || b.attemptedDate || b.endTime || b.startTime || null;
+
+                    if (!dtA && !dtB) return 0;
+                    if (!dtA) return 1;
+                    if (!dtB) return -1;
+
+                    const timeA = new Date(dtA).getTime();
+                    const timeB = new Date(dtB).getTime();
+                    if (isNaN(timeA) && isNaN(timeB)) return 0;
+                    if (isNaN(timeA)) return 1;
+                    if (isNaN(timeB)) return -1;
+
+                    return timeB - timeA;
+                });
+            }
+            setRows(fetchedRows);
             const examsList = exams?.rows || exams || [];
             setAllExams(examsList.map((e) => e.title || e.name || e));
         } catch (e) {
@@ -306,14 +325,10 @@ export default function CandidatesPage() {
                 </div>
                 <div className="a1-field">
                     <label>Access</label>
-                    <select value={filters.status} onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, status: e.target.value })); }}>
+                    <select value={filters.access} onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, access: e.target.value })); }}>
                         <option value="">All access status</option>
-                        <option value="IN_PROGRESS">In Progress</option>
-                        <option value="SUBMITTED">Submitted</option>
-                        <option value="PASSED">Passed</option>
-                        <option value="FAILED">Failed</option>
-                        <option value="TERMINATED">Terminated</option>
-                        <option value="NOT_STARTED">Not Started</option>
+                        <option value="true">Locked</option>
+                        <option value="false">Unlocked / Approved</option>
                     </select>
                 </div>
                 <div className="a1-field">
@@ -321,14 +336,6 @@ export default function CandidatesPage() {
                     <select value={filters.exam} onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, exam: e.target.value })); }}>
                         <option value="">All exams</option>
                         {examOptions.map((ex) => <option key={ex} value={ex}>{ex}</option>)}
-                    </select>
-                </div>
-                <div className="a1-field">
-                    <label>Override Lock</label>
-                    <select value={filters.locked} onChange={(e) => { setPage(1); setFilters((f) => ({ ...f, locked: e.target.value })); }}>
-                        <option value="">All</option>
-                        <option value="true">Locked</option>
-                        <option value="false">Unlocked / Approved</option>
                     </select>
                 </div>
             </div>

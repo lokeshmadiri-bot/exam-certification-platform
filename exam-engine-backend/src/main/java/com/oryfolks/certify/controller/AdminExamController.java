@@ -186,6 +186,16 @@ public class AdminExamController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<Exam>> createExam(@RequestBody Exam exam, Principal principal) {
+        if (exam.getTitle() != null && !exam.getTitle().trim().isEmpty()) {
+            String trimmedTitle = exam.getTitle().trim();
+            if (examRepository.findByTitleIgnoreCase(trimmedTitle).isPresent()) {
+                throw new BadRequestException("An exam with title '" + trimmedTitle + "' already exists. Please choose a different title.");
+            }
+            exam.setTitle(trimmedTitle);
+        } else {
+            throw new BadRequestException("Exam title is required.");
+        }
+
         if (exam.getStatus() == null) exam.setStatus(ExamStatus.ACTIVE);
         if (exam.getVersion() == null) exam.setVersion("1");
 
@@ -223,7 +233,15 @@ public class AdminExamController {
         Exam exam = examRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Exam not found: " + id));
 
-        if (payload.getTitle() != null) exam.setTitle(payload.getTitle());
+        if (payload.getTitle() != null && !payload.getTitle().trim().isEmpty()) {
+            String trimmedTitle = payload.getTitle().trim();
+            Optional<Exam> existingWithTitle = examRepository.findByTitleIgnoreCase(trimmedTitle);
+            if (existingWithTitle.isPresent() && !existingWithTitle.get().getId().equals(id)) {
+                throw new BadRequestException("An exam with title '" + trimmedTitle + "' already exists. Please choose a different title.");
+            }
+            exam.setTitle(trimmedTitle);
+        }
+
         if (payload.getStack() != null) exam.setStack(payload.getStack());
         if (payload.getDurationMinutes() != null) exam.setDurationMinutes(payload.getDurationMinutes());
         else if (payload.getDurationMin() != null) exam.setDurationMinutes(payload.getDurationMin());
@@ -264,8 +282,15 @@ public class AdminExamController {
         Exam src = examRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Exam not found: " + id));
 
+        String newTitle = src.getTitle() + " (Copy)";
+        int copyIndex = 1;
+        while (examRepository.findByTitleIgnoreCase(newTitle).isPresent()) {
+            copyIndex++;
+            newTitle = src.getTitle() + " (Copy " + copyIndex + ")";
+        }
+
         Exam copy = Exam.builder()
-                .title(src.getTitle() + " (Copy)")
+                .title(newTitle)
                 .stack(src.getStack())
                 .durationMinutes(src.getDurationMinutes())
                 .questionPool(src.getQuestionPool())

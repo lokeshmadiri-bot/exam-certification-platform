@@ -187,17 +187,18 @@ function ExamRunnerContent() {
           else bCount++;
         });
 
-        // Time segregation strictly based on difficulty level:
-        // Beginner (Easy): 15 minutes (900s) or 90s per question
-        // Intermediate (Medium): 20 minutes (1200s) or 150s per question
-        // Advanced (Hard): 25 minutes (1500s) or 240s per question
-        const bTime = Math.max(900, (bCount > 0 ? bCount : 5) * 90);
-        const iTime = Math.max(1200, (iCount > 0 ? iCount : 5) * 150);
-        const aTime = Math.max(1500, (aCount > 0 ? aCount : 5) * 240);
+        // Section time calculated as: Beginner (2m/q), Intermediate (5m/q), Advanced (10m/q)
+        const bFallback = bCount * 120;
+        const iFallback = iCount * 300;
+        const aFallback = aCount * 600;
 
-        setBeginnerTimeRemaining(prev => (prev !== null && prev !== undefined ? prev : bTime));
-        setIntermediateTimeRemaining(prev => (prev !== null && prev !== undefined ? prev : iTime));
-        setAdvancedTimeRemaining(prev => (prev !== null && prev !== undefined ? prev : aTime));
+        const bTime = typeof data.beginnerTimeRemaining === 'number' && data.beginnerTimeRemaining > 0 && data.beginnerTimeRemaining <= bFallback ? data.beginnerTimeRemaining : bFallback;
+        const iTime = typeof data.intermediateTimeRemaining === 'number' && data.intermediateTimeRemaining > 0 && data.intermediateTimeRemaining <= iFallback ? data.intermediateTimeRemaining : iFallback;
+        const aTime = typeof data.advancedTimeRemaining === 'number' && data.advancedTimeRemaining > 0 && data.advancedTimeRemaining <= aFallback ? data.advancedTimeRemaining : aFallback;
+
+        setBeginnerTimeRemaining(bTime);
+        setIntermediateTimeRemaining(iTime);
+        setAdvancedTimeRemaining(aTime);
 
         setSections(loadedSections);
         setQuestions(allQuestions);

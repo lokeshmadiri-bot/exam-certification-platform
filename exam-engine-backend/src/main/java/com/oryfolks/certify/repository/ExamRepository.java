@@ -14,4 +14,6 @@ public interface ExamRepository extends JpaRepository<Exam, UUID> {
     List<Exam> findByStack(String stack);
 
     List<Exam> findByStatus(ExamStatus status);
+
+    java.util.Optional<Exam> findByTitleIgnoreCase(String title);
 }
