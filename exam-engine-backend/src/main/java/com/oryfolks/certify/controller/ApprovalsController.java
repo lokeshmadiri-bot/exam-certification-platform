@@ -34,6 +34,9 @@ public class ApprovalsController {
     private AccessAuditLogRepository auditLogRepository;
 
     @Autowired
+    private com.oryfolks.certify.util.AdminUserHelper adminUserHelper;
+
+    @Autowired
     private ExamAttemptRepository attemptRepository;
 
     @Autowired
@@ -56,7 +59,7 @@ public class ApprovalsController {
                 .orElseThrow(() -> new RuntimeException("Approval request not found: " + id));
 
         String note = body != null ? body.getOrDefault("note", "") : "";
-        String adminName = principal != null ? principal.getName() : "Admin User";
+        String adminName = adminUserHelper.resolveAdminName(principal);
 
         req.setStatus("APPROVED");
         req.setResolvedBy(adminName);
@@ -163,7 +166,7 @@ public class ApprovalsController {
                 .orElseThrow(() -> new RuntimeException("Approval request not found: " + id));
 
         String note = body != null ? body.getOrDefault("note", "") : "";
-        String adminName = principal != null ? principal.getName() : "Admin User";
+        String adminName = adminUserHelper.resolveAdminName(principal);
 
         req.setStatus("REJECTED");
         req.setResolvedBy(adminName);

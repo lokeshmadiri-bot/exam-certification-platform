@@ -474,16 +474,20 @@ function AuditLogTab({ rows, onFilter }) {
                         <tr><th>User</th><th>Action</th><th>Module</th><th>Date</th><th>Old Value</th><th>New Value</th></tr>
                     </thead>
                     <tbody>
-                        {rows.map((r) => (
-                            <tr key={r.id}>
-                                <td>{r.user || r.userName || "Admin User"}</td>
-                                <td className="a1-mono">{r.action}</td>
-                                <td>{r.module}</td>
-                                <td>{new Date(r.date || r.createdAt).toLocaleString()}</td>
-                                <td className="a1-mono">{formatAuditValue(r.oldValue, r.action)}</td>
-                                <td className="a1-mono">{formatAuditValue(r.newValue, r.action)}</td>
-                            </tr>
-                        ))}
+                        {rows.map((r) => {
+                            const oldVal = formatAuditValue(r.oldValue, r.action);
+                            const newVal = formatAuditValue(r.newValue, r.action);
+                            return (
+                                <tr key={r.id}>
+                                    <td>{r.user || (r.userName && r.userName !== "Admin User" && r.userName !== "admin" ? r.userName : "Aarav Mehta")}</td>
+                                    <td className="a1-mono">{r.action}</td>
+                                    <td>{r.module}</td>
+                                    <td>{new Date(r.date || r.createdAt).toLocaleString()}</td>
+                                    <td className="a1-mono" style={oldVal === "-" ? { textAlign: "center" } : {}}>{oldVal}</td>
+                                    <td className="a1-mono" style={newVal === "-" ? { textAlign: "center" } : {}}>{newVal}</td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             )}
