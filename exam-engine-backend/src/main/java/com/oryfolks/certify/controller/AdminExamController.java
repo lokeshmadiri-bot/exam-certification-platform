@@ -28,6 +28,9 @@ public class AdminExamController {
     private AccessAuditLogRepository auditLogRepository;
 
     @Autowired
+    private com.oryfolks.certify.util.AdminUserHelper adminUserHelper;
+
+    @Autowired
     private ApprovalRequestRepository approvalRepository;
 
     @Autowired
@@ -214,7 +217,7 @@ public class AdminExamController {
         Exam saved = examRepository.save(exam);
 
         auditLogRepository.save(AccessAuditLog.builder()
-                .userName(principal != null ? principal.getName() : "Admin User")
+                .userName(adminUserHelper.resolveAdminName(principal))
                 .action("CREATE_EXAM")
                 .module("Exams Library")
                 .oldValue("-")
@@ -267,7 +270,7 @@ public class AdminExamController {
         Exam saved = examRepository.save(exam);
 
         auditLogRepository.save(AccessAuditLog.builder()
-                .userName(principal != null ? principal.getName() : "Admin User")
+                .userName(adminUserHelper.resolveAdminName(principal))
                 .action("EDIT_EXAM_METADATA")
                 .module("Exams Library")
                 .oldValue("-")
@@ -309,7 +312,7 @@ public class AdminExamController {
         Exam savedCopy = examRepository.save(copy);
 
         auditLogRepository.save(AccessAuditLog.builder()
-                .userName(principal != null ? principal.getName() : "Admin User")
+                .userName(adminUserHelper.resolveAdminName(principal))
                 .action("DUPLICATE_EXAM")
                 .module("Exams Library")
                 .oldValue(src.getTitle())

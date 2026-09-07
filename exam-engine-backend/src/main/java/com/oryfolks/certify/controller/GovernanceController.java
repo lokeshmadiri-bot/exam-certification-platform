@@ -28,6 +28,12 @@ public class GovernanceController {
     @Autowired
     private ApprovalRequestRepository approvalRepository;
 
+    @Autowired
+    private com.oryfolks.certify.repository.UserRepository userRepository;
+
+    @Autowired
+    private com.oryfolks.certify.util.AdminUserHelper adminUserHelper;
+
     private GovernanceSetting getOrInitSettings() {
         List<GovernanceSetting> all = governanceSettingRepository.findAll();
         GovernanceSetting gs;
@@ -118,7 +124,7 @@ public class GovernanceController {
         String newValue = String.format("encryption=%s, watermark=%s", gs.getEncryption(), gs.getWatermark());
 
         auditLogRepository.save(AccessAuditLog.builder()
-                .userName(principal != null ? principal.getName() : "Admin User")
+                .userName(adminUserHelper.resolveAdminName(principal))
                 .action("UPDATE_SECURITY")
                 .module("Governance")
                 .oldValue(oldValue)
@@ -154,7 +160,7 @@ public class GovernanceController {
         String newValue = String.format("sensitivity=%s, flagNotFail=%s", gs.getSensitivity(), gs.getFlagNotFail());
 
         auditLogRepository.save(AccessAuditLog.builder()
-                .userName(principal != null ? principal.getName() : "Admin User")
+                .userName(adminUserHelper.resolveAdminName(principal))
                 .action("UPDATE_AI_SETTINGS")
                 .module("Governance")
                 .oldValue(oldValue)
@@ -210,7 +216,7 @@ public class GovernanceController {
                 gs.getAlertWindowSec(), gs.getSnapshotResolution());
 
         auditLogRepository.save(AccessAuditLog.builder()
-                .userName(principal != null ? principal.getName() : "Admin User")
+                .userName(adminUserHelper.resolveAdminName(principal))
                 .action("UPDATE_AI_PARAMETERS")
                 .module("Governance")
                 .oldValue(oldValue)
@@ -242,12 +248,13 @@ public class GovernanceController {
             Object daysObj = body != null ? body.get("days") : null;
             int days = daysObj != null ? Integer.parseInt(daysObj.toString()) : 180;
             String note = (body != null && body.get("note") != null) ? body.get("note").toString() : "";
+            String adminName = adminUserHelper.resolveAdminName(principal);
 
             ApprovalRequest req = ApprovalRequest.builder()
                     .type("RETENTION_CHANGE")
                     .label("Change retention policy → " + days + " days")
                     .targetId("governance")
-                    .requestedBy(principal != null && principal.getName() != null ? principal.getName() : "Admin User")
+                    .requestedBy(adminName)
                     .note(note)
                     .status("PENDING")
                     .payloadJson(days + ":" + (gs != null && gs.getRetentionDays() != null ? gs.getRetentionDays() : 180))
@@ -271,9 +278,24 @@ public class GovernanceController {
     @GetMapping("/audit-log")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getAuditLog(
             @RequestParam(required = false) String module,
-            @RequestParam(required = false) String user) {
+            @RequestParam(required = false) String user,
+            Principal principal) {
 
         List<AccessAuditLog> logs = auditLogRepository.findAllByOrderByCreatedAtDesc();
+
+        String currentAdminName = adminUserHelper.resolveAdminName(principal);
+
+        for (AccessAuditLog log : logs) {
+            String rawUser = log.getUserName();
+            if (rawUser == null || rawUser.isBlank() || "Admin User".equalsIgnoreCase(rawUser) || "admin".equalsIgnoreCase(rawUser)) {
+                log.setUserName(currentAdminName);
+            } else {
+                Optional<com.oryfolks.certify.entity.User> uOpt = userRepository.findByUsername(rawUser);
+                if (uOpt.isPresent() && uOpt.get().getFullName() != null && !uOpt.get().getFullName().isBlank()) {
+                    log.setUserName(uOpt.get().getFullName());
+                }
+            }
+        }
 
         if (module != null && !module.isBlank()) {
             logs = logs.stream().filter(l -> l.getModule() != null && l.getModule().equalsIgnoreCase(module)).toList();

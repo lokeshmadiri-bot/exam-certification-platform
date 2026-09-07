@@ -35,6 +35,9 @@ public class AdminQuestionController {
     private AccessAuditLogRepository auditLogRepository;
 
     @Autowired
+    private com.oryfolks.certify.util.AdminUserHelper adminUserHelper;
+
+    @Autowired
     private GeminiService geminiService;
 
     @Autowired
@@ -117,7 +120,7 @@ public class AdminQuestionController {
         Question saved = questionRepository.save(question);
 
         auditLogRepository.save(AccessAuditLog.builder()
-                .userName(principal != null ? principal.getName() : "Admin User")
+                .userName(adminUserHelper.resolveAdminName(principal))
                 .action("CREATE_QUESTION")
                 .module("Question Bank")
                 .oldValue("-")
@@ -166,7 +169,7 @@ public class AdminQuestionController {
         Question saved = questionRepository.save(existing);
 
         auditLogRepository.save(AccessAuditLog.builder()
-                .userName(principal != null ? principal.getName() : "Admin User")
+                .userName(adminUserHelper.resolveAdminName(principal))
                 .action("EDIT_QUESTION")
                 .module("Question Bank")
                 .oldValue("-")
@@ -202,7 +205,7 @@ public class AdminQuestionController {
         }
 
         auditLogRepository.save(AccessAuditLog.builder()
-                .userName(principal != null ? principal.getName() : "Admin User")
+                .userName(adminUserHelper.resolveAdminName(principal))
                 .action("DELETE_QUESTION")
                 .module("Question Bank")
                 .oldValue(id.toString())
@@ -257,7 +260,7 @@ public class AdminQuestionController {
         }
 
         auditLogRepository.save(AccessAuditLog.builder()
-                .userName(principal != null ? principal.getName() : "Admin User")
+                .userName(adminUserHelper.resolveAdminName(principal))
                 .action("BULK_DELETE_QUESTIONS")
                 .module("Question Bank")
                 .oldValue((deletedCount + softDeletedCount) + " items")
@@ -305,7 +308,7 @@ public class AdminQuestionController {
         }
 
         auditLogRepository.save(AccessAuditLog.builder()
-                .userName(principal != null ? principal.getName() : "Admin User")
+                .userName(adminUserHelper.resolveAdminName(principal))
                 .action("BULK_UPDATE_QUESTIONS")
                 .module("Question Bank")
                 .oldValue(updatedCount + " items")
