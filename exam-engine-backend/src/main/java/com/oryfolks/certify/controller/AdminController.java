@@ -41,6 +41,7 @@ import com.oryfolks.certify.entity.RecordingSession;
 import com.oryfolks.certify.enums.ResultPublishStatus;
 import com.oryfolks.certify.enums.ResultStatus;
 import com.oryfolks.certify.enums.CompetencyLevel;
+import com.oryfolks.certify.util.AdminUserHelper;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.security.Principal;
@@ -53,6 +54,9 @@ public class AdminController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private AdminUserHelper adminUserHelper;
 
     @Autowired
     private AccessAuditLogRepository auditLogRepository;
@@ -411,11 +415,13 @@ public class AdminController {
                     "CANDIDATE_UNLOCK", candidateId.toString(), "PENDING"
             );
         }
+        String adminName = adminUserHelper.resolveAdminName(principal);
+
         if (pendingOpt.isPresent()) {
             ApprovalRequest pending = pendingOpt.get();
             pending.setStatus("APPROVED");
             pending.setTargetId(targetIdStr);
-            pending.setResolvedBy(principal != null ? principal.getName() : "Admin");
+            pending.setResolvedBy(adminName);
             pending.setResolvedAt(LocalDateTime.now());
             approvalRepository.save(pending);
         } else {
@@ -424,11 +430,11 @@ public class AdminController {
                     .type("CANDIDATE_UNLOCK")
                     .label("Unlock candidate · " + (candidate.getFullName() != null ? candidate.getFullName() : candidate.getUsername()))
                     .targetId(targetIdStr)
-                    .requestedBy(principal != null ? principal.getName() : "Admin")
+                    .requestedBy(adminName)
                     .status("APPROVED")
                     .requestedAt(LocalDateTime.now())
                     .resolvedAt(LocalDateTime.now())
-                    .resolvedBy(principal != null ? principal.getName() : "Admin")
+                    .resolvedBy(adminName)
                     .createdAt(LocalDateTime.now())
                     .build();
             approvalRepository.save(req);
@@ -436,8 +442,8 @@ public class AdminController {
 
         auditLogRepository.save(
                 AccessAuditLog.builder()
-                        .userName(principal != null ? principal.getName() : "Admin")
-                        .action("Approved retry override for candidate: " + candidate.getFullName())
+                        .userName(adminName)
+                        .action("Approved retry override for candidate: " + (candidate.getFullName() != null ? candidate.getFullName() : candidate.getUsername()))
                         .module("Candidates")
                         .oldValue("LOCKED")
                         .newValue("OVERRIDE_APPROVED")
