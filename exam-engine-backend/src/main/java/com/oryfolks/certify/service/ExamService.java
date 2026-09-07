@@ -105,6 +105,13 @@
 
         @Transactional
         public Exam createExam(Exam exam) {
+            if (exam.getTitle() != null && !exam.getTitle().trim().isEmpty()) {
+                String trimmedTitle = exam.getTitle().trim();
+                if (examRepository.findByTitleIgnoreCase(trimmedTitle).isPresent()) {
+                    throw new com.oryfolks.certify.exception.BadRequestException("An exam with title '" + trimmedTitle + "' already exists. Please choose a different title.");
+                }
+                exam.setTitle(trimmedTitle);
+            }
             if (exam.getStatus() == null) {
                 exam.setStatus(ExamStatus.ACTIVE);
             }

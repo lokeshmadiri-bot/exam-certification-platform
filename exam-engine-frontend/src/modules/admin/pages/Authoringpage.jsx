@@ -126,6 +126,8 @@ export default function AuthoringPage() {
     const isInitialLoadRef = useRef(true);
     const wasCreated = useRef(false); // tracks whether last save was a create vs update
     const [availableCounts, setAvailableCounts] = useState({ beginner: 0, intermediate: 0, advanced: 0 });
+    const [existingExams, setExistingExams] = useState([]);
+    const [apiErrorMsg, setApiErrorMsg] = useState("");
 
     const difficultyComposition = useMemo(() => {
         return getDifficultyComposition(
@@ -160,15 +162,21 @@ export default function AuthoringPage() {
     useEffect(() => {
         if (isInitialLoadRef.current) {
             isInitialLoadRef.current = false;
+            if (!examId && suggestedDuration > 0) {
+                setField("durationMin", suggestedDuration);
+            }
             return;
         }
-        setField("durationMin", suggestedDuration || "");
-    }, [suggestedDuration]);
+        if (suggestedDuration > 0) {
+            setField("durationMin", suggestedDuration);
+        }
+    }, [suggestedDuration, examId]);
 
-    // Load unique stacks from all existing exams on mount
+    // Load unique stacks and existing exams on mount
     useEffect(() => {
         fetchExams().then((res) => {
             const list = res?.rows || (Array.isArray(res) ? res : []);
+            setExistingExams(list);
             const customStacks = list.map(e => e.stack).filter(Boolean);
             setAvailableStacks(Array.from(new Set([...META.STACKS, ...customStacks])));
         }).catch(() => {});
@@ -180,6 +188,7 @@ export default function AuthoringPage() {
         // so we must clear transient UI state explicitly.
         setShowSuccessModal(false);
         setSavedMsg("");
+        setApiErrorMsg("");
 
         if (!examId) {
             setForm(emptyForm);
@@ -239,6 +248,17 @@ export default function AuthoringPage() {
     const validationErrors = useMemo(() => {
         const errors = {};
         
+        if (form.title && form.title.trim()) {
+            const trimmed = form.title.trim().toLowerCase();
+            const isDup = existingExams.some((e) => {
+                if (examId && (String(e.id) === String(examId))) return false;
+                return (e.title || "").trim().toLowerCase() === trimmed;
+            });
+            if (isDup) {
+                errors.title = "An exam with this title already exists. Please choose a unique title.";
+            }
+        }
+
         const duration = Number(form.durationMin);
         if (form.durationMin !== "") {
             if (duration > 1000) {
@@ -308,7 +328,7 @@ export default function AuthoringPage() {
         }
         
         return errors;
-    }, [form]);
+    }, [form, existingExams, examId]);
 
     const hasValidationErrors = Object.keys(validationErrors).length > 0;
 
@@ -328,10 +348,10 @@ export default function AuthoringPage() {
             return;
         }
 
-
-
         setSavingForm(true);
         setSavedMsg("");
+        setApiErrorMsg("");
+
         const payload = {
             ...form,
             durationMin: Number(form.durationMin),
@@ -343,16 +363,28 @@ export default function AuthoringPage() {
             intermediatePct: form.difficultyMode === "MANUAL" ? Number(form.intermediatePct) : null,
             advancedPct: form.difficultyMode === "MANUAL" ? Number(form.advancedPct) : null,
         };
-        if (examId) {
-            wasCreated.current = false;
-            await updateExam(examId, payload);
-        } else {
-            wasCreated.current = true;
-            const created = await createExam(payload);
-            setParams({ examId: created.id }, { replace: true });
+        try {
+            if (examId) {
+                wasCreated.current = false;
+                await updateExam(examId, payload);
+            } else {
+                wasCreated.current = true;
+                const created = await createExam(payload);
+                setParams({ examId: created.id }, { replace: true });
+            }
+            // Refresh list of existing exams
+            fetchExams().then((res) => {
+                const list = res?.rows || (Array.isArray(res) ? res : []);
+                setExistingExams(list);
+            }).catch(() => {});
+            setShowSuccessModal(true);
+        } catch (err) {
+            console.error("Error saving exam:", err);
+            const msg = err?.response?.data?.message || err?.message || "Failed to save exam. An exam with this name already exists.";
+            setApiErrorMsg(msg);
+        } finally {
+            setSavingForm(false);
         }
-        setSavingForm(false);
-        setShowSuccessModal(true);
     };
 
     const bandErrors = useMemo(() => validateBands(bands), [bands]);
@@ -390,6 +422,7 @@ export default function AuthoringPage() {
             </header>
 
             {savedMsg && <div className="a1-banner a1-banner-green a1-banner-slim">{savedMsg}</div>}
+            {apiErrorMsg && <div className="a1-banner a1-banner-red a1-banner-slim" style={{ marginBottom: 16 }}>⚠ {apiErrorMsg}</div>}
 
             <div className="a1-grid-2">
                 {/* Exam Format Form */}
@@ -404,8 +437,16 @@ export default function AuthoringPage() {
                                     maxLength={32}
                                     placeholder="e.g. Java Backend Developer"
                                     value={form.title}
-                                    onChange={(e) => setField("title", e.target.value.slice(0, 32))}
+                                    onChange={(e) => {
+                                        setApiErrorMsg("");
+                                        setField("title", e.target.value.slice(0, 32));
+                                    }}
                                 />
+                                {validationErrors.title && (
+                                    <span style={{ color: "#ef4444", fontSize: "11px", marginTop: "4px", display: "block" }}>
+                                        {validationErrors.title}
+                                    </span>
+                                )}
                             </div>
                             <div className="a1-field">
                                 <label>Technology Stack *</label>
@@ -523,10 +564,35 @@ export default function AuthoringPage() {
                                     value={form.durationMin} 
                                     onChange={(e) => handleNumberChange("durationMin", e.target.value)} 
                                 />
-                                {validationErrors.durationMin && (
+                                {validationErrors.durationMin ? (
                                     <span style={{ color: "#ef4444", fontSize: "11px", marginTop: "4px", display: "block" }}>
                                         {validationErrors.durationMin}
                                     </span>
+                                ) : (
+                                    <span style={{ fontSize: "11px", color: "var(--a1-mut)", marginTop: "4px", display: "block" }}>
+                                        {suggestedDuration > 0
+                                            ? `Calculated: ${suggestedDuration} mins (${difficultyComposition.beginner} Beginner × 2m + ${difficultyComposition.intermediate} Intermediate × 5m + ${difficultyComposition.advanced} Advanced × 10m)`
+                                            : "Auto-calculated based on questions per attempt (2m Beginner, 5m Intermediate, 10m Advanced)."}
+                                    </span>
+                                )}
+                                {suggestedDuration > 0 && Number(form.durationMin) !== suggestedDuration && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setField("durationMin", suggestedDuration)}
+                                        style={{
+                                            background: "none",
+                                            border: "none",
+                                            color: "#2563eb",
+                                            fontSize: "11px",
+                                            fontWeight: 600,
+                                            cursor: "pointer",
+                                            padding: 0,
+                                            marginTop: "3px",
+                                            textDecoration: "underline"
+                                        }}
+                                    >
+                                        Use suggested duration ({suggestedDuration} mins)
+                                    </button>
                                 )}
                             </div>
                         </div>

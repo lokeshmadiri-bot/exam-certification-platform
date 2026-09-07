@@ -254,19 +254,18 @@ public class AttemptService {
                         }
                 }
 
-                long totalDurationSeconds = (long) (exam.getDurationMinutes() != null ? exam.getDurationMinutes() : 45) * 60;
-                int totalQuestions = selectedQuestions.size();
-                long beginnerTimeSeconds = 0;
-                long intermediateTimeSeconds = 0;
-                long advancedTimeSeconds = 0;
-
-                if (totalQuestions > 0) {
-                        beginnerTimeSeconds = totalDurationSeconds * bCount / totalQuestions;
-                        intermediateTimeSeconds = totalDurationSeconds * iCount / totalQuestions;
-                        advancedTimeSeconds = totalDurationSeconds - beginnerTimeSeconds - intermediateTimeSeconds;
-                }
+                long beginnerTimeSeconds = bCount * 2L * 60L;
+                long intermediateTimeSeconds = iCount * 5L * 60L;
+                long advancedTimeSeconds = aCount * 10L * 60L;
 
                 long totalSeconds = beginnerTimeSeconds + intermediateTimeSeconds + advancedTimeSeconds;
+                if (totalSeconds == 0) {
+                        long totalDurationSeconds = (long) (exam.getDurationMinutes() != null && exam.getDurationMinutes() > 0 ? exam.getDurationMinutes() : 45) * 60L;
+                        beginnerTimeSeconds = totalDurationSeconds / 3;
+                        intermediateTimeSeconds = totalDurationSeconds / 3;
+                        advancedTimeSeconds = totalDurationSeconds - beginnerTimeSeconds - intermediateTimeSeconds;
+                        totalSeconds = totalDurationSeconds;
+                }
 
                 ExamAttempt attempt = ExamAttempt.builder()
                                 .candidate(candidate)

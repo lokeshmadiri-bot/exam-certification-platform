@@ -107,7 +107,8 @@ public class AdminController {
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String exam,
-            @RequestParam(required = false) String locked) {
+            @RequestParam(required = false) String locked,
+            @RequestParam(required = false) String access) {
 
         List<User> candidates = userRepository.findByRole(UserRole.ROLE_CANDIDATE);
         List<Exam> activeExams = examRepository.findByStatus(ExamStatus.ACTIVE);
@@ -289,10 +290,36 @@ public class AdminController {
         if (exam != null && !exam.isBlank()) {
             rows = rows.stream().filter(r -> r.get("examTitle") != null && r.get("examTitle").toString().toLowerCase().contains(exam.toLowerCase())).toList();
         }
-        if (locked != null && !locked.isBlank()) {
-            boolean lockBool = Boolean.parseBoolean(locked);
+        String lockVal = (access != null && !access.isBlank()) ? access : locked;
+        if (lockVal != null && !lockVal.isBlank()) {
+            boolean lockBool = Boolean.parseBoolean(lockVal) || "locked".equalsIgnoreCase(lockVal);
             rows = rows.stream().filter(r -> Boolean.TRUE.equals(r.get("locked")) == lockBool).toList();
         }
+
+        // Sort candidates by attempted date descending (latest attempt first)
+        List<Map<String, Object>> sortedRows = new ArrayList<>(rows);
+        sortedRows.sort((a, b) -> {
+            Object dtA = a.get("lastAttempt");
+            if (dtA == null) dtA = a.get("endTime");
+            if (dtA == null) dtA = a.get("startTime");
+
+            Object dtB = b.get("lastAttempt");
+            if (dtB == null) dtB = b.get("endTime");
+            if (dtB == null) dtB = b.get("startTime");
+
+            if (dtA == null && dtB == null) return 0;
+            if (dtA == null) return 1;  // candidates without attempt date go to the bottom
+            if (dtB == null) return -1; // candidates with attempt date come first
+
+            if (dtA instanceof LocalDateTime && dtB instanceof LocalDateTime) {
+                return ((LocalDateTime) dtB).compareTo((LocalDateTime) dtA);
+            }
+            if (dtA instanceof java.util.Date && dtB instanceof java.util.Date) {
+                return ((java.util.Date) dtB).compareTo((java.util.Date) dtA);
+            }
+            return dtB.toString().compareTo(dtA.toString());
+        });
+        rows = sortedRows;
 
         Map<String, Object> result = new HashMap<>();
         result.put("rows", rows);
@@ -1383,12 +1410,18 @@ public class AdminController {
 
             String resultStr = "NEEDS_REVIEW";
             if (isPublished) {
-                if (a.getResultStatus() == ResultStatus.PASSED) {
+                if ("REJECTED".equalsIgnoreCase(a.getAdminDecision())) {
+                    resultStr = "FAIL";
+                } else if (a.getResultStatus() == ResultStatus.PASSED) {
                     resultStr = "PASS";
                 } else if (a.getResultStatus() == ResultStatus.FAILED || a.getResultStatus() == ResultStatus.TERMINATED) {
                     resultStr = "FAIL";
                 } else {
-                    resultStr = "PASS";
+                    int calcScore = a.getScore() != null ? a.getScore() : calculateAttemptScore(a);
+                    int totMarksVal = (a.getExam() != null && a.getExam().getTotalMarks() != null) ? a.getExam().getTotalMarks() : 100;
+                    int passMark = (a.getExam() != null && a.getExam().getPassMark() != null) ? a.getExam().getPassMark() : 70;
+                    int scorePct = totMarksVal > 0 ? (int) Math.round(((double) calcScore / totMarksVal) * 100) : 0;
+                    resultStr = (scorePct >= passMark) ? "PASS" : "FAIL";
                 }
             }
             map.put("result", resultStr);

@@ -190,11 +190,17 @@ export default function AttemptReviewPage() {
             </h1>
           </div>
         </div>
-        <ResultPill result={
-          attempt.adminDecision === "REJECTED" ? "REJECTED" :
-          (attempt.adminDecision === "CONFIRMED" || attempt.adminDecision === "ACCEPTED") ? "CONFIRMED" :
-          (isAlreadyReviewed ? "REVIEWED" : attempt.result)
-        } />
+        <span className={`a2-pill ${
+          attempt.adminDecision === "REJECTED" ? "a2-pill-red" :
+          (attempt.adminDecision === "CONFIRMED" || attempt.adminDecision === "ACCEPTED" || isAlreadyReviewed) ? "a2-pill-green" :
+          "a2-pill-amber"
+        }`}>
+          {
+            attempt.adminDecision === "REJECTED" ? "Rejected" :
+            (attempt.adminDecision === "CONFIRMED" || attempt.adminDecision === "ACCEPTED" || isAlreadyReviewed) ? "Accepted" :
+            "Needs review"
+          }
+        </span>
       </div>
 
       <style>{`

@@ -260,8 +260,13 @@ export const regenerateAIQuestion = (question) =>
 
 // ---------------- Candidates ----------------
 
-export const fetchCandidates = (filters = {}) =>
-    withFallback(() => get("/candidates", filters), () => mockListCandidates(filters));
+export const fetchCandidates = (filters = {}) => {
+    const params = { ...filters };
+    if (params.access !== undefined && params.access !== "" && !params.locked) {
+        params.locked = params.access;
+    }
+    return withFallback(() => get("/candidates", params), () => mockListCandidates(params));
+};
 
 export const requestCandidateLockOverride = (id, note) =>
     withFallback(() => post(`/candidates/${id}/lock-override/request`, { note }), () =>
@@ -653,11 +658,24 @@ function mockBulkUpdateQuestions(ids, patch) {
     return { ok: true, updated: ids.length };
 }
 function mockListCandidates(filters) {
-    let rows = MOCK.candidates;
+    let rows = [...MOCK.candidates];
     if (filters.q) rows = rows.filter((c) => (c.candidateName || c.name || '').toLowerCase().includes(filters.q.toLowerCase()) || (c.email || '').toLowerCase().includes(filters.q.toLowerCase()));
-    if (filters.status) rows = rows.filter((c) => c.status === filters.status);
+    
+    const lockVal = filters.access !== undefined && filters.access !== "" ? filters.access : filters.locked;
+    if (lockVal !== undefined && lockVal !== "") {
+        rows = rows.filter((c) => String(c.locked) === String(lockVal));
+    }
     if (filters.exam) rows = rows.filter((c) => (c.examTitle || c.exam || '') === filters.exam);
-    if (filters.locked) rows = rows.filter((c) => String(c.locked) === filters.locked);
+
+    rows.sort((a, b) => {
+        const dtA = a.lastAttempt || a.attemptedDate || a.endTime || a.startTime || null;
+        const dtB = b.lastAttempt || b.attemptedDate || b.endTime || b.startTime || null;
+        if (!dtA && !dtB) return 0;
+        if (!dtA) return 1;
+        if (!dtB) return -1;
+        return new Date(dtB) - new Date(dtA);
+    });
+
     return { rows, total: rows.length };
 }
 function mockRequestLockOverride(id, note) {
