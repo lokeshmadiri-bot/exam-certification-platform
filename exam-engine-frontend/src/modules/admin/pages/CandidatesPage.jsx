@@ -280,6 +280,9 @@ export default function CandidatesPage() {
     const submitOverride = async () => {
         const cId = overrideFor?.candidateId || overrideFor?.userId || overrideFor?.id;
         const eId = overrideFor?.examId;
+        const candidateName = overrideFor?.candidateName || "Candidate";
+        const examTitle = overrideFor?.examTitle || overrideFor?.examName;
+
         if (!cId) {
             setFeedbackModal({
                 title: "Unlock Failed",
@@ -290,7 +293,10 @@ export default function CandidatesPage() {
         }
         try {
             await approveCandidateOverride(cId, eId);
-            setToastMessage(`Candidate "${overrideFor?.candidateName || 'Candidate'}" unlocked successfully.`);
+            const successMsg = examTitle
+                ? `Candidate "${candidateName}" unlocked successfully for ${examTitle}.`
+                : `Candidate "${candidateName}" unlocked successfully.`;
+            setToastMessage(successMsg);
         } catch (err) {
             console.error("Override lock error:", err);
             setFeedbackModal({
@@ -424,7 +430,7 @@ export default function CandidatesPage() {
             <RequestApprovalModal
                 open={!!overrideFor}
                 title={overrideFor ? `Override lock for ${overrideFor.candidateName}?` : ""}
-                description="This will immediately remove the 30-day retry lock for this certification exam."
+                description={overrideFor?.examTitle ? `This will immediately remove the 30-day retry lock for ${overrideFor.examTitle}.` : "This will immediately remove the 30-day retry lock for this certification exam."}
                 confirmLabel="Approve Override"
                 tone="amber"
                 onCancel={() => setOverrideFor(null)}
