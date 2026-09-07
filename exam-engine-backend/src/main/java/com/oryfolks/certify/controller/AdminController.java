@@ -300,9 +300,15 @@ public class AdminController {
             rows = rows.stream().filter(r -> Boolean.TRUE.equals(r.get("locked")) == lockBool).toList();
         }
 
-        // Sort candidates by attempted date descending (latest attempt first)
+        // Sort candidates: 1) Locked records first, 2) Attempted date descending (latest attempt first)
         List<Map<String, Object>> sortedRows = new ArrayList<>(rows);
         sortedRows.sort((a, b) -> {
+            boolean isLockedA = Boolean.TRUE.equals(a.get("locked"));
+            boolean isLockedB = Boolean.TRUE.equals(b.get("locked"));
+            if (isLockedA != isLockedB) {
+                return isLockedA ? -1 : 1;
+            }
+
             Object dtA = a.get("lastAttempt");
             if (dtA == null) dtA = a.get("endTime");
             if (dtA == null) dtA = a.get("startTime");

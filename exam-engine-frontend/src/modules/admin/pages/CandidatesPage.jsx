@@ -226,6 +226,14 @@ export default function CandidatesPage() {
             let fetchedRows = res?.rows || res || [];
             if (Array.isArray(fetchedRows)) {
                 fetchedRows = [...fetchedRows].sort((a, b) => {
+                    // 1. Primary rule: Locked records come first
+                    const isLockedA = Boolean(a.locked);
+                    const isLockedB = Boolean(b.locked);
+                    if (isLockedA !== isLockedB) {
+                        return isLockedA ? -1 : 1;
+                    }
+
+                    // 2. Secondary rule: Attempted date descending (latest first)
                     const dtA = a.lastAttempt || a.attemptedDate || a.endTime || a.startTime || null;
                     const dtB = b.lastAttempt || b.attemptedDate || b.endTime || b.startTime || null;
 
