@@ -163,7 +163,7 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
     };
 
     // ---- Continuous Pool Generation ----
-    const runGeneration = async (targetSize, existingQuestions = []) => {
+    const runGeneration = async (targetSize, existingQuestions = [], overrideBatchSize = null) => {
         setGenerating(true);
         setError(null);
         cancelRef.current = false;
@@ -178,7 +178,8 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
                 }
 
                 const shortage = targetSize - (initialAvailable + currentQuestions.length);
-                const batchSize = Math.min(Number(form.count) || 10, shortage);
+                const requestedBatch = overrideBatchSize || Number(form.count) || 10;
+                const batchSize = Math.min(requestedBatch, shortage);
 
                 const payload = {
                     stack: form.stack,
@@ -321,9 +322,11 @@ export default function AIQuestionGenerator({ examId, exams = [], onClose, onSav
         } else if (action === "approve_save") {
             await handleSave();
         } else if (action === "generate_more") {
-            const newPoolSize = Number(form.poolSize) + 10;
+            const currentTotal = initialAvailable + questions.length;
+            const batchCount = 10;
+            const newPoolSize = Math.max(Number(form.poolSize) + batchCount, currentTotal + batchCount);
             setForm(f => ({ ...f, poolSize: newPoolSize }));
-            await runGeneration(newPoolSize, questions);
+            await runGeneration(newPoolSize, questions, 10);
         } else if (action === "clear_start_over") {
             setQuestions([]);
             setDuplicateCount(0);
