@@ -259,10 +259,34 @@ public class GeminiService {
                 .examId(q.getExamId()).build();
     }
 
+    private String getFallbackModel(String endpointUrl, String key) {
+        try {
+            String modelsUrl = endpointUrl.replace("/chat/completions", "/models");
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(key);
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.exchange(modelsUrl, HttpMethod.GET, entity, String.class);
+            JsonNode root = objectMapper.readTree(response.getBody());
+            JsonNode dataNode = root.path("data");
+            if (dataNode.isArray() && dataNode.size() > 0) {
+                for (JsonNode modelNode : dataNode) {
+                    String id = modelNode.path("id").asText();
+                    if (id.contains("gpt") || id.contains("llama") || id.contains("qwen") || id.contains("mixtral") || id.contains("gemma")) {
+                        return id;
+                    }
+                }
+                return dataNode.get(0).path("id").asText();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to fetch dynamic models: {}", e.getMessage());
+        }
+        return "openai/gpt-oss-20b";
+    }
+
     private List<GeneratedQuestionDTO> generateWithOpenAiFormat(GenerateQuestionRequest req, String key,
             String endpointUrl, String model, String providerName) {
         String prompt = buildPrompt(req);
-        String selectedModel = (model != null && !model.isBlank()) ? model : "groq/compound-mini";
+        String selectedModel = (model != null && !model.isBlank()) ? model : "openai/gpt-oss-20b";
 
         Map<String, Object> requestBody = Map.of(
                 "model", selectedModel,
@@ -283,7 +307,20 @@ public class GeminiService {
             return parseOpenAiResponse(response.getBody(), req, providerName + " (" + selectedModel + ")");
         } catch (Exception e) {
             String errStr = e.getMessage() != null ? e.getMessage() : "";
-            if (errStr.contains("429") || errStr.contains("Too Many Requests") || errStr.contains("Rate limit")) {
+            if (errStr.contains("404") || errStr.contains("model_not_found") || errStr.contains("does not exist") || errStr.contains("400") || errStr.contains("Invalid model")) {
+                log.warn("Model '{}' not found or invalid. Fetching available models dynamically...", selectedModel);
+                String dynamicModel = getFallbackModel(endpointUrl, key);
+                log.info("Retrying with dynamic model: {}", dynamicModel);
+                java.util.Map<String, Object> retryBody = new java.util.HashMap<>(requestBody);
+                retryBody.put("model", dynamicModel);
+                HttpEntity<java.util.Map<String, Object>> retryEntity = new HttpEntity<>(retryBody, headers);
+                try {
+                    ResponseEntity<String> response = restTemplate.postForEntity(endpointUrl, retryEntity, String.class);
+                    return parseOpenAiResponse(response.getBody(), req, providerName + " (" + dynamicModel + ")");
+                } catch (Exception retryEx) {
+                    log.error("Retry with dynamic model also failed: {}", retryEx.getMessage());
+                }
+            } else if (errStr.contains("429") || errStr.contains("Too Many Requests") || errStr.contains("Rate limit")) {
                 log.warn("Rate limit (429) hit. Waiting 2.5 seconds before retrying...");
                 try { Thread.sleep(2500); } catch (InterruptedException ignored) {}
                 try {
