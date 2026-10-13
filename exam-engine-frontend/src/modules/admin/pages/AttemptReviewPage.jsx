@@ -7,7 +7,7 @@ import {
   fetchAttempt, fetchRecordingUrl, fetchFlags, fetchScore,
   confirmResult, rejectResult, escalateForSecondReview,
 } from "../services/api";
-import { ResultPill } from "./AttemptsPage";
+import { ResultPill, formatDateTime } from "./AttemptsPage";
 
 export default function AttemptReviewPage() {
   const { attemptId } = useParams();
@@ -704,7 +704,7 @@ export default function AttemptReviewPage() {
                   </div>
                   {(attempt.publishedAt || attempt.reviewedDate) && (
                     <div style={{ fontSize: "11px", color: "#ef4444", opacity: 0.85, fontFamily: "monospace", marginTop: "4px" }}>
-                      Reviewed on: {new Date(attempt.publishedAt || attempt.reviewedDate).toLocaleString()}
+                      Reviewed on: {formatDateTime(attempt.publishedAt || attempt.reviewedDate)}
                     </div>
                   )}
                 </div>
@@ -725,7 +725,7 @@ export default function AttemptReviewPage() {
                   </div>
                   {(attempt.publishedAt || attempt.reviewedDate) && (
                     <div style={{ fontSize: "11px", color: "#22c55e", opacity: 0.85, fontFamily: "monospace", marginTop: "4px" }}>
-                      Reviewed on: {new Date(attempt.publishedAt || attempt.reviewedDate).toLocaleString()}
+                      Reviewed on: {formatDateTime(attempt.publishedAt || attempt.reviewedDate)}
                     </div>
                   )}
                 </div>

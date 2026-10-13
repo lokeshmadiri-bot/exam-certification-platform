@@ -7,6 +7,33 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { fetchAttempts, fetchReviewAttempts, fetchExams, META } from "../services/api";
 import "../components/a2.css";
 
+export function parseDate(dateStr) {
+  if (!dateStr) return null;
+  let str = String(dateStr).trim();
+  // If the date string has no timezone indicator (e.g. '2026-10-13T10:11:55'),
+  // it was stored as UTC on the server. Append 'Z' so the browser converts it
+  // properly to the user's local timezone (e.g. IST).
+  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(str)) {
+    str = str.replace(" ", "T") + "Z";
+  }
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+export function formatDateTime(dateStr) {
+  const d = parseDate(dateStr);
+  if (!d) return "—";
+  return d.toLocaleString("en-US", {
+    month: "numeric",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+}
+
 export function getEvaluatedStatus(r) {
   if (!r) return "FAIL";
   if (r.adminDecision === "REJECTED") return "FAIL";
@@ -121,21 +148,37 @@ export default function AttemptsPage() {
       }
       if (filters.from) {
         rows = rows.filter((r) => {
-          const dt = r.submittedAt || r.createdAt;
-          return dt && new Date(dt) >= new Date(filters.from);
+          const dt = parseDate(r.submittedAt || r.createdAt);
+          return dt && dt >= new Date(filters.from);
         });
       }
       if (filters.to) {
         rows = rows.filter((r) => {
-          const dt = r.submittedAt || r.createdAt;
-          return dt && new Date(dt) <= new Date(`${filters.to}T23:59:59`);
+          const dt = parseDate(r.submittedAt || r.createdAt);
+          return dt && dt <= new Date(`${filters.to}T23:59:59`);
         });
       }
 
       return [...rows].sort((a, b) => {
-        const dateA = new Date(a.submittedAt || a.createdAt || 0).getTime();
-        const dateB = new Date(b.submittedAt || b.createdAt || 0).getTime();
+        const dateA = parseDate(a.submittedAt || a.createdAt)?.getTime() || 0;
+        const dateB = parseDate(b.submittedAt || b.createdAt)?.getTime() || 0;
         return dateB - dateA;
+      });
+    }
+
+    if (filters.stack) {
+      rows = rows.filter((r) => r.stack === filters.stack);
+    }
+    if (filters.from) {
+      rows = rows.filter((r) => {
+        const dt = parseDate(r.submittedAt || r.createdAt);
+        return dt && dt >= new Date(filters.from);
+      });
+    }
+    if (filters.to) {
+      rows = rows.filter((r) => {
+        const dt = parseDate(r.submittedAt || r.createdAt);
+        return dt && dt <= new Date(`${filters.to}T23:59:59`);
       });
     }
 
@@ -164,8 +207,8 @@ export default function AttemptsPage() {
       if (!isReviewedA && isReviewedB) return -1;
       if (isReviewedA && !isReviewedB) return 1;
 
-      const dateA = new Date(a.submittedAt || a.createdAt || 0).getTime();
-      const dateB = new Date(b.submittedAt || b.createdAt || 0).getTime();
+      const dateA = parseDate(a.submittedAt || a.createdAt)?.getTime() || 0;
+      const dateB = parseDate(b.submittedAt || b.createdAt)?.getTime() || 0;
       return dateB - dateA;
     });
   }, [data.rows, filters, isReviewPage]);
@@ -294,10 +337,10 @@ export default function AttemptsPage() {
                           )}
                         </td>
                       )}
-                      <td>{r.submittedAt ? new Date(r.submittedAt).toLocaleString("en-US", { month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }) : (r.createdAt ? new Date(r.createdAt).toLocaleString("en-US", { month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }) : "—")}</td>
+                      <td>{formatDateTime(r.submittedAt || r.createdAt)}</td>
                       {isReviewPage && (
                         <td>
-                          {r.reviewedDate || r.publishedAt ? new Date(r.reviewedDate || r.publishedAt).toLocaleString() : "—"}
+                          {formatDateTime(r.reviewedDate || r.publishedAt)}
                         </td>
                       )}
                     </tr>
@@ -315,8 +358,8 @@ export default function AttemptsPage() {
                                 (r.adminDecision === "CONFIRMED" || r.adminDecision === "ACCEPTED") ? "Accepted" :
                                 (filters.result === "REVIEWED" || r.isReviewed || ["CONFIRMED", "REJECTED", "REVIEWED", "PUBLISHED", "PASS", "FAIL"].includes((r.result || "").toUpperCase())) ? "Reviewed" : "Needs review"
                               } />
-                              <Fact label="Submitted date" value={r.submittedAt ? new Date(r.submittedAt).toLocaleString() : "—"} />
-                              <Fact label="Reviewed date" value={r.reviewedDate || r.publishedAt ? new Date(r.reviewedDate || r.publishedAt).toLocaleString() : "—"} />
+                              <Fact label="Submitted date" value={formatDateTime(r.submittedAt || r.createdAt)} />
+                              <Fact label="Reviewed date" value={formatDateTime(r.reviewedDate || r.publishedAt)} />
                             </div>
                             <div className="a2-drill-actions">
                               <button
