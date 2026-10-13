@@ -959,13 +959,17 @@ public class AdminController {
         // Look up the real RecordingSession for this attempt
         List<RecordingSession> sessions = recordingSessionRepository.findByAttemptId(id);
         if (!sessions.isEmpty()) {
-            // Use the most recent completed session
-            sessions.sort((a, b) -> {
-                if (a.getEndedAt() == null) return 1;
-                if (b.getEndedAt() == null) return -1;
-                return b.getEndedAt().compareTo(a.getEndedAt());
-            });
-            RecordingSession session = sessions.get(0);
+            // Prioritize sessions with a valid videoUrl, then most recent ended/started
+            RecordingSession session = sessions.stream()
+                    .filter(s -> s.getVideoUrl() != null && !s.getVideoUrl().isBlank())
+                    .sorted((a, b) -> {
+                        if (a.getEndedAt() != null && b.getEndedAt() != null) return b.getEndedAt().compareTo(a.getEndedAt());
+                        if (a.getStartedAt() != null && b.getStartedAt() != null) return b.getStartedAt().compareTo(a.getStartedAt());
+                        return 0;
+                    })
+                    .findFirst()
+                    .orElse(sessions.get(0));
+
             String videoUrl = session.getVideoUrl();
             res.put("url", videoUrl != null ? videoUrl : "");
             res.put("sessionId", session.getId());
