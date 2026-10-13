@@ -980,8 +980,8 @@ public class AdminController {
             res.put("streamUrl", "/api/admin/attempts/" + id + "/recording-stream");
             res.put("sessionId", session.getId());
             res.put("status", session.getStatus());
-            res.put("startedAt", session.getStartedAt() != null ? session.getStartedAt().toString() : null);
-            res.put("endedAt", session.getEndedAt() != null ? session.getEndedAt().toString() : null);
+            res.put("startedAt", session.getStartedAt() != null ? formatIsoUtc(session.getStartedAt()) : null);
+            res.put("endedAt", session.getEndedAt() != null ? formatIsoUtc(session.getEndedAt()) : null);
         } else {
             res.put("url", "");
             res.put("streamUrl", "");
@@ -1421,6 +1421,11 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success("All notifications marked as read", Map.of("ok", true)));
     }
 
+    private String formatIsoUtc(LocalDateTime dt) {
+        if (dt == null) return null;
+        return dt.atZone(java.time.ZoneOffset.UTC).toInstant().toString();
+    }
+
     private Map<String, Object> mapAttemptSummary(ExamAttempt a) {
         return mapAttemptSummary(a, null);
     }
@@ -1477,16 +1482,16 @@ public class AdminController {
             }
             map.put("result", resultStr);
 
-            map.put("submittedAt", a.getSubmittedAt() != null ? a.getSubmittedAt().toString()
-                    : (a.getEndTime() != null ? a.getEndTime().toString()
-                    : (a.getCreatedAt() != null ? a.getCreatedAt().toString() : new Date().toString())));
+            map.put("submittedAt", a.getSubmittedAt() != null ? formatIsoUtc(a.getSubmittedAt())
+                    : (a.getEndTime() != null ? formatIsoUtc(a.getEndTime())
+                    : (a.getCreatedAt() != null ? formatIsoUtc(a.getCreatedAt()) : formatIsoUtc(LocalDateTime.now()))));
 
             map.put("adminDecision", a.getAdminDecision() != null ? a.getAdminDecision() : "NONE");
             map.put("resultPublishStatus", a.getResultPublishStatus() != null ? a.getResultPublishStatus().name() : "DRAFT");
             boolean isRev = isPublished || (a.getAdminDecision() != null && !a.getAdminDecision().isBlank() && !"NONE".equalsIgnoreCase(a.getAdminDecision()));
             map.put("isReviewed", isRev);
-            map.put("publishedAt", a.getPublishedAt() != null ? a.getPublishedAt().toString() : null);
-            map.put("reviewedDate", a.getPublishedAt() != null ? a.getPublishedAt().toString() : null);
+            map.put("publishedAt", a.getPublishedAt() != null ? formatIsoUtc(a.getPublishedAt()) : null);
+            map.put("reviewedDate", a.getPublishedAt() != null ? formatIsoUtc(a.getPublishedAt()) : null);
             map.put("rejectionReason", a.getRejectionReason() != null ? a.getRejectionReason() : "");
 
             int flagsCount = 0;
