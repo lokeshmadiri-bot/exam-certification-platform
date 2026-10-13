@@ -12,10 +12,13 @@ Production-ready React application managing candidate examination flows, proctor
 
 ## Configuration
 
-Set the API endpoint inside `.env`:
+Set the API endpoint inside `.env` (or in Vercel project environment variables):
 ```env
 VITE_API_URL=http://localhost:8080/api
+VITE_API_HOST=http://localhost:8080
 ```
+*(For production, e.g. `https://exam-certification-platform.onrender.com/api` and `https://exam-certification-platform.onrender.com`)*
+
 
 ## Getting Started
 

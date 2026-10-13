@@ -4,7 +4,12 @@
 // through this file.
 // ============================================================
 
-const API_HOST = import.meta.env.VITE_API_HOST || "http://localhost:8080";
+const getApiHost = () => {
+    if (import.meta.env.VITE_API_HOST) return import.meta.env.VITE_API_HOST;
+    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL.replace(/\/api\/?$/, "");
+    return "http://localhost:8080";
+};
+const API_HOST = getApiHost();
 const BASE = `${API_HOST}/api/admin`;
 const AUTH_BASE = `${API_HOST}/api/auth`;
 

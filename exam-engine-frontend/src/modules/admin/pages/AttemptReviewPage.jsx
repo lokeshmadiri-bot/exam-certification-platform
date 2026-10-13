@@ -24,10 +24,15 @@ export default function AttemptReviewPage() {
   const [videoDuration, setVideoDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
   useEffect(() => {
+    setVideoError(false);
     fetchAttempt(attemptId).then(setAttempt);
-    fetchRecordingUrl(attemptId).then(setRecording);
+    fetchRecordingUrl(attemptId).then((rec) => {
+      setRecording(rec);
+      setVideoError(false);
+    });
     fetchFlags(attemptId).then(setFlags);
     fetchScore(attemptId).then(setScore);
   }, [attemptId]);
@@ -121,7 +126,9 @@ export default function AttemptReviewPage() {
     if (url.startsWith("http://") || url.startsWith("https://")) {
       return url;
     }
-    const apiHost = import.meta.env.VITE_API_HOST || "http://localhost:8080";
+    const apiHost = import.meta.env.VITE_API_HOST
+      || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, "") : "")
+      || "http://localhost:8080";
     const prefix = apiHost.endsWith("/") ? apiHost.slice(0, -1) : apiHost;
     const path = url.startsWith("/") ? url : "/" + url;
     return prefix + path;
@@ -233,28 +240,76 @@ export default function AttemptReviewPage() {
               </span>
             </div>
 
-            {recording?.url ? (
-              <div style={{ position: "relative", backgroundColor: "#000" }}>
-                <video
-                  key={recording.url}
-                  ref={videoRef}
-                  src={getFullVideoUrl(recording.url)}
-                  preload="auto"
-                  onClick={togglePlay}
-                  onPlay={() => setIsPlaying(true)}
-                  onPause={() => setIsPlaying(false)}
-                  onEnded={() => setIsPlaying(false)}
-                  onTimeUpdate={handleTimeUpdate}
-                  onLoadedMetadata={handleTimeUpdate}
-                  onDurationChange={handleTimeUpdate}
-                  onError={(e) => {
-                    console.error("Video load error:", e.target?.error, getFullVideoUrl(recording.url));
-                  }}
-                  style={{ width: "100%", height: "auto", aspectRatio: "1.3333 / 1", maxHeight: "360px", objectFit: "contain", backgroundColor: "#000", display: "block", cursor: "pointer" }}
-                >
-                  <source src={getFullVideoUrl(recording.url)} type="video/webm" />
-                  Your browser does not support HTML5 WebM video.
-                </video>
+            {recording?.url ? (() => {
+              const isHttps = typeof window !== "undefined" && window.location?.protocol === "https:";
+              const activeVideoUrl = (isHttps && recording?.url?.startsWith("http://"))
+                ? (recording?.streamUrl || `/api/admin/attempts/${attemptId}/recording-stream`)
+                : (recording?.streamUrl || recording?.url || "");
+
+              return (
+                <div style={{ position: "relative", backgroundColor: "#000" }}>
+                  <video
+                    key={activeVideoUrl}
+                    ref={videoRef}
+                    src={getFullVideoUrl(activeVideoUrl)}
+                    preload="auto"
+                    onClick={togglePlay}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    onEnded={() => setIsPlaying(false)}
+                    onTimeUpdate={handleTimeUpdate}
+                    onLoadedMetadata={handleTimeUpdate}
+                    onDurationChange={handleTimeUpdate}
+                    onError={(e) => {
+                      console.error("Video load error:", e.target?.error, getFullVideoUrl(activeVideoUrl));
+                      setVideoError(true);
+                    }}
+                    style={{ width: "100%", height: "auto", aspectRatio: "1.3333 / 1", maxHeight: "360px", objectFit: "contain", backgroundColor: "#000", display: "block", cursor: "pointer" }}
+                  >
+                    <source src={getFullVideoUrl(activeVideoUrl)} type="video/webm" />
+                    Your browser does not support HTML5 WebM video.
+                  </video>
+
+                  {videoError && (
+                    <div style={{
+                      margin: "12px 18px",
+                      padding: "12px 16px",
+                      backgroundColor: "rgba(239, 68, 68, 0.12)",
+                      border: "1px solid rgba(239, 68, 68, 0.3)",
+                      borderRadius: "10px",
+                      color: "#fca5a5",
+                      fontSize: "12.5px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "12px"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "16px" }}>⚠️</span>
+                        <span>Recording video could not be loaded from storage. The file may have expired or is unavailable.</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setVideoError(false);
+                          if (videoRef.current) {
+                            videoRef.current.load();
+                          }
+                        }}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          backgroundColor: "rgba(255,255,255,0.08)",
+                          border: "1px solid rgba(255,255,255,0.2)",
+                          color: "#ffffff",
+                          fontSize: "12px",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
 
                 {/* Single Unified Player Control Bar with White Line & Flag Markers */}
                 <div style={{ padding: "12px 18px 14px", backgroundColor: "#061224", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -390,7 +445,8 @@ export default function AttemptReviewPage() {
                   </div>
                 </div>
               </div>
-            ) : (
+            );
+          })() : (
               <div style={{
                 height: "300px", display: "flex", flexDirection: "column",
                 alignItems: "center", justifyContent: "center", gap: "12px",

@@ -59,4 +59,78 @@ public class LocalStorageService implements StorageService {
             throw new RuntimeException("Could not store file. Error: " + ex.getMessage(), ex);
         }
     }
+
+    @Override
+    public org.springframework.http.ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody> streamFile(String fileUrlOrPath, String rangeHeader) {
+        if (fileUrlOrPath == null || fileUrlOrPath.isBlank()) {
+            return org.springframework.http.ResponseEntity.notFound().build();
+        }
+
+        String pathStr = fileUrlOrPath;
+        if (pathStr.startsWith("/uploads/")) {
+            pathStr = pathStr.substring(9);
+        } else if (pathStr.startsWith("uploads/")) {
+            pathStr = pathStr.substring(8);
+        }
+
+        Path targetPath = Paths.get(uploadDir, pathStr).toAbsolutePath().normalize();
+        File file = targetPath.toFile();
+        if (!file.exists()) {
+            file = new File(fileUrlOrPath.startsWith("/") ? fileUrlOrPath.substring(1) : fileUrlOrPath);
+        }
+
+        if (file.exists() && file.isFile()) {
+            return S3StorageService.streamLocalFile(file, rangeHeader);
+        }
+
+        // If it's an HTTP URL (e.g. MinIO), proxy it
+        if (fileUrlOrPath.startsWith("http://") || fileUrlOrPath.startsWith("https://")) {
+            try {
+                java.net.URI uri = java.net.URI.create(fileUrlOrPath);
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) uri.toURL().openConnection();
+                if (rangeHeader != null) {
+                    conn.setRequestProperty("Range", rangeHeader);
+                }
+                conn.connect();
+
+                int code = conn.getResponseCode();
+                if (code >= 400) {
+                    return org.springframework.http.ResponseEntity.status(code).build();
+                }
+
+                org.springframework.http.HttpStatus status = org.springframework.http.HttpStatus.valueOf(code);
+                org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+                headers.set(org.springframework.http.HttpHeaders.CONTENT_TYPE, conn.getContentType() != null ? conn.getContentType() : "video/webm");
+                headers.set(org.springframework.http.HttpHeaders.ACCEPT_RANGES, "bytes");
+                String contentRange = conn.getHeaderField("Content-Range");
+                if (contentRange != null) {
+                    headers.set(org.springframework.http.HttpHeaders.CONTENT_RANGE, contentRange);
+                }
+                long len = conn.getContentLengthLong();
+                if (len > 0) {
+                    headers.setContentLength(len);
+                }
+
+                java.io.InputStream in = conn.getInputStream();
+                org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody responseBody = outputStream -> {
+                    try (in) {
+                        byte[] buffer = new byte[16384];
+                        int read;
+                        while ((read = in.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, read);
+                        }
+                        outputStream.flush();
+                    } catch (Exception ignored) {}
+                };
+
+                return org.springframework.http.ResponseEntity.status(status).headers(headers).body(responseBody);
+            } catch (Exception e) {
+                System.err.println("Proxy streaming error in LocalStorageService: " + e.getMessage());
+                return org.springframework.http.ResponseEntity.notFound().build();
+            }
+        }
+
+        return org.springframework.http.ResponseEntity.notFound().build();
+    }
 }
+
