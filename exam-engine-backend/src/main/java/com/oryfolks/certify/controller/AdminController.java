@@ -42,7 +42,9 @@ import com.oryfolks.certify.enums.ResultPublishStatus;
 import com.oryfolks.certify.enums.ResultStatus;
 import com.oryfolks.certify.enums.CompetencyLevel;
 import com.oryfolks.certify.util.AdminUserHelper;
+import com.oryfolks.certify.service.StorageService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.security.Principal;
 import java.time.LocalDateTime;
@@ -99,6 +101,9 @@ public class AdminController {
 
     @Autowired
     private ExamAttemptQuestionRepository examAttemptQuestionRepository;
+
+    @Autowired
+    private StorageService storageService;
 
     @Value("${app.retry-lock-duration-days:30}")
     private int retryLockDurationDays;
@@ -972,17 +977,47 @@ public class AdminController {
 
             String videoUrl = session.getVideoUrl();
             res.put("url", videoUrl != null ? videoUrl : "");
+            res.put("streamUrl", "/api/admin/attempts/" + id + "/recording-stream");
             res.put("sessionId", session.getId());
             res.put("status", session.getStatus());
             res.put("startedAt", session.getStartedAt() != null ? session.getStartedAt().toString() : null);
             res.put("endedAt", session.getEndedAt() != null ? session.getEndedAt().toString() : null);
         } else {
             res.put("url", "");
+            res.put("streamUrl", "");
             res.put("sessionId", null);
             res.put("status", "NOT_FOUND");
         }
 
         return ResponseEntity.ok(ApiResponse.success("Recording URL retrieved", res));
+    }
+
+    @GetMapping("/attempts/{id}/recording-stream")
+    public ResponseEntity<StreamingResponseBody> streamRecording(
+            @PathVariable UUID id,
+            @RequestHeader(value = "Range", required = false) String rangeHeader) {
+
+        List<RecordingSession> sessions = recordingSessionRepository.findByAttemptId(id);
+        if (sessions == null || sessions.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        RecordingSession session = sessions.stream()
+                .filter(s -> s.getVideoUrl() != null && !s.getVideoUrl().isBlank())
+                .sorted((a, b) -> {
+                    if (a.getEndedAt() != null && b.getEndedAt() != null) return b.getEndedAt().compareTo(a.getEndedAt());
+                    if (a.getStartedAt() != null && b.getStartedAt() != null) return b.getStartedAt().compareTo(a.getStartedAt());
+                    return 0;
+                })
+                .findFirst()
+                .orElse(sessions.get(0));
+
+        String videoUrl = session.getVideoUrl();
+        if (videoUrl == null || videoUrl.isBlank()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return storageService.streamFile(videoUrl, rangeHeader);
     }
 
     @GetMapping("/attempts/{id}/flags")

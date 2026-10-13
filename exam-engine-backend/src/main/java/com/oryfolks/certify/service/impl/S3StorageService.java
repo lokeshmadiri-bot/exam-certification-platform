@@ -157,4 +157,164 @@ public class S3StorageService implements StorageService {
             throw new RuntimeException("Failed to upload file to S3", e);
         }
     }
+
+    private String extractS3Key(String urlOrPath) {
+        if (urlOrPath == null) return null;
+        if (bucketName != null && urlOrPath.contains("/" + bucketName + "/")) {
+            return urlOrPath.substring(urlOrPath.indexOf("/" + bucketName + "/") + bucketName.length() + 2);
+        }
+        if (urlOrPath.contains("recordings/")) {
+            return urlOrPath.substring(urlOrPath.indexOf("recordings/"));
+        }
+        if (urlOrPath.contains("snapshots/")) {
+            return urlOrPath.substring(urlOrPath.indexOf("snapshots/"));
+        }
+        return urlOrPath.startsWith("/") ? urlOrPath.substring(1) : urlOrPath;
+    }
+
+    @Override
+    public org.springframework.http.ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody> streamFile(String fileUrlOrPath, String rangeHeader) {
+        if (fileUrlOrPath == null || fileUrlOrPath.isBlank()) {
+            return org.springframework.http.ResponseEntity.notFound().build();
+        }
+
+        // 1. If it exists on local filesystem (e.g. from local fallback), stream it directly
+        String localCandidate = fileUrlOrPath.startsWith("/") ? fileUrlOrPath.substring(1) : fileUrlOrPath;
+        java.io.File localFile = new java.io.File(localCandidate);
+        if (!localFile.exists() && localCandidate.startsWith("uploads/")) {
+            localFile = new java.io.File(localCandidate);
+        }
+        if (localFile.exists() && localFile.isFile()) {
+            return streamLocalFile(localFile, rangeHeader);
+        }
+
+        // 2. Otherwise stream from S3 / MinIO
+        if (s3Client == null) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+
+        String key = extractS3Key(fileUrlOrPath);
+        if (key == null || key.isBlank()) {
+            return org.springframework.http.ResponseEntity.notFound().build();
+        }
+
+        try {
+            software.amazon.awssdk.services.s3.model.GetObjectRequest.Builder reqBuilder = software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(key);
+
+            if (rangeHeader != null && !rangeHeader.isBlank()) {
+                reqBuilder.range(rangeHeader);
+            }
+
+            software.amazon.awssdk.core.ResponseInputStream<software.amazon.awssdk.services.s3.model.GetObjectResponse> s3Stream =
+                    s3Client.getObject(reqBuilder.build());
+            software.amazon.awssdk.services.s3.model.GetObjectResponse response = s3Stream.response();
+
+            org.springframework.http.HttpStatus status = (rangeHeader != null && !rangeHeader.isBlank())
+                    ? org.springframework.http.HttpStatus.PARTIAL_CONTENT
+                    : org.springframework.http.HttpStatus.OK;
+
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            String contentType = response.contentType() != null ? response.contentType() : "video/webm";
+            headers.set(org.springframework.http.HttpHeaders.CONTENT_TYPE, contentType);
+            headers.set(org.springframework.http.HttpHeaders.ACCEPT_RANGES, "bytes");
+
+            if (response.contentLength() != null) {
+                headers.setContentLength(response.contentLength());
+            }
+            if (response.contentRange() != null) {
+                headers.set(org.springframework.http.HttpHeaders.CONTENT_RANGE, response.contentRange());
+            }
+            if (response.eTag() != null) {
+                headers.setETag(response.eTag());
+            }
+
+            org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody responseBody = outputStream -> {
+                try (java.io.InputStream in = s3Stream) {
+                    byte[] buffer = new byte[16384];
+                    int bytesRead;
+                    while ((bytesRead = in.read(buffer)) != -1) {
+                        outputStream.write(buffer, 0, bytesRead);
+                    }
+                    outputStream.flush();
+                } catch (Exception ignored) {
+                    // Client abort / socket closed
+                }
+            };
+
+            return org.springframework.http.ResponseEntity.status(status).headers(headers).body(responseBody);
+        } catch (software.amazon.awssdk.services.s3.model.NoSuchKeyException e) {
+            return org.springframework.http.ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            System.err.println("Error streaming from S3 for key '" + key + "': " + e.getMessage());
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    public static org.springframework.http.ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody> streamLocalFile(java.io.File file, String rangeHeader) {
+        if (!file.exists() || !file.isFile()) {
+            return org.springframework.http.ResponseEntity.notFound().build();
+        }
+        long fileLength = file.length();
+        long start = 0;
+        long end = fileLength - 1;
+        boolean isRange = false;
+
+        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+            String[] parts = rangeHeader.substring(6).split("-");
+            try {
+                if (!parts[0].isBlank()) {
+                    start = Long.parseLong(parts[0].trim());
+                }
+                if (parts.length > 1 && !parts[1].isBlank()) {
+                    end = Long.parseLong(parts[1].trim());
+                }
+                if (end >= fileLength) {
+                    end = fileLength - 1;
+                }
+                if (start <= end) {
+                    isRange = true;
+                }
+            } catch (Exception ignored) {}
+        }
+
+        long contentLength = end - start + 1;
+        org.springframework.http.HttpStatus status = isRange ? org.springframework.http.HttpStatus.PARTIAL_CONTENT : org.springframework.http.HttpStatus.OK;
+
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        String contentType = file.getName().endsWith(".webm") ? "video/webm" :
+                             file.getName().endsWith(".jpg") || file.getName().endsWith(".jpeg") ? "image/jpeg" :
+                             file.getName().endsWith(".png") ? "image/png" : "application/octet-stream";
+        headers.set(org.springframework.http.HttpHeaders.CONTENT_TYPE, contentType);
+        headers.set(org.springframework.http.HttpHeaders.ACCEPT_RANGES, "bytes");
+        headers.setContentLength(contentLength);
+        if (isRange) {
+            headers.set(org.springframework.http.HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + fileLength);
+        }
+
+        final long finalStart = start;
+        final long finalLength = contentLength;
+
+        org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody responseBody = outputStream -> {
+            try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(file, "r")) {
+                raf.seek(finalStart);
+                byte[] buffer = new byte[16384];
+                long remaining = finalLength;
+                while (remaining > 0) {
+                    int toRead = (int) Math.min(buffer.length, remaining);
+                    int read = raf.read(buffer, 0, toRead);
+                    if (read == -1) break;
+                    outputStream.write(buffer, 0, read);
+                    remaining -= read;
+                }
+                outputStream.flush();
+            } catch (Exception ignored) {
+                // Client abort
+            }
+        };
+
+        return org.springframework.http.ResponseEntity.status(status).headers(headers).body(responseBody);
+    }
 }
+
