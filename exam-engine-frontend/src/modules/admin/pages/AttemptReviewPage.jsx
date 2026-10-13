@@ -238,6 +238,7 @@ export default function AttemptReviewPage() {
                 <video
                   key={recording.url}
                   ref={videoRef}
+                  src={getFullVideoUrl(recording.url)}
                   preload="auto"
                   onClick={togglePlay}
                   onPlay={() => setIsPlaying(true)}
@@ -246,6 +247,9 @@ export default function AttemptReviewPage() {
                   onTimeUpdate={handleTimeUpdate}
                   onLoadedMetadata={handleTimeUpdate}
                   onDurationChange={handleTimeUpdate}
+                  onError={(e) => {
+                    console.error("Video load error:", e.target?.error, getFullVideoUrl(recording.url));
+                  }}
                   style={{ width: "100%", height: "auto", aspectRatio: "1.3333 / 1", maxHeight: "360px", objectFit: "contain", backgroundColor: "#000", display: "block", cursor: "pointer" }}
                 >
                   <source src={getFullVideoUrl(recording.url)} type="video/webm" />
